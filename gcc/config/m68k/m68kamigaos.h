@@ -324,8 +324,7 @@ if (target_flags & (MASK_RESTORE_A4|MASK_ALWAYS_RESTORE_A4)) \
   "%{noixemul:%(cpp_libnix)} " \
   "%{mcrt=nix*:%(cpp_libnix)} " \
   "%{mcrt=ixemul:%(cpp_ixemul)} " \
-  "%{mcrt=clib2:%(cpp_clib2)}" \
-  "-include common_compiler.h"
+  "%{mcrt=clib2:%(cpp_clib2)}"
 
 /* Various -m flags require special flags to the assembler.  */
 
