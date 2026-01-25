@@ -1185,3 +1185,5 @@ m68k_emit_setmemsi(rtx dest, rtx val, rtx length, rtx alignment);
 
 #define BRANCH_COST(speed_p, predictable_p) 1
 
+int
+m68k_index_uses_reg (rtx reg, rtx dst, rtx src);

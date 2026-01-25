@@ -552,3 +552,87 @@ m68k_static_chain_rtx (const_tree decl, bool incoming ATTRIBUTE_UNUSED)
 
   return 0;
 }
+
+
+/* Forward declaration */
+static int
+m68k_index_uses_reg_2 (rtx reg, rtx addr);
+static int
+m68k_index_uses_reg_mem (rtx reg, rtx addr);
+
+/* Entry point: returns true if reg is valid index in any MEM */
+int
+m68k_index_uses_reg (rtx reg, rtx dst, rtx src)
+{
+  int r1 = MEM_P(dst) ? m68k_index_uses_reg_mem (reg, dst) : m68k_index_uses_reg_2 (reg, dst);
+  if (r1 < 0)
+    return false;
+
+  int r2 = MEM_P(src) ? m68k_index_uses_reg_mem (reg, src) : m68k_index_uses_reg_2 (reg, src);
+  if (r2 < 0)
+    return false;
+
+  return r1 | r2;
+}
+
+static int
+m68k_index_uses_reg_2 (rtx reg, rtx x)
+{
+  if (REG_P(x))
+    return rtx_equal_p (x, reg) ? -1 : 0;
+
+  int r = 0;
+
+  const char *fmt = GET_RTX_FORMAT(GET_CODE(x));
+  int len = GET_RTX_LENGTH(GET_CODE(x));
+  for (int i = 0; i < len; i++)
+    {
+      if (fmt[i] == 'E')
+	return -1;
+      if (fmt[i] != 'e')
+	continue;
+
+      rtx sub = XEXP(x, i);
+      if (!sub)
+	continue;
+
+      if (MEM_P(sub))
+	{
+	  if (reg_mentioned_p (reg, sub))
+	    {
+	      int r2 = m68k_index_uses_reg_mem (reg, sub);
+	      if (r2 < 0)
+		return -1; /* invalid usage */
+	      r |= r2;
+	    }
+	}
+      else
+	{
+	  int r2 = m68k_index_uses_reg_2 (reg, sub);
+	  if (r2 < 0)
+	    return r2;
+	  r |= r2;
+	}
+    }
+  return r;
+}
+
+static int
+m68k_index_uses_reg_mem (rtx reg, rtx mem)
+{
+  struct m68k_address addr;
+  rtx x = XEXP(mem, 0);
+
+  if (!decompose_mem (0, &x, &addr, /*strict_p=*/0))
+    return -1;
+
+  /* Base must not match reg */
+  if (addr.base && rtx_equal_p (addr.base, reg))
+    return -1;
+
+  /* Index matches reg -> valid */
+  if (addr.index && rtx_equal_p (addr.index, reg))
+    return 1;
+
+  return 0;
+}
