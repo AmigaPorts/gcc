@@ -2907,12 +2907,17 @@ opt_reg_rename (void)
 		      int labi = 0;
 
 		      // search next non-label insn
-		      insn_info * bb;
-		      do
-		        bb = &(*infos)[label_index + ++labi];
-		      while (bb->is_label());
+		      insn_info *bb = NULL;
+		      while (label_index + labi + 1 < infos->size())  // ensure we stay within bounds
+			{
+			  labi++;
+			  bb = &(*infos)[label_index + labi];
+			  if (!bb->is_label ())
+			    break;
+			  bb = NULL;
+			}
 
-		      if (found.find (label_index) == found.end () && bb->is_use (rename_regno))
+		      if (bb != NULL && found.find (label_index) == found.end () && bb->is_use (rename_regno))
 			{
 //			  printf ("jump %d -> label %d \n", pos, label_index); fflush (stdout);
 			  todo.insert (label_index);
