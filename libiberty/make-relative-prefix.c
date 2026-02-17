@@ -64,6 +64,9 @@ relative prefix can be found, return @code{NULL}.
 #include <sys/types.h>
 #include <dirent.h>
 #include <string.h>
+#ifdef __MACH__
+#include <mach-o/dyld.h>
+#endif
 
 #include "ansidecl.h"
 #include "libiberty.h"
