@@ -620,7 +620,7 @@ m68k_index_uses_reg_2 (rtx reg, rtx x)
 static int
 m68k_index_uses_reg_mem (rtx reg, rtx mem)
 {
-  struct m68k_address addr;
+  struct m68k_address addr; memset(&addr, 0, sizeof(addr));
   rtx x = XEXP(mem, 0);
 
   if (!decompose_mem (0, &x, &addr, /*strict_p=*/0))
