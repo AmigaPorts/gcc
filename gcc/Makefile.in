@@ -1634,6 +1634,7 @@ OBJS = \
 	ubsan.o \
 	sanopt.o \
 	sancov.o \
+	tree-assume.o \
 	tree-call-cdce.o \
 	tree-cfg.o \
 	tree-cfgcleanup.o \
