@@ -1309,10 +1309,10 @@ gimple_fold_builtin_strcpy (gimple_stmt_iterator *gsi,
       replace_call_with_value (gsi, dest);
       return true;
     }
-
+#if AMIGA_ENABLE_BUILTIN
   if (optimize_function_for_size_p (cfun))
     return false;
-
+#endif
   fn = builtin_decl_implicit (BUILT_IN_MEMCPY);
   if (!fn)
     return false;
@@ -1962,10 +1962,12 @@ gimple_fold_builtin_stpcpy (gimple_stmt_iterator *gsi)
       || TREE_CODE (len) != INTEGER_CST)
     return false;
 
+#if AMIGA_ENABLE_BUILTIN
   if (optimize_function_for_size_p (cfun)
       /* If length is zero it's small enough.  */
       && !integer_zerop (len))
     return false;
+#endif
 
   /* If the source has a known length replace stpcpy with memcpy.  */
   fn = builtin_decl_implicit (BUILT_IN_MEMCPY);
