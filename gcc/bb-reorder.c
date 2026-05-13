@@ -2626,7 +2626,10 @@ pass_duplicate_computed_gotos::gate (function *fun)
     return false;
   return (optimize > 0
 	  && flag_expensive_optimizations
-	  && ! optimize_function_for_size_p (fun));
+#ifdef AMIGA_REORDER	  
+	  && ! optimize_function_for_size_p (fun)
+#endif	  
+	  );
 }
 
 unsigned int
