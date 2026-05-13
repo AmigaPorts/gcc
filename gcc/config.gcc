@@ -1951,8 +1951,8 @@ m68k*-*-amigaosvasm*)
 	;;
 m68k*-*-amigaos*)
 	default_m68k_cpu=68000
-	tm_file="${tm_file}  dbx.h newlib-stdint.h m68k/m68kamigaos.h"
-	tm_defines="${tm_defines} MOTOROLA=1 TARGET_AMIGAOS TARGET_CPU_DEFAULT=0"
+	tm_file="${tm_file} newlib-stdint.h m68k/m68kamigaos.h"
+	tm_defines="${tm_defines} MOTOROLA=1 TARGET_AMIGAOS TARGET_CPU_DEFAULT=0 DWARF2_DEBUGGING_INFO"
 	tmake_file="m68k/t-floatlib m68k/t-m68kbare m68k/t-amigaos"
 	tm_p_file="${tm_p_file} m68k/amigaos-protos.h"
 	extra_options="${extra_options} m68k/amigaos.opt"
@@ -1973,7 +1973,7 @@ m68k*-*-openbsd*)
 	default_m68k_cpu=68020
 	default_cf_cpu=5475
 	# needed to unconfuse gdb
-	tm_defines="${tm_defines} OBSD_OLD_GAS"
+	tm_defines="${tm_defines} OBSD_OLD_GAS "
 	tm_file="${tm_file} openbsd.h openbsd-stdint.h openbsd-libpthread.h m68k/openbsd.h"
 	extra_options="${extra_options} openbsd.opt"
 	tmake_file="t-openbsd m68k/t-openbsd"
