@@ -3181,51 +3181,57 @@ do_regular_insertion (basic_block block, basic_block dom)
   auto_vec<pre_expr> avail;
   int i;
 
+#if defined(TARGET_M68K)
+  /* PRE: no insertions in loops */
+  if (block->loop_father)
+    return false;
+#endif
+
   exprs = sorted_array_from_bitmap_set (ANTIC_IN (block));
   avail.safe_grow (EDGE_COUNT (block->preds));
 
   FOR_EACH_VEC_ELT (exprs, i, expr)
     {
       if (expr->kind == NARY
-	  || expr->kind == REFERENCE)
-	{
-	  unsigned int val;
-	  bool by_some = false;
-	  bool cant_insert = false;
-	  bool all_same = true;
-	  pre_expr first_s = NULL;
-	  edge pred;
-	  basic_block bprime;
-	  pre_expr eprime = NULL;
-	  edge_iterator ei;
-	  pre_expr edoubleprime = NULL;
-	  bool do_insertion = false;
+          || expr->kind == REFERENCE)
+        {
+          unsigned int val;
+          bool by_some = false;
+          bool cant_insert = false;
+          bool all_same = true;
+          pre_expr first_s = NULL;
+          edge pred;
+          basic_block bprime;
+          pre_expr eprime = NULL;
+          edge_iterator ei;
+          pre_expr edoubleprime = NULL;
+          bool do_insertion = false;
 
-	  val = get_expr_value_id (expr);
-	  if (bitmap_set_contains_value (PHI_GEN (block), val))
-	    continue;
-	  if (bitmap_set_contains_value (AVAIL_OUT (dom), val))
-	    {
-	      if (dump_file && (dump_flags & TDF_DETAILS))
-		{
-		  fprintf (dump_file, "Found fully redundant value: ");
-		  print_pre_expr (dump_file, expr);
-		  fprintf (dump_file, "\n");
-		}
-	      continue;
-	    }
+          val = get_expr_value_id (expr);
+          if (bitmap_set_contains_value (PHI_GEN (block), val))
+            continue;
+          if (bitmap_set_contains_value (AVAIL_OUT (dom), val))
+            {
+              if (dump_file && (dump_flags & TDF_DETAILS))
+                {
+                  fprintf (dump_file, "Found fully redundant value: ");
+                  print_pre_expr (dump_file, expr);
+                  fprintf (dump_file, "\n");
+                }
+              continue;
+            }
 
-	  FOR_EACH_EDGE (pred, ei, block->preds)
-	    {
-	      unsigned int vprime;
+          FOR_EACH_EDGE (pred, ei, block->preds)
+            {
+              unsigned int vprime;
 
 	      /* We should never run insertion for the exit block
 	         and so not come across fake pred edges.  */
-	      gcc_assert (!(pred->flags & EDGE_FAKE));
-	      bprime = pred->src;
+              gcc_assert (!(pred->flags & EDGE_FAKE));
+              bprime = pred->src;
 	      /* We are looking at ANTIC_OUT of bprime.  */
-	      eprime = phi_translate (expr, ANTIC_IN (block), NULL,
-				      bprime, block);
+              eprime = phi_translate (expr, ANTIC_IN (block), NULL,
+                                      bprime, block);
 
 	      /* eprime will generally only be NULL if the
 		 value of the expression, translated
@@ -3236,99 +3242,118 @@ do_regular_insertion (basic_block block, basic_block dom)
 		 predecessor path.  We can thus break out
 		 early because it doesn't matter what the
 		 rest of the results are.  */
-	      if (eprime == NULL)
-		{
-		  avail[pred->dest_idx] = NULL;
-		  cant_insert = true;
-		  break;
-		}
+              if (eprime == NULL)
+                {
+                  avail[pred->dest_idx] = NULL;
+                  cant_insert = true;
+                  break;
+                }
 
-	      eprime = fully_constant_expression (eprime);
-	      vprime = get_expr_value_id (eprime);
-	      edoubleprime = bitmap_find_leader (AVAIL_OUT (bprime),
-						 vprime);
-	      if (edoubleprime == NULL)
-		{
-		  avail[pred->dest_idx] = eprime;
-		  all_same = false;
-		}
-	      else
-		{
-		  avail[pred->dest_idx] = edoubleprime;
-		  by_some = true;
+              eprime = fully_constant_expression (eprime);
+              vprime = get_expr_value_id (eprime);
+              edoubleprime = bitmap_find_leader (AVAIL_OUT (bprime),
+                                                 vprime);
+              if (edoubleprime == NULL)
+                {
+                  avail[pred->dest_idx] = eprime;
+                  all_same = false;
+                }
+              else
+                {
+                  avail[pred->dest_idx] = edoubleprime;
+                  by_some = true;
 		  /* We want to perform insertions to remove a redundancy on
 		     a path in the CFG we want to optimize for speed.  */
-		  if (optimize_edge_for_speed_p (pred))
-		    do_insertion = true;
-		  if (first_s == NULL)
-		    first_s = edoubleprime;
-		  else if (!pre_expr_d::equal (first_s, edoubleprime))
-		    all_same = false;
-		}
-	    }
+                  if (optimize_edge_for_speed_p (pred))
+                    do_insertion = true;
+                  if (first_s == NULL)
+                    first_s = edoubleprime;
+                  else if (!pre_expr_d::equal (first_s, edoubleprime))
+                    all_same = false;
+                }
+            }
 	  /* If we can insert it, it's not the same value
 	     already existing along every predecessor, and
 	     it's defined by some predecessor, it is
 	     partially redundant.  */
-	  if (!cant_insert && !all_same && by_some)
-	    {
-	      if (!do_insertion)
-		{
-		  if (dump_file && (dump_flags & TDF_DETAILS))
-		    {
-		      fprintf (dump_file, "Skipping partial redundancy for "
-			       "expression ");
-		      print_pre_expr (dump_file, expr);
-		      fprintf (dump_file, " (%04d), no redundancy on to be "
-			       "optimized for speed edge\n", val);
-		    }
-		}
-	      else if (dbg_cnt (treepre_insert))
-		{
-		  if (dump_file && (dump_flags & TDF_DETAILS))
-		    {
-		      fprintf (dump_file, "Found partial redundancy for "
-			       "expression ");
-		      print_pre_expr (dump_file, expr);
-		      fprintf (dump_file, " (%04d)\n",
-			       get_expr_value_id (expr));
-		    }
-		  if (insert_into_preds_of_block (block,
-						  get_expression_id (expr),
-						  avail))
-		    new_stuff = true;
-		}
-	    }
+          if (!cant_insert && !all_same && by_some)
+            {
+#if defined(TARGET_M68K)
+              /* Keine PRE-Insertions in/vor Schleifen. */
+              bool any_loop_pred = false;
+              edge pred2;
+              edge_iterator ei2;
+              FOR_EACH_EDGE (pred2, ei2, block->preds)
+                if (pred2->src->loop_father)
+                  {
+                    any_loop_pred = true;
+                    break;
+                  }
+
+              if (any_loop_pred)
+                {
+                  if (dump_file && (dump_flags & TDF_DETAILS))
+                    {
+                      fprintf (dump_file,
+                               "Skipping PRE insertion in/near loop for ");
+                      print_pre_expr (dump_file, expr);
+                      fprintf (dump_file, "\n");
+                    }
+                }
+              else
+#endif
+              if (do_insertion && dbg_cnt (treepre_insert))
+                {
+                  if (dump_file && (dump_flags & TDF_DETAILS))
+                    {
+                      fprintf (dump_file, "Found partial redundancy for "
+                               "expression ");
+                      print_pre_expr (dump_file, expr);
+                      fprintf (dump_file, " (%04d)\n",
+                               get_expr_value_id (expr));
+                    }
+                  if (insert_into_preds_of_block (block,
+                                                  get_expression_id (expr),
+                                                  avail))
+                    new_stuff = true;
+                }
+            }
 	  /* If all edges produce the same value and that value is
 	     an invariant, then the PHI has the same value on all
 	     edges.  Note this.  */
-	  else if (!cant_insert && all_same)
-	    {
-	      gcc_assert (edoubleprime->kind == CONSTANT
-			  || edoubleprime->kind == NAME);
+          else if (!cant_insert && all_same)
+            {
+#if defined(TARGET_M68K)
+              /* Kein neues PRE-Temp im Loop-Body anlegen. */
+              if (block->loop_father)
+                continue;
+#endif
 
-	      tree temp = make_temp_ssa_name (get_expr_type (expr),
-					      NULL, "pretmp");
-	      gassign *assign
-		= gimple_build_assign (temp,
-				       edoubleprime->kind == CONSTANT ?
-				       PRE_EXPR_CONSTANT (edoubleprime) :
-				       PRE_EXPR_NAME (edoubleprime));
-	      gimple_stmt_iterator gsi = gsi_after_labels (block);
-	      gsi_insert_before (&gsi, assign, GSI_NEW_STMT);
+              gcc_assert (edoubleprime->kind == CONSTANT
+                          || edoubleprime->kind == NAME);
 
-	      gimple_set_plf (assign, NECESSARY, false);
-	      VN_INFO_GET (temp)->value_id = val;
-	      VN_INFO (temp)->valnum = sccvn_valnum_from_value_id (val);
-	      if (VN_INFO (temp)->valnum == NULL_TREE)
-		VN_INFO (temp)->valnum = temp;
-	      bitmap_set_bit (inserted_exprs, SSA_NAME_VERSION (temp));
-	      pre_expr newe = get_or_alloc_expr_for_name (temp);
-	      add_to_value (val, newe);
-	      bitmap_value_replace_in_set (AVAIL_OUT (block), newe);
-	      bitmap_insert_into_set (NEW_SETS (block), newe);
-	    }
-	}
+              tree temp = make_temp_ssa_name (get_expr_type (expr),
+                                              NULL, "pretmp");
+              gassign *assign
+                = gimple_build_assign (temp,
+                                       edoubleprime->kind == CONSTANT ?
+                                       PRE_EXPR_CONSTANT (edoubleprime) :
+                                       PRE_EXPR_NAME (edoubleprime));
+              gimple_stmt_iterator gsi = gsi_after_labels (block);
+              gsi_insert_before (&gsi, assign, GSI_NEW_STMT);
+
+              gimple_set_plf (assign, NECESSARY, false);
+              VN_INFO_GET (temp)->value_id = val;
+              VN_INFO (temp)->valnum = sccvn_valnum_from_value_id (val);
+              if (VN_INFO (temp)->valnum == NULL_TREE)
+                VN_INFO (temp)->valnum = temp;
+              bitmap_set_bit (inserted_exprs, SSA_NAME_VERSION (temp));
+              pre_expr newe = get_or_alloc_expr_for_name (temp);
+              add_to_value (val, newe);
+              bitmap_value_replace_in_set (AVAIL_OUT (block), newe);
+              bitmap_insert_into_set (NEW_SETS (block), newe);
+            }
+        }
     }
 
   exprs.release ();
