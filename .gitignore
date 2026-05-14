@@ -71,3 +71,6 @@ stamp-*
 /gmp*
 /isl*
 /gettext*
+
+.project
+.cproject
