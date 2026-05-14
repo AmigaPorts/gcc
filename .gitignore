@@ -72,5 +72,9 @@ stamp-*
 /isl*
 /gettext*
 
-.project
-.cproject
+# ADDITIONS from GCCRS front-end
+libgrust/*/target/
+/.cproject
+/.project
+/.settings
+
