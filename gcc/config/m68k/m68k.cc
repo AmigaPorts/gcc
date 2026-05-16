@@ -176,6 +176,7 @@ static bool m68k_ok_for_sibcall_p (tree, tree);
 static bool m68k_tls_symbol_p (rtx);
 static rtx m68k_legitimize_address (rtx, rtx, machine_mode);
 static bool m68k_rtx_costs (rtx, machine_mode, int, int, int *, bool);
+static int m68k_address_cost(rtx x, machine_mode mode, addr_space_t t, bool speed);
 #if M68K_HONOR_TARGET_STRICT_ALIGNMENT
 static bool m68k_return_in_memory (const_tree, const_tree);
 #endif
@@ -278,6 +279,9 @@ static bool m68k_use_lra_p (void);
 
 #undef TARGET_RTX_COSTS
 #define TARGET_RTX_COSTS m68k_rtx_costs
+
+#undef TARGET_ADDRESS_COST
+#define TARGET_ADDRESS_COST m68k_address_cost
 
 #undef TARGET_ATTRIBUTE_TABLE
 #define TARGET_ATTRIBUTE_TABLE m68k_attribute_table
@@ -3024,7 +3028,7 @@ const_int_cost (HOST_WIDE_INT i)
 }
 
 static bool
-m68k_rtx_costs (rtx x, machine_mode mode, int outer_code,
+m68k_rtx_costs0 (rtx x, machine_mode mode, int outer_code,
 		int opno ATTRIBUTE_UNUSED,
 		int *total, bool speed ATTRIBUTE_UNUSED)
 {
@@ -7275,3 +7279,57 @@ m68k_use_lra_p ()
 }
 
 #include "gt-m68k.h"
+
+
+extern bool
+m68k_68000_10_costs (rtx x, machine_mode mode, int outer_code,
+		int opno, int *total, bool speed );
+
+extern bool
+m68k_68020_costs (rtx x, machine_mode mode, int outer_code,
+		int opno, int *total, bool speed );
+
+extern bool
+m68k_68030_costs (rtx x, machine_mode mode, int outer_code,
+		int opno, int *total, bool speed );
+
+extern bool
+m68k_68040_costs (rtx x, machine_mode mode, int outer_code,
+		int opno, int *total, bool speed );
+
+extern bool
+m68k_68080_costs (rtx x, machine_mode mode, int outer_code,
+		int opno, int *total, bool speed );
+
+static bool
+m68k_rtx_costs (rtx x, machine_mode mode, int outer_code,
+		int opno,
+		int *total, bool speed )
+{
+  bool r;
+  if (TUNE_68000_10)
+    r =  m68k_68000_10_costs(x, mode, outer_code, opno, total, speed);
+  else
+  if (m68k_tune == u68020)
+    r = m68k_68020_costs(x, mode, outer_code, opno, total, speed);
+  else
+  if (m68k_tune == u68030)
+    r = m68k_68030_costs(x, mode, outer_code, opno, total, speed);
+  else
+  if (m68k_tune == u68040 || m68k_tune == u68020_40)
+    r = m68k_68040_costs(x, mode, outer_code, opno, total, speed);
+  else
+    r = m68k_68080_costs(x, mode, outer_code, opno, total, speed);
+
+  return r;
+}
+
+int m68k_address_cost(rtx x, machine_mode mode, addr_space_t t ATTRIBUTE_UNUSED, bool speed)
+{
+  static class rtx_def mem;
+  mem.code = MEM;
+  mem.u.fld[0].rt_rtx = x;
+  int total = 0;
+  m68k_rtx_costs(&mem, mode, SET, 0, &total, speed);
+  return total;
+}
