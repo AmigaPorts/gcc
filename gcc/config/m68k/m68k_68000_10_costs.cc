@@ -10,80 +10,115 @@
 
 #define USE_MOVQ(i)	((unsigned) ((i) + 128) <= 255)
 
-bool
-m68k_68000_10_costs (rtx x,
-                        machine_mode mode,
-                        int outer_code ATTRIBUTE_UNUSED,
-                        int opno ATTRIBUTE_UNUSED,
-                        int *total,
-                        bool speed)
+enum m68k_cost_kind {
+    cost_reg,
+
+    cost_mem_reg,
+    cost_mem_plus_reg_disp,
+    cost_mem_plus_reg_reg,
+    cost_mem_other,
+
+    cost_const_int_q,
+    cost_const_int_w,
+    cost_const_int_l,
+    cost_const_double,
+    cost_symbol,
+
+    cost_plus_reg_reg,
+    cost_plus_reg_constq,
+    cost_plus_reg_constw,
+    cost_plus_reg_constl,
+    cost_plus_other,
+
+    cost_logic_reg_const,
+
+    cost_shift_const,
+    cost_shift_const_w,
+
+    cost_neg_not_l,
+    cost_neg_not_w,
+
+    cost_branch,
+
+    cost_set_reg_reg,
+    cost_set_clr_mem_l,
+
+    cost_call_reg,
+    cost_call_other,
+
+    cost_max
+};
+
+#include "m68k-costs-speed.h"
+#include "m68k-costs-size.h"
+
+static bool
+m68k_68000_10_costs_table (rtx x,
+                     machine_mode mode,
+                     int outer_code ATTRIBUTE_UNUSED,
+                     int opno ATTRIBUTE_UNUSED,
+                     int *total,
+                     bool speed)
 {
+  const int *thecosts = speed ? m68k_costs_speed : m68k_costs_size;
   int code = GET_CODE (x);
   int total2;
 
-  if (!speed)
-    {
-      *total = COSTS_N_INSNS (1);
-      return true;
-    }
-
   switch (code)
     {
-    /* -------------------------------------------------- */
-    /* Free / nearly free RTL nodes                       */
-    /* -------------------------------------------------- */
 
-    case REG:
-    case SUBREG:
-    case STRICT_LOW_PART:
-    case TRUNCATE:
-    case POST_INC:
-      *total = 0;
-      return true;
-
-    case ZERO_EXTEND:
-    case SIGN_EXTEND:
-        *total = 4;
-        return true;
-
-    case PRE_DEC:
-      *total = 1;
-      return true;
-
-    /* -------------------------------------------------- */
-    /* Constants                                          */
-    /* -------------------------------------------------- */
+  case PRE_DEC:
+  case POST_INC:
+  case IF_THEN_ELSE:
+  case ZERO_EXTEND:
+  case SIGN_EXTEND:
+  case TRUNCATE:
+  case ROTATE:
+  case ROTATERT:
+  case LABEL_REF:
+  case SUBREG:
+  case STRICT_LOW_PART:
+	  *total = 0;
+    return true;
 
     case CONST_INT:
       {
         HOST_WIDE_INT v = INTVAL (x);
 
         if (USE_MOVQ (v))
-          *total = 0;
+          *total = thecosts[cost_const_int_q];
         else if (v >= -32768 && v <= 32767)
-          *total = 2;
+          *total = thecosts[cost_const_int_w];
         else
-          *total = 4;
+          *total = thecosts[cost_const_int_l];
 
         return true;
       }
 
     case CONST_DOUBLE:
-        *total = 16;
+      *total = thecosts[cost_const_double];
       return true;
 
     case SYMBOL_REF:
-    case LABEL_REF:
-      *total = 6;
+      *total = thecosts[cost_symbol];
       return true;
 
     case CONST:
-      *total = 4;
-      return true;
+      {
+        rtx inner = XEXP (x, 0);
+        /* symbol+offset: wie SYMBOL_REF */
+        if (GET_CODE (inner) == PLUS
+            && SYMBOL_REF_P (XEXP (inner, 0))
+            && CONST_INT_P (XEXP (inner, 1)))
+          *total = thecosts[cost_symbol];
+        else
+          *total = 0;
+        return true;
+      }
 
-    /* -------------------------------------------------- */
-    /* Memory -- THIS is the important balancing point    */
-    /* -------------------------------------------------- */
+    case REG:
+      *total = thecosts[cost_reg];
+      return true;
 
     case MEM:
       {
@@ -93,11 +128,11 @@ m68k_68000_10_costs (rtx x,
           {
           case REG:
           case POST_INC:
-            *total = 4;
+            *total = thecosts[cost_mem_reg];
             break;
 
           case PRE_DEC:
-            *total = 5;
+            *total = 0; // must be free for push
             break;
 
           case PLUS:
@@ -105,17 +140,18 @@ m68k_68000_10_costs (rtx x,
               rtx a = XEXP (addr, 0);
               rtx b = XEXP (addr, 1);
 
-              /* reg + disp */
-              if ((REG_P (a) && CONST_INT_P (b))
-                  || (REG_P (b) && CONST_INT_P (a)))
-                *total = 8;
-
-              /* reg + reg */
+              if ((REG_P (a) && CONST_INT_P (b)))
+                {
+                  HOST_WIDE_INT off = INTVAL (b);
+                  if (off >= -32768 && off <= 32767)
+                    *total = thecosts[cost_mem_plus_reg_disp];
+                  else
+                    *total = thecosts[cost_mem_plus_reg_reg];
+                }
               else if (REG_P (a) && REG_P (b))
-                *total = 12;
-
+                *total = thecosts[cost_mem_plus_reg_reg];
               else
-                *total = 14;
+                *total = thecosts[cost_mem_other];
 
               break;
             }
@@ -123,57 +159,19 @@ m68k_68000_10_costs (rtx x,
           case SYMBOL_REF:
           case LABEL_REF:
           case CONST:
-            *total = 10;
+            *total = thecosts[cost_mem_other];
             break;
 
           default:
-            *total = 16; //8;
+            *total = thecosts[cost_mem_other];
             break;
           }
 
-        /* important for sieve / crc */
         if (GET_MODE_SIZE (mode) > 2)
           *total += 2;
 
         return true;
       }
-
-    /* -------------------------------------------------- */
-    /* SET                                                */
-    /* -------------------------------------------------- */
-
-    case SET:
-      {
-        rtx dest = XEXP (x, 0);
-        rtx src  = XEXP (x, 1);
-
-        if (!m68k_68000_10_costs (dest, mode,
-                                     code, 0,
-                                     total, speed))
-          return false;
-
-        if (!m68k_68000_10_costs (src, mode,
-                                     code, 1,
-                                     &total2, speed))
-          return false;
-
-        *total += total2;
-
-        /* strongly encourage clr/moveq */
-        if (CONST_INT_P (src) && INTVAL (src) == 0)
-          {
-            if (REG_P (dest))
-              *total = 2;
-            else if (MEM_P (dest))
-              *total = GET_MODE_SIZE (mode) > 2 ? 8 : 6;
-          }
-
-        return true;
-      }
-
-    /* -------------------------------------------------- */
-    /* Arithmetic                                         */
-    /* -------------------------------------------------- */
 
     case PLUS:
     case MINUS:
@@ -181,43 +179,39 @@ m68k_68000_10_costs (rtx x,
         rtx a = XEXP (x, 0);
         rtx b = XEXP (x, 1);
 
-        /* keep combine alive, but not TOO alive */
         if (REG_P (a) && REG_P (b))
           {
-            *total = 4; // GET_MODE_SIZE (mode) > 2 ? 6 : 4;
+            *total = thecosts[cost_plus_reg_reg];
             return true;
           }
 
-        /* ADDQ/SUBQ */
         if (REG_P (a) && CONST_INT_P (b))
           {
             HOST_WIDE_INT v = INTVAL (b);
 
             if (v >= -8 && v <= 8)
               {
-                *total = 4;
+                *total = thecosts[cost_plus_reg_constq];
                 return true;
               }
 
             if (REGNO (a) == SP_REG)
-			  {
-				*total = 8;
-				return true;
-			  }
+              {
+                *total = 8;
+                return true;
+              }
 
-            *total = GET_MODE_SIZE (mode) > 2 ? 12 : 8;
+            *total = GET_MODE_SIZE (mode) > 2
+                     ? thecosts[cost_plus_reg_constl]
+                     : thecosts[cost_plus_reg_constw];
             return true;
           }
 
-        /* critical: NOT too cheap */
-        *total = GET_CODE (a) == PLUS ? 12 : 8;
+        *total = (GET_CODE (a) == PLUS
+                  ? thecosts[cost_plus_other]
+                  : thecosts[cost_plus_other] / 2);
         return true;
       }
-
-    /* -------------------------------------------------- */
-    /* Logic                                              */
-    /* -------------------------------------------------- */
-
     case AND:
     case IOR:
     case XOR:
@@ -226,13 +220,12 @@ m68k_68000_10_costs (rtx x,
         rtx a = XEXP (x, 0);
         rtx b = XEXP (x, 1);
 
-        /* SHA/CRC friendliness */
         if (REG_P (a) && REG_P (b))
           {
             if (code == XOR)
-              *total = 5; // 3
+              *total = 0;
             else
-              *total = 6; // 4
+              *total = 1;
 
             return true;
           }
@@ -240,23 +233,15 @@ m68k_68000_10_costs (rtx x,
         if ((REG_P (a) && CONST_INT_P (b))
             || (REG_P (b) && CONST_INT_P (a)))
           {
-            *total = GET_MODE_SIZE (mode) > 2 ? 10 : 6; // 12 : 8
+            *total = GET_MODE_SIZE (mode) > 2
+                     ? thecosts[cost_logic_reg_const] + 2
+                     : thecosts[cost_logic_reg_const];
             return true;
           }
 
-        if (MEM_P (a) || MEM_P (b))
-          {
-            *total = 12;
-            return true;
-          }
-
-        *total = 8;
+        *total = 0;
         return true;
       }
-
-    /* -------------------------------------------------- */
-    /* Shifts / rotates                                   */
-    /* -------------------------------------------------- */
 
     case ASHIFT:
     case ASHIFTRT:
@@ -265,68 +250,27 @@ m68k_68000_10_costs (rtx x,
         rtx a = XEXP (x, 0);
         rtx b = XEXP (x, 1);
 
-        /* IMPORTANT:
-           Cheap enough for SHA1,
-           expensive enough to avoid spill hell. */
-
         if (REG_P (a) && CONST_INT_P (b))
           {
-            int n = INTVAL (b);
-
-//            *total = (GET_MODE_SIZE (mode) > 2 ? 6 : 4)
-//                     + (n >> 1);
-                    *total = (GET_MODE_SIZE (mode) > 2 ? 8 : 6)
-            + (n << 1);
-
+            *total = (GET_MODE_SIZE (mode) > 2 ? thecosts[cost_shift_const] : thecosts[cost_shift_const_w]);
             return true;
           }
 
-        if (REG_P (a))
-          {
-            *total = GET_MODE_SIZE (mode) > 2 ? 12 : 8;
-            return true;
-          }
-
-        *total = 10;
+        *total = 0;
         return true;
       }
-
-    case ROTATE:
-    case ROTATERT:
-      {
-        rtx a = XEXP (x, 0);
-        rtx b = XEXP (x, 1);
-
-        /* targeted SHA1 optimization */
-
-        if (REG_P (a) && CONST_INT_P (b))
-          {
-            *total = GET_MODE_SIZE (mode) > 2 ? 5 : 4;
-            return true;
-          }
-
-        *total = 10;
-        return true;
-      }
-
-    /* -------------------------------------------------- */
-    /* Unary                                              */
-    /* -------------------------------------------------- */
 
     case NEG:
     case NOT:
-      *total = GET_MODE_SIZE (mode) > 2 ? 6 : 4;
+    	*total = GET_MODE_SIZE(mode) > 2
+    	         ? thecosts[cost_neg_not_l]
+    	         : thecosts[cost_neg_not_w];
       return true;
 
-    /* -------------------------------------------------- */
-    /* Multiply / divide                                  */
-    /* -------------------------------------------------- */
     case MULT:
       {
         rtx a = XEXP (x, 0);
         rtx b = XEXP (x, 1);
-
-        /* power-of-two => shifts */
 
         if (CONST_INT_P (b))
           {
@@ -352,10 +296,7 @@ m68k_68000_10_costs (rtx x,
 
         if (speed)
           {
-            int f;
-
-            /* hybridV3 baseline behalten */
-            f = GET_MODE_SIZE (mode) > 2 ? 180 : 48;
+            int f = GET_MODE_SIZE (mode) > 2 ? 180 : 0;
 
             if (GET_CODE (b) == CONST_INT)
               {
@@ -376,7 +317,6 @@ m68k_68000_10_costs (rtx x,
                             t >>= 1;
                           }
 
-                        /* leichte Verbesserung */
                         f = 24 + bits * 6;
                       }
                     else
@@ -394,15 +334,12 @@ m68k_68000_10_costs (rtx x,
                             t >>= 1;
                           }
 
-                        /* signed synthese etwas teurer */
                         f = 28 + transitions * 7;
                       }
 
-                    /* große Modi bleiben teuer */
                     if (GET_MODE_SIZE (mode) > 2)
                       f = (f * 3) / 2;
 
-                    /* power-of-two massiv bevorzugen */
                     if ((i & (i - 1)) == 0)
                       f >>= 1;
                   }
@@ -412,21 +349,20 @@ m68k_68000_10_costs (rtx x,
           }
         else
           {
-            *total += GET_MODE_SIZE (mode) > 2 ? 48 : 16;
+            *total += GET_MODE_SIZE (mode) > 2
+                      ? 48
+                      : 0;
           }
 
         return true;
       }
+
     case DIV:
     case UDIV:
     case MOD:
     case UMOD:
-      *total = GET_MODE_SIZE (mode) > 2 ? 260 : 120;
+      *total = GET_MODE_SIZE (mode) > 2 ? 260 : 0;
       return true;
-
-    /* -------------------------------------------------- */
-    /* Branches                                           */
-    /* -------------------------------------------------- */
 
     case EQ:
     case NE:
@@ -438,34 +374,54 @@ m68k_68000_10_costs (rtx x,
     case LEU:
     case GTU:
     case GEU:
-      *total = 6;
+      *total = thecosts[cost_branch];
       return true;
 
-    case IF_THEN_ELSE:
-      *total = 6;
-      return true;
 
-    /* -------------------------------------------------- */
-    /* Calls                                              */
-    /* -------------------------------------------------- */
+    case SET:
+          {
+            rtx dest = XEXP (x, 0);
+            rtx src  = XEXP (x, 1);
+
+            /* reg -> reg: MOVE - 1 verhindert Dn->An Spills (nbody)
+               ohne SHA1's Register-Rotationen zu bestrafen */
+            if (REG_P (dest) && REG_P (src))
+              {
+                *total = thecosts[cost_set_reg_reg];
+                return true;
+              }
+
+            if (!m68k_68000_10_costs_table (dest, mode, code, 0, total, speed))
+              return false;
+            if (!m68k_68000_10_costs_table (src, mode, code, 1, &total2, speed))
+              return false;
+            *total += total2;
+
+            /* CLR - überschreibt Summe */
+            if (CONST_INT_P (src) && INTVAL (src) == 0)
+              {
+                if (REG_P (dest))
+                  *total = 0;
+                else if (MEM_P (dest))
+                  *total = GET_MODE_SIZE (mode) > 2
+                           ? thecosts[cost_set_clr_mem_l]
+                           : 0;
+              }
+
+            return true;
+          }
 
     case CALL:
       {
-        rtx a = XEXP (x, 0);
+        rtx mem = XEXP (x, 0); // always MEM
+		rtx b = XEXP (mem, 0);
 
-        if (MEM_P (a))
-          {
-            rtx b = XEXP (a, 0);
-
-            if (REG_P (b))
-              *total = 16;
-            else if (GET_CODE (b) == PLUS)
-              *total = 18;
-            else
-              *total = 20;
-          }
-        else
-          *total = 18;
+		if (REG_P (b))
+		  *total = thecosts[cost_call_reg];
+		else if (GET_CODE (b) == PLUS)
+		  *total = 0;
+		else
+		  *total = thecosts[cost_call_other];
 
         return true;
       }
@@ -474,4 +430,99 @@ m68k_68000_10_costs (rtx x,
       *total = 4;
       return true;
     }
+}
+
+struct cost_entry {
+    const char *name;
+    int index;
+};
+
+static const struct cost_entry cost_map[] = {
+    { "cost_reg", cost_reg },
+    { "cost_mem_reg", cost_mem_reg },
+    { "cost_mem_plus_reg_disp", cost_mem_plus_reg_disp },
+    { "cost_mem_plus_reg_reg", cost_mem_plus_reg_reg },
+    { "cost_mem_other", cost_mem_other },
+    { "cost_const_int_q", cost_const_int_q },
+    { "cost_const_int_w", cost_const_int_w },
+    { "cost_const_int_l", cost_const_int_l },
+    { "cost_const_double", cost_const_double },
+    { "cost_symbol", cost_symbol },
+    { "cost_plus_reg_reg", cost_plus_reg_reg },
+    { "cost_plus_reg_constq", cost_plus_reg_constq },
+    { "cost_plus_reg_constw", cost_plus_reg_constw },
+    { "cost_plus_reg_constl", cost_plus_reg_constl },
+    { "cost_plus_other", cost_plus_other },
+    { "cost_logic_reg_const", cost_logic_reg_const },
+    { "cost_shift_const", cost_shift_const },
+    { "cost_shift_const_w", cost_shift_const_w },
+    { "cost_branch", cost_branch },
+    { "cost_call_reg", cost_call_reg },
+    { "cost_call_other", cost_call_other },
+    { "cost_set_reg_reg", cost_set_reg_reg },
+    { "cost_set_clr_mem_l", cost_set_clr_mem_l },
+	{ "cost_neg_not_l", cost_neg_not_l },
+	{ "cost_neg_not_w", cost_neg_not_w },
+};
+
+static void load_cost_overrides(const char *filename, int table[])
+{
+    FILE *f = fopen(filename, "r");
+    if (!f)
+        return;
+
+    char line[256];
+
+    while (fgets(line, sizeof(line), f)) {
+        char *p = line;
+
+        /* Kommentare überspringen */
+        if (*p == '#' || *p == '\n')
+            continue;
+
+        /* name = value parsen */
+        char name[128];
+        int value;
+
+        if (sscanf(p, " %127[^=] = %d", name, &value) != 2)
+            continue;
+
+        /* Whitespace trimmen */
+        for (char *q = name; *q; q++)
+            if (*q == ' ' || *q == '\t')
+                *q = 0;
+
+        /* Lookup */
+        for (size_t i = 0; i < sizeof(cost_map)/sizeof(cost_map[0]); i++) {
+            if (strcmp(cost_map[i].name, name) == 0) {
+                table[cost_map[i].index] = value;
+                break;
+            }
+        }
+    }
+
+    fclose(f);
+}
+
+static void m68k_init_costs(void)
+{
+    load_cost_overrides("m68k-costs-speed.txt", m68k_costs_speed);
+    load_cost_overrides("m68k-costs-size.txt",  m68k_costs_size);
+}
+
+bool
+m68k_68000_10_costs (rtx x,
+                     machine_mode mode,
+                     int outer_code ATTRIBUTE_UNUSED,
+                     int opno ATTRIBUTE_UNUSED,
+                     int *total,
+                     bool speed)
+{
+	static int initialized;
+	if (!initialized) {
+	    initialized = 1;
+	    m68k_init_costs();
+	}
+
+	return m68k_68000_10_costs_table(x, mode, outer_code, opno, total, speed);
 }
