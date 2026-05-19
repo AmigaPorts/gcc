@@ -506,7 +506,7 @@ static const struct default_options default_options_table[] =
 //#endif
     },
 
-    { OPT_LEVELS_2_PLUS, OPT_fprune_stack_vars, NULL, 1 },
+//    { OPT_LEVELS_2_PLUS, OPT_fprune_stack_vars, NULL, 1 },
     { OPT_LEVELS_2_PLUS, OPT_freorder_functions, NULL, 1 },
     { OPT_LEVELS_2_PLUS, OPT_ftree_vrp, NULL, 1 },
     { OPT_LEVELS_2_PLUS, OPT_ftree_pre, NULL, 1 },
