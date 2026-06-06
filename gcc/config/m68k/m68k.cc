@@ -3272,6 +3272,31 @@ valid_mov3q_const (HOST_WIDE_INT i)
   return TARGET_ISAB && (i == -1 || IN_RANGE (i, 1, 7));
 }
 
+/* Return true if OPERANDS[] are valid for output_move_simode.
+   In particular, if SRC is a MEM with auto-inc/dec adressing and
+   its REG is mentioned in DST, it's invalid.  See PR123853.  */
+
+bool
+check_move_simode (const rtx *operands)
+{
+  rtx src = operands[1];
+  if (MEM_P (src))
+    {
+      rtx src1 = XEXP (src, 0);
+      if (GET_CODE (src1) == PRE_DEC || GET_CODE (src1) == POST_INC)
+	{
+	  rtx src2 = XEXP (src1, 0);
+	  if (REG_P (src2))
+	    {
+	      rtx dst = operands[0];
+	      if (reg_overlap_mentioned_p (src2, dst))
+		return false;
+	    }
+	}
+    }
+  return true;
+}
+
 /* Return an instruction to move CONST_INT OPERANDS[1] into OPERANDS[0].
    I is the value of OPERANDS[1].  */
 
