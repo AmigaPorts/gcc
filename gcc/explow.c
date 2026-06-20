@@ -84,7 +84,9 @@ plus_constant (machine_mode mode, rtx x, HOST_WIDE_INT c,
   rtx tem;
   int all_constant = 0;
 
-  gcc_assert (GET_MODE (x) == VOIDmode || GET_MODE (x) == mode);
+  gcc_assert (GET_MODE (x) == VOIDmode || GET_MODE (x) == mode
+	      || GET_CODE (x) == ENTRY_VALUE
+	      );
 
   if (c == 0)
     return x;

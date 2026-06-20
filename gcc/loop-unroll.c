@@ -34,6 +34,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "params.h"
 #include "dojump.h"
 #include "expr.h"
+#include "df.h"
 #include "dumpfile.h"
 
 /* This pass performs loop unrolling.  We only perform this
@@ -218,6 +219,35 @@ decide_unrolling (int flags)
   /* Scan the loops, inner ones first.  */
   FOR_EACH_LOOP (loop, LI_FROM_INNERMOST)
     {
+
+    /* m68k-specific: disable unrolling when register pressure is too high.  */
+    #if defined(TARGET_M68K)
+
+      unsigned max_live = 0;
+      basic_block *bbs = get_loop_body (loop);
+      unsigned nbbs = loop->num_nodes;
+
+      for (unsigned i = 0; i < nbbs; i++)
+        {
+          basic_block bb = bbs[i];
+          bitmap live = DF_LIVE_IN (bb);
+          unsigned count = bitmap_count_bits (live);
+          if (count > max_live)
+            max_live = count;
+        }
+
+      /* Threshold tuned for m68k: more than ~12 live values kills performance.  */
+      if (max_live > 12)
+        {
+          if (dump_file)
+            fprintf (dump_file,
+                     "m68k: disabling unrolling in loop %d (live=%u)\n",
+                     loop->num, max_live);
+          continue;
+        }
+
+    #endif
+
       loop->lpt_decision.decision = LPT_NONE;
       location_t locus = get_loop_location (loop);
 

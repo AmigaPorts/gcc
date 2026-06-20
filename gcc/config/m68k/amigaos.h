@@ -114,13 +114,15 @@ amiga_named_section (const char *name, unsigned int flags, tree decl);
 
 /* Various ABI issues.  */
 
-/* This is (almost;-) BSD, so it wants DBX format.  */
+/* enable dwarf2 */
+#undef PREFERRED_DEBUGGING_TYPE
+#define PREFERRED_DEBUGGING_TYPE DWARF2_DEBUG
+
+#define DWARF2_DEBUGGING_INFO 1
+#define DWARF2_ASM_LINE_DEBUG_INFO 1
+
 #undef DBX_DEBUGGING_INFO
-#define DBX_DEBUGGING_INFO
-
-/* GDB goes mad if it sees the function end marker.  */
-
-#define NO_DBX_FUNCTION_END 1
+#undef SDB_DEBUGGING_INFO
 
 /* Allow folding division by zero.  */
 
