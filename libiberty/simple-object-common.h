@@ -152,6 +152,7 @@ struct simple_object_functions
 /* The known object file formats.  */
 
 extern const struct simple_object_functions simple_object_coff_functions;
+extern const struct simple_object_functions simple_object_amiga_functions;
 extern const struct simple_object_functions simple_object_elf_functions;
 extern const struct simple_object_functions simple_object_mach_o_functions;
 extern const struct simple_object_functions simple_object_xcoff_functions;
