@@ -524,7 +524,7 @@ if (target_flags & (MASK_RESTORE_A4|MASK_ALWAYS_RESTORE_A4)) \
     "%{!MM:" \
       "%{!E:" \
         "%{!S:" \
-          "%(linker) -Cvbcc %l %X %{o*} %{A} %{d} %{e*} %{m} " \
+	  "%(linker) " LINK_PLUGIN_SPEC "-Cvbcc %l %X %{o*} %{A} %{d} %{e*} %{m} " \
           "%{N} %{n} %{r} %{s} %{t} %{u*} %{x} %{z} %{Z} " \
           "%{!A:%{!nostdlib:%{!nostartfiles:%S}}} " \
           "%{static:} %{L*} %F %o " \
@@ -541,7 +541,7 @@ if (target_flags & (MASK_RESTORE_A4|MASK_ALWAYS_RESTORE_A4)) \
     "%{!MM:" \
       "%{!E:" \
         "%{!S:" \
-          "%(linker) %l %X %{o*} %{A} %{d} %{e*} %{m} " \
+	  "%(linker) " LINK_PLUGIN_SPEC "%l %X %{o*} %{A} %{d} %{e*} %{m} " \
           "%{N} %{n} %{r} %{s} %{t} %{u*} %{x} %{z} %{Z} " \
           "%{!A:%{!nostdlib:%{!nostartfiles:%S}}} " \
           "%{static:} %{L*} %F -L%:sdk_root(lib/) -L%:sdk_root(../lib/) %o " \
