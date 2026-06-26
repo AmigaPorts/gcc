@@ -54,6 +54,50 @@ append_to_collect_gcc_options (struct obstack *ob,
   *first_p = false;
 }
 
+/* Append each assembler option from COLLECT_AS_OPTIONS as
+   "-Xassembler <option>" for LTRANS.  */
+
+static void
+append_collect_as_options (const char *collect_as_options,
+			   struct obstack *ob, bool *first_p)
+{
+  char *argv_storage;
+  int j, k;
+
+  argv_storage = xstrdup (collect_as_options);
+
+  for (j = 0, k = 0; argv_storage[j] != '\0'; ++j)
+    {
+      if (argv_storage[j] == '\'')
+	{
+	  char *option = &argv_storage[k];
+
+	  ++j;
+	  do
+	    {
+	      if (argv_storage[j] == '\0')
+		fatal_error (input_location, "malformed COLLECT_AS_OPTIONS");
+	      else if (strncmp (&argv_storage[j], "'\\''", 4) == 0)
+		{
+		  argv_storage[k++] = '\'';
+		  j += 4;
+		}
+	      else if (argv_storage[j] == '\'')
+		break;
+	      else
+		argv_storage[k++] = argv_storage[j++];
+	    }
+	  while (1);
+	  argv_storage[k++] = '\0';
+
+	  append_to_collect_gcc_options (ob, first_p, "-Xassembler");
+	  append_to_collect_gcc_options (ob, first_p, option);
+	}
+    }
+
+  free (argv_storage);
+}
+
 /* Write currently held options to an LTO IL section.  */
 
 void
@@ -208,6 +252,11 @@ lto_write_options (void)
 	append_to_collect_gcc_options (&temporary_obstack, &first_p,
 				       option->canonical_option[j]);
     }
+
+  if (const char *collect_as_options = getenv ("COLLECT_AS_OPTIONS"))
+    append_collect_as_options (collect_as_options, &temporary_obstack,
+			       &first_p);
+
   obstack_grow (&temporary_obstack, "\0", 1);
   args = XOBFINISH (&temporary_obstack, char *);
   lto_write_data (args, strlen (args) + 1);
