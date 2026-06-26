@@ -275,19 +275,12 @@ m68k_68000_10_costs_table (rtx x,
         if (CONST_INT_P (b))
           {
             HOST_WIDE_INT n = INTVAL (b);
-            HOST_WIDE_INT p = 1;
-            int shift = 0;
+	    unsigned HOST_WIDE_INT abs_n
+	      = n < 0 ? -(unsigned HOST_WIDE_INT) n
+		      : (unsigned HOST_WIDE_INT) n;
+	    int shift = exact_log2 (abs_n);
 
-            if (n < 0)
-              n = -n;
-
-            while (p < n)
-              {
-                p <<= 1;
-                shift++;
-              }
-
-            if (p == n)
+	    if (shift >= 0)
               {
                 *total = 8 + (shift * 2);
                 return true;
