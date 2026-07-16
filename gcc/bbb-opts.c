@@ -5400,6 +5400,29 @@ try_auto_inc (unsigned index, insn_info & ii, rtx reg, int size, int addend)
   return 1;
 }
 
+/**
+ * Get the correct memory source size.
+ */
+static int get_mem_access_size(rtx set) {
+    rtx src = SET_SRC(set);
+
+    // If the source is an extension/truncation, unwrap it
+    if (GET_CODE(src) == SIGN_EXTEND ||
+        GET_CODE(src) == ZERO_EXTEND ||
+        GET_CODE(src) == FLOAT_EXTEND ||
+        GET_CODE(src) == FLOAT_TRUNCATE) {
+        src = XEXP(src, 0);
+    }
+
+    // Now src should be a MEM
+    if (MEM_P(src)) {
+        return GET_MODE_SIZE(GET_MODE(src));
+    }
+
+    // Fallback: use destination mode
+    return GET_MODE_SIZE(GET_MODE(SET_DEST(set)));
+}
+
 /*
  * Convert a series of reg with offset ( (ax), 4(ax), 8(ax), ...) into autoincx ( (ax+), (ax+), (ax+), ...)
  *
@@ -5437,15 +5460,13 @@ opt_autoinc ()
 
       // move.w (a0)+,a1 reads a word but writes a long...
       int dsize = GET_MODE_SIZE(ii.get_mode());
-      if (dsize > 4 && !((TARGET_68881 && ii.get_mode() == DFmode) || ii.get_mode() == DImode))
+      if (dsize > 4 && !((TARGET_68881 && (ii.get_mode() == DFmode || ii.get_mode() == XFmode))
+          || ii.get_mode() == DImode))
         return 0;
 
       int ssize = dsize;
       if (ii.is_src_mem()) {
-	  if (GET_CODE(SET_SRC(set)) == SIGN_EXTEND)
-	    ssize /= 2;
-	  else if (GET_CODE(SET_SRC(set)) == FLOAT_TRUNCATE)
-	    ssize *= 2;
+	    ssize = get_mem_access_size(set);
       }
 
       // neither INC or nested MEM is allowed
