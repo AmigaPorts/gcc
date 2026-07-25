@@ -185,6 +185,7 @@ static rtx m68k_delegitimize_address (rtx);
 extern void m68k_function_arg_advance (cumulative_args_t,
 				       const function_arg_info &);
 extern rtx m68k_function_arg (cumulative_args_t, const function_arg_info &);
+extern bool m68k_is_ok_for_sibcall (tree, tree);
 static bool m68k_cannot_force_const_mem (machine_mode mode, rtx x);
 static bool m68k_output_addr_const_extra (FILE *, rtx);
 static void m68k_init_sync_libfuncs (void) ATTRIBUTE_UNUSED;
@@ -1440,14 +1441,15 @@ m68k_ok_for_sibcall_p (tree decl, tree exp)
   if (kind == m68k_fk_normal_function)
     /* We can always sibcall from a normal function, because it's
        undefined if it is calling an interrupt function.  */
-    return true;
-
+    ;
   /* Otherwise we can only sibcall if the function kind is known to be
      the same.  */
-  if (decl && m68k_get_function_kind (decl) == kind)
-    return true;
-  
-  return false;
+  else if (!(decl && m68k_get_function_kind (decl) == kind))
+    return false;
+
+  /* Reject sibcalls when -mregparm puts args in callee-saved regs that
+     the epilogue would restore over the outgoing arguments.  */
+  return m68k_is_ok_for_sibcall (decl, exp);
 }
 
 /* Convert X to a legitimate function call memory reference and return the
