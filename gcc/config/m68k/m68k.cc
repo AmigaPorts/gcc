@@ -925,6 +925,13 @@ m68k_initial_elimination_offset (int from, int to)
 static bool
 m68k_save_reg (unsigned int regno, bool interrupt_handler)
 {
+  tree attrs = TYPE_ATTRIBUTES (TREE_TYPE (current_function_decl));
+  if (lookup_attribute ("entrypoint", attrs))
+    return false;
+
+  if (regno != 15 && lookup_attribute ("saveallregs", attrs))
+    return true;
+
   if (flag_pic && regno == PIC_REG)
     {
       if (crtl->saves_all_registers)
