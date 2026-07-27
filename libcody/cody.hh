@@ -54,6 +54,14 @@ constexpr char S2C (char const (&s)[I])
   return s[0];
 }
 
+// --- GCC 15 / C++20+ char8_t compatibility ---
+template<unsigned int I>
+constexpr char S2C (char8_t const (&s)[I])
+{
+  // UTF‑8 single‑byte ASCII passt immer in char
+  return static_cast<char>(s[0]);
+}
+
 /// Internal buffering class.  Used to concatenate outgoing messages
 /// and Lex incoming ones.
 class MessageBuffer
