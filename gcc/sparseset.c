@@ -41,6 +41,16 @@ sparseset_alloc (SPARSESET_ELT_TYPE n_elms)
   set->dense = &(set->elms[0]);
   set->sparse = &(set->elms[n_elms]);
   set->size = n_elms;
+
+  /* CRITICAL FIX: Initialize the entire sparse array to a safe value.
+     Without this, the sparse array contains garbage that can cause
+     corruption when sparseset_bit_p reads uninitialized values. */
+  for (SPARSESET_ELT_TYPE i = 0; i < n_elms; i++)
+    {
+      set->sparse[i] = n_elms;  /* Set to size (invalid index) */
+      set->dense[i] = n_elms;   /* Also initialize dense for safety */
+    }
+
   sparseset_clear (set);
   return set;
 }
@@ -236,4 +246,3 @@ sparseset_equal_p (sparseset a, sparseset b)
 
   return true;
 }
-
