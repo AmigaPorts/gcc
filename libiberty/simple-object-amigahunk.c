@@ -46,6 +46,9 @@
 
 #include "simple-object-common.h"
 
+#define AMIGA_LTO_DEBUG_MAGIC 0x4c544f31 /* "LTO1" */
+#define AMIGA_LTO_DEBUG_HEADER_SIZE 8
+
 /**
  * all info needed to find hunks aka sections.
  */
@@ -129,6 +132,89 @@ readName (unsigned l, int descriptor, off_t * offset)
   return r;
 }
 
+static unsigned
+fetch4 (const unsigned char *b)
+{
+  return (b[0] << 24) | (b[1] << 16) | (b[2] << 8) | b[3];
+}
+
+static int
+is_lto_section (const char *section_name)
+{
+  return strncmp (section_name, ".gnu.lto", 8) == 0;
+}
+
+static int
+is_padded_lto_section (const char *section_name)
+{
+  if (!is_lto_section (section_name))
+    return 0;
+
+  if (strcmp (section_name, ".gnu.lto_.opts") == 0)
+    return 0;
+
+  if (strncmp (section_name, ".gnu.lto_.symtab", 16) == 0
+      || strncmp (section_name, ".gnu.lto_.ext_symtab", 20) == 0
+      || strncmp (section_name, ".gnu.lto_.lto", 13) == 0)
+    return 0;
+
+  return 1;
+}
+
+static int
+read_lto_header (int descriptor, off_t *offset, unsigned *length)
+{
+  unsigned char header[AMIGA_LTO_DEBUG_HEADER_SIZE];
+  const char *errmsg;
+  int err;
+  unsigned magic;
+  unsigned payload_length;
+
+  if (*length < AMIGA_LTO_DEBUG_HEADER_SIZE)
+    return 0;
+
+  if (!simple_object_internal_read (descriptor, *offset, header,
+				    sizeof (header), &errmsg, &err))
+    return 0;
+
+  magic = fetch4 (header);
+  if (magic != AMIGA_LTO_DEBUG_MAGIC)
+    return 0;
+
+  payload_length = fetch4 (header + 4);
+  if (payload_length > *length - AMIGA_LTO_DEBUG_HEADER_SIZE)
+    return 0;
+
+  *offset += AMIGA_LTO_DEBUG_HEADER_SIZE;
+  *length = payload_length;
+  return 1;
+}
+
+static unsigned
+trim_lto_padding (int descriptor, off_t offset, unsigned length)
+{
+  unsigned char buffer[3];
+  const char *errmsg;
+  int err;
+  unsigned count;
+
+  if (length == 0)
+    return length;
+
+  count = length < sizeof (buffer) ? length : sizeof (buffer);
+  if (!simple_object_internal_read (descriptor, offset + length - count,
+				    buffer, count, &errmsg, &err))
+    return length;
+
+  while (count != 0 && buffer[count - 1] == 0)
+    {
+      --count;
+      --length;
+    }
+
+  return length;
+}
+
 /* See if we have an Amiga file.
  * Also remember all hunks.
  */
@@ -187,6 +273,20 @@ simple_object_amigahunk_match (
 	  offset += 4;
 	  h->length = read4 (descriptor, &offset) * 4;
 	  h->offset = offset;
+	  if (is_lto_section (h->name))
+	    {
+	      off_t lto_offset = h->offset;
+	      unsigned lto_length = h->length;
+
+	      if (read_lto_header (descriptor, &lto_offset, &lto_length))
+		{
+		  h->offset = lto_offset;
+		  h->length = lto_length;
+		}
+	      else if (is_padded_lto_section (h->name))
+		h->length = trim_lto_padding (descriptor, h->offset,
+					      h->length);
+	    }
 	  offset -= 8;
 
 	  oar->root = h;
@@ -501,10 +601,14 @@ simple_object_amigahunk_write_to_file (simple_object_write *sobj,
       // collect data len
       struct simple_object_write_section_buffer * sb;
       size_t slen = 0;
+      size_t lto_header_size = 0;
       for (sb = section->buffers; sb; sb = sb->next)
 	slen += sb->size;
 
-      unsigned len = (slen + 3) >> 2;
+      if (is_lto_section (section->name))
+	lto_header_size = AMIGA_LTO_DEBUG_HEADER_SIZE;
+
+      unsigned len = (slen + lto_header_size + 3) >> 2;
       unsigned char b[4];
       b[3] = len;
       b[2] = len >> 8;
@@ -517,6 +621,27 @@ simple_object_amigahunk_write_to_file (simple_object_write *sobj,
 
       offset += 4;
 
+      if (lto_header_size)
+	{
+	  b[3] = AMIGA_LTO_DEBUG_MAGIC;
+	  b[2] = AMIGA_LTO_DEBUG_MAGIC >> 8;
+	  b[1] = AMIGA_LTO_DEBUG_MAGIC >> 16;
+	  b[0] = AMIGA_LTO_DEBUG_MAGIC >> 24;
+	  if (!simple_object_internal_write (descriptor, offset, b, 4,
+					     &errmsg, err))
+	    return 0;
+	  offset += 4;
+
+	  b[3] = slen;
+	  b[2] = slen >> 8;
+	  b[1] = slen >> 16;
+	  b[0] = slen >> 24;
+	  if (!simple_object_internal_write (descriptor, offset, b, 4,
+					     &errmsg, err))
+	    return 0;
+	  offset += 4;
+	}
+
       // write data
       for (sb = section->buffers; sb; sb = sb->next)
 	{
@@ -528,7 +653,7 @@ simple_object_amigahunk_write_to_file (simple_object_write *sobj,
 	}
 
       // pad
-      slen = (len << 2) - slen;
+      slen = (len << 2) - slen - lto_header_size;
       if (slen)
 	{
 	  b[1] = 0;
