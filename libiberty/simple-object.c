@@ -54,6 +54,7 @@ Boston, MA 02110-1301, USA.  */
 
 static const struct simple_object_functions * const format_functions[] =
 {
+  &simple_object_amiga_functions,
   &simple_object_elf_functions,
   &simple_object_mach_o_functions,
   &simple_object_coff_functions,
