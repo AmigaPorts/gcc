@@ -110,6 +110,8 @@ bitmap_bit_p (const_sbitmap map, int bitno)
 static inline void
 bitmap_set_bit (sbitmap map, int bitno)
 {
+  if (bitno < 0)
+    return;
   gcc_checking_assert (! map->popcount);
   map->elms[bitno / SBITMAP_ELT_BITS]
     |= (SBITMAP_ELT_TYPE) 1 << (bitno) % SBITMAP_ELT_BITS;

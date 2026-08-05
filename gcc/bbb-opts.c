@@ -1433,24 +1433,40 @@ add_clobbers (rtx_insn * oldinsn)
 void insn_info::patch_mem_offsets(rtx x, int offset)
 {
   if (MEM_P(x))
+  {
+    rtx addr = XEXP(x, 0);
+
+    if (GET_CODE(addr) == PLUS)
     {
-      rtx plus = XEXP(x, 0);
-
+      rtx base = XEXP(addr, 0);
       if (offset == 0)
-	XEXP(x, 0) = XEXP(plus, 0);
+      {
+        // Replace with just the base address
+        rtx new_mem = replace_equiv_address_nv(x, base);
+        // Copy the new MEM back
+        MEM_COPY_ATTRIBUTES(new_mem, x);
+        XEXP(x, 0) = XEXP(new_mem, 0);
+      }
       else
-	XEXP(plus, 1) = gen_rtx_CONST_INT (VOIDmode, offset);
-
-      return;
+      {
+        // Update the offset
+        XEXP(addr, 1) = gen_rtx_CONST_INT(VOIDmode, offset);
+      }
     }
+    return;
+  }
 
-  const char * format = GET_RTX_FORMAT(GET_CODE(x));
-  if (format[0] == 'e')
-    patch_mem_offsets(XEXP(x, 0), offset);
-  if (format[1] == 'e')
-    patch_mem_offsets(XEXP(x, 1), offset);
+  // Recursively process sub-expressions
+  const char *format = GET_RTX_FORMAT(GET_CODE(x));
+  for (int i = GET_RTX_LENGTH(GET_CODE(x)) - 1; i >= 0; i--)
+  {
+    if (format[i] == 'e')
+      patch_mem_offsets(XEXP(x, i), offset);
+    else if (format[i] == 'E')
+      for (int j = XVECLEN(x, i) - 1; j >= 0; j--)
+        patch_mem_offsets(XVECEXP(x, i, j), offset);
+  }
 }
-
 void
 insn_info::auto_inc_fixup (int regno, int size, int addend)
 {
@@ -5400,6 +5416,29 @@ try_auto_inc (unsigned index, insn_info & ii, rtx reg, int size, int addend)
   return 1;
 }
 
+/**
+ * Get the correct memory source size.
+ */
+static int get_mem_access_size(rtx set) {
+    rtx src = SET_SRC(set);
+
+    // If the source is an extension/truncation, unwrap it
+    if (GET_CODE(src) == SIGN_EXTEND ||
+        GET_CODE(src) == ZERO_EXTEND ||
+        GET_CODE(src) == FLOAT_EXTEND ||
+        GET_CODE(src) == FLOAT_TRUNCATE) {
+        src = XEXP(src, 0);
+    }
+
+    // Now src should be a MEM
+    if (MEM_P(src)) {
+        return GET_MODE_SIZE(GET_MODE(src));
+    }
+
+    // Fallback: use destination mode
+    return GET_MODE_SIZE(GET_MODE(SET_DEST(set)));
+}
+
 /*
  * Convert a series of reg with offset ( (ax), 4(ax), 8(ax), ...) into autoincx ( (ax+), (ax+), (ax+), ...)
  *
@@ -5437,15 +5476,13 @@ opt_autoinc ()
 
       // move.w (a0)+,a1 reads a word but writes a long...
       int dsize = GET_MODE_SIZE(ii.get_mode());
-      if (dsize > 4 && !((TARGET_68881 && ii.get_mode() == DFmode) || ii.get_mode() == DImode))
+      if (dsize > 4 && !((TARGET_68881 && (ii.get_mode() == DFmode || ii.get_mode() == XFmode))
+          || ii.get_mode() == DImode))
         return 0;
 
       int ssize = dsize;
       if (ii.is_src_mem()) {
-	  if (GET_CODE(SET_SRC(set)) == SIGN_EXTEND)
-	    ssize /= 2;
-	  else if (GET_CODE(SET_SRC(set)) == FLOAT_TRUNCATE)
-	    ssize *= 2;
+	    ssize = get_mem_access_size(set);
       }
 
       // neither INC or nested MEM is allowed
