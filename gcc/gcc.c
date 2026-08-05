@@ -353,6 +353,7 @@ static const char *eval_spec_function (const char *, const char *);
 static const char *handle_spec_function (const char *, bool *);
 static char *save_string (const char *, int);
 static void set_collect_gcc_options (void);
+static void putenv_COLLECT_AS_OPTIONS (vec<char *>);
 static int do_spec_1 (const char *, int, const char *);
 static int do_spec_2 (const char *);
 static void do_option_spec (const char *, const char *);
@@ -940,7 +941,7 @@ proper position among the other output files.  */
 #if HAVE_LTO_PLUGIN > 0
 /* The linker used has full plugin support, use LTO plugin by default.  */
 #if HAVE_LTO_PLUGIN == 2
-#define PLUGIN_COND "!fno-use-linker-plugin:%{!fno-lto"
+#define PLUGIN_COND "!fno-use-linker-plugin:%{flto|flto=*|fuse-linker-plugin"
 #define PLUGIN_COND_CLOSE "}"
 #else
 /* The linker used has limited plugin support, use LTO plugin with explicit
@@ -4652,6 +4653,44 @@ set_collect_gcc_options (void)
   obstack_grow (&collect_obstack, "\0", 1);
   xputenv (XOBFINISH (&collect_obstack, char *));
 }
+
+/* Add options passed via -Xassembler or -Wa to COLLECT_AS_OPTIONS.  */
+
+static void
+putenv_COLLECT_AS_OPTIONS (vec<char_p> vec)
+{
+  unsigned ix;
+  char *opt;
+
+  if (vec.is_empty ())
+    return;
+
+  obstack_init (&collect_obstack);
+  obstack_grow (&collect_obstack, "COLLECT_AS_OPTIONS=",
+		sizeof ("COLLECT_AS_OPTIONS=") - 1);
+
+  FOR_EACH_VEC_ELT (vec, ix, opt)
+    {
+      const char *p, *q;
+
+      obstack_grow (&collect_obstack, "'", 1);
+      q = opt;
+      while ((p = strchr (q, '\'')))
+	{
+	  obstack_grow (&collect_obstack, q, p - q);
+	  obstack_grow (&collect_obstack, "'\\''", 4);
+	  q = ++p;
+	}
+      obstack_grow (&collect_obstack, q, strlen (q));
+      obstack_grow (&collect_obstack, "'", 1);
+
+      if (ix < vec.length () - 1)
+	obstack_grow (&collect_obstack, " ", 1);
+    }
+
+  obstack_grow (&collect_obstack, "\0", 1);
+  xputenv (XOBFINISH (&collect_obstack, char *));
+}
 
 /* Process a spec string, accumulating and running commands.  */
 
@@ -7210,6 +7249,7 @@ driver::main (int argc, char **argv)
   global_initializations ();
   build_multilib_strings ();
   set_up_specs ();
+  putenv_COLLECT_AS_OPTIONS (assembler_options);
   putenv_COLLECT_GCC (argv[0]);
   maybe_putenv_COLLECT_LTO_WRAPPER ();
   maybe_putenv_OFFLOAD_TARGETS ();

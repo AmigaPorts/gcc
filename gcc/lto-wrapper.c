@@ -531,6 +531,9 @@ append_compiler_options (obstack *argv_obstack, struct cl_decoded_option *opts,
 	case OPT_fcheck_pointer_bounds:
 	  break;
 
+	case OPT_Xassembler:
+	  break;
+
 	default:
 	  if (!(cl_options[option->opt_index].flags & CL_TARGET))
 	    continue;
