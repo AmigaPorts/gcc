@@ -2687,6 +2687,10 @@ legitimize_pic_address (rtx orig, machine_mode mode ATTRIBUTE_UNUSED,
 {
   rtx pic_ref = orig;
 
+  // new - no pic refs for baserel - handled in extra pass
+   if (flag_pic >= 3)
+     return orig;
+
   /* First handle a simple SYMBOL_REF or LABEL_REF */
   if (GET_CODE (orig) == SYMBOL_REF || GET_CODE (orig) == LABEL_REF)
     {

@@ -87,6 +87,39 @@ namespace
   };
 // class pass_bbb_optimizations
 
+  // Function to count complexity of an address expression
+  static int count_address_components(rtx x)
+  {
+      int count = 0;
+
+      if (GET_CODE(x) == SYMBOL_REF || GET_CODE(x) == LABEL_REF)
+          return 1;
+
+      if (GET_CODE(x) == CONST)
+          return count_address_components(XEXP(x, 0));
+
+      if (GET_CODE(x) == PLUS)
+      {
+          return count_address_components(XEXP(x, 0)) +
+                 count_address_components(XEXP(x, 1));
+      }
+
+      if (REG_P(x))
+          return 1;
+
+      if (CONST_INT_P(x))
+          return 1;
+
+      if (GET_CODE(x) == UNSPEC)
+      {
+          for (int i = 0; i < XVECLEN(x, 0); i++)
+              count += count_address_components(XVECEXP(x, 0, i));
+          return count;
+      }
+
+      return 0;
+  }
+
   static rtx picreg;
   static int cur_tmp_use;
   static rtx cur_symbol[8];
@@ -96,169 +129,156 @@ namespace
   {
     int r = 0;
     enum rtx_code code = GET_CODE(*x);
+
     if (code == SYMBOL_REF)
+    {
+      tree decl = SYMBOL_REF_DECL (*x);
+      if (!decl)
+        return 0;
+      // only handle VAR non CONST
+      if (decl->base.code != VAR_DECL)
+        return 0;
+
+      // a section means: a4 unless the section is ".datachip" ".datafast" ".datafar"
+      char const * secname = DECL_SECTION_NAME(decl);
+      if (secname && (
+             0 == strcmp(secname, ".datachip")
+          || 0 == strcmp(secname, ".datafast")
+          || 0 == strcmp(secname, ".datafar")))
+        return 0;
+
+      if (secname == 0)
       {
-	tree decl = SYMBOL_REF_DECL (*x);
-	if (!decl)
-	  return 0;
-	// only handle VAR non CONST
-	if (decl->base.code != VAR_DECL)
-	  return 0;
+        if (decl->base.constant_flag || decl->base.readonly_flag)
+          return 0;
 
-	// a section means: a4 unless the section is ".datachip" ".datafast" ".datafar"
-	char const * secname = DECL_SECTION_NAME(decl);
-	if (secname && (
-	       0 == strcmp(secname, ".datachip")
-	    || 0 == strcmp(secname, ".datafast")
-	    || 0 == strcmp(secname, ".datafar")))
-	  return 0;
+        // normal constants end up in text.
+        if (TREE_READONLY (decl))
+          return 0;
 
-	if (secname == 0)
-	  {
-	    if (decl->base.constant_flag || decl->base.readonly_flag)
-	      return 0;
-
-	    // normal constants end up in text.
-	    if (TREE_READONLY (decl))
-	      return 0;
-
-	    tree type = decl->decl_minimal.common.typed.type;
-	    if (type->base.code == ARRAY_TYPE)
-	      type = type->typed.type;
-	    if (type->base.readonly_flag)
-	      return 0;
-	  }
-	else
-	  if (0 == strcmp(".text", secname))
-	    return 0;
-
-	if (secname == 0 || strcmp(".data", secname))
-	  {
-	    section * sec = get_variable_section(decl, false);
-	    if ( (sec->common.flags & SECTION_WRITE) == 0)
-	      return 0;
-	  }
-
-//	  if (decl)
-//	    printf("%s: %8x %d\n", decl->decl_minimal.name->identifier.id.str, sec ? sec->common.flags : 0, ispic);
-
-	rtx symbol = *x;
-
-	// create the pic_ref expression
-	rtx s = gen_rtx_UNSPEC (Pmode, gen_rtvec (2, *x, GEN_INT (0)),
-					    UNSPEC_RELOC16);
-	s = gen_rtx_CONST (Pmode, s);
-	s = gen_rtx_PLUS (Pmode, picreg, s);
-//	s = gen_rtx_CONST (Pmode, s);
-
-	// try to use it directly.
-	if (!use_tmp)
-	  validate_unshare_change(insn, x, s, 0);
-	else if (!*use_tmp)
-	  *use_tmp |= !validate_unshare_change(insn, x, s, 0);
-
-	// if direct use failed, use a tmp register per symbol
-	if (use_tmp && *use_tmp)
-	  {
-	    rtx r = 0;
-	    for (int i = 0; i < cur_tmp_use; ++i)
-	      {
-		if (rtx_equal_p(cur_symbol[i], symbol))
-		  {
-		    r = cur_tmp_reg[i];
-		    break;
-		  }
-	      }
-	    if (!r)
-	      {
-		r = gen_reg_rtx (Pmode);
-		rtx set = gen_rtx_SET(r, s);
-		emit_insn_before(set, insn);
-
-		cur_symbol[cur_tmp_use] = symbol;
-		cur_tmp_reg[cur_tmp_use] = r;
-		++cur_tmp_use;
-	      }
-
-	    // if the change does not validate, poke it hard and pray that it's fixed later on. see maybe_fix()
-	    if (!validate_unshare_change(insn, x, r, 0))
-	      {
-//		    fprintf(stderr, "can't convert to baserel: ");
-//		    debug_rtx(insn);
-		*x = r;
-//		    debug_rtx(insn);
-		return -1;
-	      }
-	  }
-
-	return 1;
+        tree type = decl->decl_minimal.common.typed.type;
+        if (type->base.code == ARRAY_TYPE)
+          type = type->typed.type;
+        if (type->base.readonly_flag)
+          return 0;
       }
+      else
+        if (0 == strcmp(".text", secname))
+          return 0;
+
+      if (secname == 0 || strcmp(".data", secname))
+      {
+        section * sec = get_variable_section(decl, false);
+        if ((sec->common.flags & SECTION_WRITE) == 0)
+          return 0;
+      }
+
+      rtx symbol = *x;
+
+      // create the pic_ref expression
+      rtx s = gen_rtx_UNSPEC (Pmode, gen_rtvec (2, *x, GEN_INT (0)), UNSPEC_RELOC16);
+      s = gen_rtx_CONST (Pmode, s);
+      s = gen_rtx_PLUS (Pmode, picreg, s);
+
+      // ALWAYS use a temp register for symbols
+      // This is safer and the optimizers will clean up redundant moves
+      rtx r = 0;
+
+      // Check if we already have this symbol in our temp cache
+      for (int i = 0; i < cur_tmp_use; ++i)
+      {
+        if (rtx_equal_p(cur_symbol[i], symbol))
+        {
+          r = cur_tmp_reg[i];
+          break;
+        }
+      }
+
+      if (!r)
+      {
+        r = gen_reg_rtx (Pmode);
+        rtx set = gen_rtx_SET (r, s);
+        emit_insn_before (set, insn);
+
+        cur_symbol[cur_tmp_use] = symbol;
+        cur_tmp_reg[cur_tmp_use] = r;
+        ++cur_tmp_use;
+      }
+
+      // Replace with the temp register
+      validate_change(insn, x, r, 0);
+      return 1;
+    }
 
     switch (code)
     {
       // skip double replacement
       case PLUS:
-	  if (XEXP (*x, 0) == picreg)
-	    return 1;
-	break;
+        if (XEXP (*x, 0) == picreg)
+          return 1;
+        break;
+
       /*
        * Handle set: SRC and DEST may each have different symbols, so reset the use_tmp flag.
        */
       case SET:
-	r |= make_pic_ref(insn, &SET_DEST(*x), use_tmp);
-	if (use_tmp)
-	  *use_tmp = false;
-	r |= make_pic_ref(insn, &SET_SRC(*x), use_tmp);
-	if (use_tmp)
-	  *use_tmp = false;
-	return r;
-	/*
-	 * No inplace pic ref if a register is seen
-	 */
+        r |= make_pic_ref(insn, &SET_DEST(*x), use_tmp);
+        if (use_tmp)
+          *use_tmp = false;
+        r |= make_pic_ref(insn, &SET_SRC(*x), use_tmp);
+        if (use_tmp)
+          *use_tmp = false;
+        return r;
+
+      /*
+       * No inplace pic ref if a register is seen
+       */
       case REG:
-	if (use_tmp)
-	  *use_tmp = true;
-	break;
-	/*
-	 * There are shared CONST(PLUS(SYMBOL, CONST_INT)) rtx! (evil!)
-	 * Make a copy if one is seen, to avoid double replacement.
-	 */
+        if (use_tmp)
+          *use_tmp = true;
+        break;
+
+      /*
+       * There are shared CONST(PLUS(SYMBOL, CONST_INT)) rtx! (evil!)
+       * Make a copy if one is seen, to avoid double replacement.
+       */
       case CONST:
-	if (GET_CODE(XEXP(*x, 0)) == PLUS && GET_CODE(XEXP(XEXP(*x, 0), 0)) == SYMBOL_REF)
-	  {
-	    /* copy_rtx can't unshare, so do it by hand. */
-	    rtx c = gen_rtx_CONST(GET_MODE(*x), gen_rtx_PLUS(GET_MODE(XEXP(*x, 0)), XEXP(XEXP(*x, 0), 0), XEXP(XEXP(*x, 0), 1)));
-	    *x = c;
+        if (GET_CODE(XEXP(*x, 0)) == PLUS && GET_CODE(XEXP(XEXP(*x, 0), 0)) == SYMBOL_REF)
+        {
+          /* copy_rtx can't unshare, so do it by hand. */
+          rtx c = gen_rtx_CONST(GET_MODE(*x), gen_rtx_PLUS(GET_MODE(XEXP(*x, 0)), XEXP(XEXP(*x, 0), 0), XEXP(XEXP(*x, 0), 1)));
+          *x = c;
 
-	    if (!make_pic_ref(insn, &XEXP(*x, 0), use_tmp))
-	      return 0;
+          if (!make_pic_ref(insn, &XEXP(*x, 0), use_tmp))
+            return 0;
 
-	    // remove CONST
-	    *x = XEXP(*x, 0);
+          // remove CONST
+          *x = XEXP(*x, 0);
 
-	    return 1;
-	  }
-	break;
-	/*
-	 * Default: try in place first.
-	 */
+          return 1;
+        }
+        break;
+
+      /*
+       * Default: try in place first.
+       */
       default:
-	break;
+        break;
     }
 
     const char *fmt = GET_RTX_FORMAT(code);
     for (int i = GET_RTX_LENGTH (code) - 1; i >= 0; i--)
+    {
+      if (fmt[i] == 'e')
       {
-        if (fmt[i] == 'e')
-  	{
-  	  r |= make_pic_ref(insn, &XEXP(*x, i), use_tmp);
-  	}
-        else if (fmt[i] == 'E')
-  	for (int j = XVECLEN (*x, i) - 1; j >= 0; j--)
-  	  {
-  	    r |= make_pic_ref(insn, &XVECEXP(*x, i, j), use_tmp);
-  	  }
+        r |= make_pic_ref(insn, &XEXP(*x, i), use_tmp);
       }
+      else if (fmt[i] == 'E')
+        for (int j = XVECLEN (*x, i) - 1; j >= 0; j--)
+        {
+          r |= make_pic_ref(insn, &XVECEXP(*x, i, j), use_tmp);
+        }
+    }
     return r;
   }
 
