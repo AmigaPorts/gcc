@@ -149,7 +149,8 @@ CFILES = alloca.c argv.c asprintf.c atexit.c				\
 	random.c regex.c rename.c rindex.c				\
 	rust-demangle.c							\
 	safe-ctype.c setenv.c setproctitle.c sha1.c sigsetmask.c        \
-	 simple-object.c simple-object-coff.c simple-object-elf.c	\
+	 simple-object.c simple-object-amiga.c simple-object-coff.c	\
+	 simple-object-elf.c						\
 	 simple-object-mach-o.c simple-object-xcoff.c			\
          snprintf.c sort.c						\
 	 spaces.c splay-tree.c stack-limit.c stpcpy.c stpncpy.c		\
@@ -189,7 +190,8 @@ REQUIRED_OFILES =							\
 	./@pexecute@.$(objext) ./vprintf-support.$(objext)		\
 	./rust-demangle.$(objext)					\
 	./safe-ctype.$(objext)						\
-	./simple-object.$(objext) ./simple-object-coff.$(objext)	\
+	./simple-object.$(objext) ./simple-object-amiga.$(objext)	\
+	./simple-object-coff.$(objext)					\
 	./simple-object-elf.$(objext) ./simple-object-mach-o.$(objext)	\
 	./simple-object-xcoff.$(objext)					\
 	./sort.$(objext) ./spaces.$(objext)				\
@@ -1319,6 +1321,17 @@ $(CONFIGURED_OFILES): stamp-picdir stamp-noasandir
 	  $(COMPILE.c) $(PICFLAG) $(NOASANFLAG) $(srcdir)/sigsetmask.c -o noasan/$@; \
 	else true; fi
 	$(COMPILE.c) $(srcdir)/sigsetmask.c $(OUTPUT_OPTION)
+
+./simple-object-amiga.$(objext): $(srcdir)/simple-object-amiga.c config.h \
+	$(INCDIR)/ansidecl.h $(INCDIR)/libiberty.h \
+	$(srcdir)/simple-object-common.h $(INCDIR)/simple-object.h
+	if [ x"$(PICFLAG)" != x ]; then \
+	  $(COMPILE.c) $(PICFLAG) $(srcdir)/simple-object-amiga.c -o pic/$@; \
+	else true; fi
+	if [ x"$(NOASANFLAG)" != x ]; then \
+	  $(COMPILE.c) $(PICFLAG) $(NOASANFLAG) $(srcdir)/simple-object-amiga.c -o noasan/$@; \
+	else true; fi
+	$(COMPILE.c) $(srcdir)/simple-object-amiga.c $(OUTPUT_OPTION)
 
 ./simple-object-coff.$(objext): $(srcdir)/simple-object-coff.c config.h \
 	$(INCDIR)/ansidecl.h $(INCDIR)/libiberty.h \
