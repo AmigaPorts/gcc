@@ -2518,7 +2518,6 @@ write_symbol (struct streamer_tree_cache_d *cache,
   unsigned char c;
 
   gcc_checking_assert (TREE_PUBLIC (t)
-		       && !is_builtin_fn (t)
 		       && !DECL_ABSTRACT_P (t)
 		       && (!VAR_P (t) || !DECL_HARD_REGISTER (t)));
 
