@@ -64,6 +64,10 @@ relative prefix can be found, return @code{NULL}.
 #include <dirent.h>
 #include <string.h>
 
+#if defined(__MACH__)
+#include <mach-o/dyld.h>
+#endif
+
 #include "ansidecl.h"
 #include "libiberty.h"
 
@@ -393,4 +397,3 @@ make_relative_prefix_ignore_links (const char *progname,
 {
   return make_relative_prefix_1 (progname, bin_prefix, prefix, 0);
 }
-
