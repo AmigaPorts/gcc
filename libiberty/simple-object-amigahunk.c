@@ -225,6 +225,8 @@ simple_object_amigahunk_match (
     off_t offset, const char *segment_name ATTRIBUTE_UNUSED,
     const char **errmsg, int *err)
 {
+  off_t file_offset = offset;
+
   if (header[0] != 0 || header[1] != 0 || header[2] != 3 || header[3] != 0xe7)
     return NULL;
 
@@ -287,6 +289,7 @@ simple_object_amigahunk_match (
 		h->length = trim_lto_padding (descriptor, h->offset,
 					      h->length);
 	    }
+	  h->offset -= file_offset;
 	  offset -= 8;
 
 	  oar->root = h;
@@ -381,6 +384,9 @@ simple_object_amigahunk_match (
 	      sz = read4 (descriptor, &offset);
 	    }
 	  break;
+
+	default:
+	  return (void *) oar;
 	}
     }
 

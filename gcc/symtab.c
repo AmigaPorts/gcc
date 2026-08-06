@@ -2223,9 +2223,9 @@ symtab_node::output_to_lto_symbol_table_p (void)
      first place.  */
   if (VAR_P (decl) && DECL_HARD_REGISTER (decl))
     return false;
-  /* FIXME: Builtins corresponding to real functions probably should have
-     symbol table entries.  */
-  if (is_builtin_fn (decl))
+  /* Builtin definitions are real symbols and must remain visible to the
+     linker.  Omit only external builtin declarations.  */
+  if (!definition && is_builtin_fn (decl))
     return false;
 
   /* We have real symbol that should be in symbol table.  However try to trim
