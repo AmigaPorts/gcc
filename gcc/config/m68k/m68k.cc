@@ -176,6 +176,7 @@ static bool m68k_ok_for_sibcall_p (tree, tree);
 static bool m68k_tls_symbol_p (rtx);
 static rtx m68k_legitimize_address (rtx, rtx, machine_mode);
 static bool m68k_rtx_costs (rtx, machine_mode, int, int, int *, bool);
+static int m68k_address_cost(rtx x, machine_mode mode, addr_space_t t, bool speed);
 #if M68K_HONOR_TARGET_STRICT_ALIGNMENT
 static bool m68k_return_in_memory (const_tree, const_tree);
 #endif
@@ -183,9 +184,9 @@ static void m68k_output_dwarf_dtprel (FILE *, int, rtx) ATTRIBUTE_UNUSED;
 static void m68k_trampoline_init (rtx, tree, rtx);
 static poly_int64 m68k_return_pops_args (tree, tree, poly_int64);
 static rtx m68k_delegitimize_address (rtx);
-static void m68k_function_arg_advance (cumulative_args_t,
+extern void m68k_function_arg_advance (cumulative_args_t,
 				       const function_arg_info &);
-static rtx m68k_function_arg (cumulative_args_t, const function_arg_info &);
+extern rtx m68k_function_arg (cumulative_args_t, const function_arg_info &);
 static bool m68k_cannot_force_const_mem (machine_mode mode, rtx x);
 static bool m68k_output_addr_const_extra (FILE *, rtx);
 static void m68k_init_sync_libfuncs (void) ATTRIBUTE_UNUSED;
@@ -279,6 +280,9 @@ static bool m68k_use_lra_p (void);
 #undef TARGET_RTX_COSTS
 #define TARGET_RTX_COSTS m68k_rtx_costs
 
+#undef TARGET_ADDRESS_COST
+#define TARGET_ADDRESS_COST m68k_address_cost
+
 #undef TARGET_ATTRIBUTE_TABLE
 #define TARGET_ATTRIBUTE_TABLE m68k_attribute_table
 
@@ -364,6 +368,13 @@ static bool m68k_use_lra_p (void);
 #undef TARGET_ASM_FINAL_POSTSCAN_INSN
 #define TARGET_ASM_FINAL_POSTSCAN_INSN m68k_asm_final_postscan_insn
 
+#if defined(TARGET_AMIGAOS)
+#include "amigaos.h"
+#endif
+
+extern tree
+m68k_handle_type_attribute (tree *node, tree name, tree args, int flags, bool *no_add_attrs);
+
 #undef TARGET_ZERO_CALL_USED_REGS
 #define TARGET_ZERO_CALL_USED_REGS m68k_zero_call_used_regs
 
@@ -379,7 +390,14 @@ TARGET_GNU_ATTRIBUTES (m68k_attribute_table,
   { "interrupt_handler", 0, 0, true,  false, false, false,
     m68k_handle_fndecl_attribute, NULL },
   { "interrupt_thread", 0, 0, true,  false, false, false,
-    m68k_handle_fndecl_attribute, NULL }
+    m68k_handle_fndecl_attribute, NULL },
+	  { "asmreg", 1, 1, false, true, false, true, m68k_handle_type_attribute, NULL },
+	  { "asmregs", 1, 1, false,  true, true, true, NULL, NULL },
+	  { "regparm", 1, 1, false,  true, true, true, m68k_handle_type_attribute, NULL },
+	  { "stkparm", 0, 0, false,  true, true, true, m68k_handle_type_attribute, NULL},
+#ifdef SUBTARGET_ATTRIBUTES
+  SUBTARGET_ATTRIBUTES
+#endif
 });
 
 #undef TARGET_DOCUMENTATION_NAME
@@ -393,8 +411,13 @@ struct gcc_target targetm = TARGET_INITIALIZER;
 /* FL_68881 controls the default setting of -m68881.  gcc has traditionally
    generated 68881 code for 68020 and 68030 targets unless explicitly told
    not to.  */
+#ifdef TARGET_AMIGAOS
+/* SBF: no CAS on the AMIGA and no 68881 per default. */
+#define FL_FOR_isa_20    (FL_FOR_isa_10 | FL_ISA_68020 | FL_BITFIELD )
+#else
 #define FL_FOR_isa_20    (FL_FOR_isa_10 | FL_ISA_68020 \
 			  | FL_BITFIELD | FL_68881 | FL_CAS)
+#endif
 #define FL_FOR_isa_40    (FL_FOR_isa_20 | FL_ISA_68040)
 #define FL_FOR_isa_cpu32 (FL_FOR_isa_10 | FL_ISA_68020)
 
@@ -642,7 +665,7 @@ m68k_option_override (void)
       else
 	m68k_symbolic_jump = "bra%.l %p0";
       /* Turn off function cse if we are doing PIC.  We always want
-	 function call to be done as `bsr foo@PLTPC'.  */
+	 function call to be done as %'bsr foo@PLTPC'.  */
       /* ??? It's traditional to do this for -mpcrel too, but it isn't
 	 clear how intentional that is.  */
       flag_no_function_cse = 1;
@@ -1183,7 +1206,7 @@ m68k_expand_prologue (void)
 			    current_frame.reg_mask, true, true));
     }
 
-  if (!TARGET_SEP_DATA
+  if (!TARGET_SEP_DATA && !TARGET_AMIGA
       && crtl->uses_pic_offset_table)
     emit_insn (gen_load_got (pic_offset_table_rtx));
 }
@@ -1441,23 +1464,6 @@ m68k_ok_for_sibcall_p (tree decl, tree exp)
     return true;
 
   return false;
-}
-
-/* On the m68k all args are always pushed.  */
-
-static rtx
-m68k_function_arg (cumulative_args_t, const function_arg_info &)
-{
-  return NULL_RTX;
-}
-
-static void
-m68k_function_arg_advance (cumulative_args_t cum_v,
-			   const function_arg_info &arg)
-{
-  CUMULATIVE_ARGS *cum = get_cumulative_args (cum_v);
-
-  *cum += (arg.promoted_size_in_bytes () + 3) & ~3;
 }
 
 /* Convert X to a legitimate function call memory reference and return the
@@ -2152,7 +2158,7 @@ m68k_legitimate_constant_address_p (rtx x, unsigned int reach, bool strict_p)
   if (!CONSTANT_ADDRESS_P (x))
     return false;
 
-  if (flag_pic
+  if ((flag_pic == 1 || flag_pic == 2)
       && !(strict_p && TARGET_PCREL)
       && symbolic_operand (x, VOIDmode))
     return false;
@@ -3022,7 +3028,7 @@ const_int_cost (HOST_WIDE_INT i)
 }
 
 static bool
-m68k_rtx_costs (rtx x, machine_mode mode, int outer_code,
+m68k_rtx_costs0 (rtx x, machine_mode mode, int outer_code,
 		int opno ATTRIBUTE_UNUSED,
 		int *total, bool speed ATTRIBUTE_UNUSED)
 {
@@ -5035,8 +5041,10 @@ print_operand (FILE *file, rtx op, int letter)
   else if (letter == 'p')
     {
       output_addr_const (file, op);
+#ifndef TARGET_AMIGAOS
       if (!(GET_CODE (op) == SYMBOL_REF && SYMBOL_REF_LOCAL_P (op)))
 	fprintf (file, "@PLTPC");
+#endif
     }
   else if (GET_CODE (op) == REG)
     {
@@ -5104,6 +5112,10 @@ m68k_get_reloc_decoration (enum m68k_reloc reloc)
 	{
 	  if (flag_pic == 1 && TARGET_68020)
 	    return "@GOT.w";
+	  else if (flag_pic == 3)
+	    return ":W";
+	  else if (flag_pic == 4)
+	    return ":L";
 	  else
 	    return "@GOT";
 	}
@@ -5688,7 +5700,7 @@ m68k_output_mi_thunk (FILE *file, tree thunk ATTRIBUTE_UNUSED,
     {
       gcc_assert (flag_pic);
 
-      if (!TARGET_SEP_DATA)
+      if (!TARGET_SEP_DATA && !TARGET_AMIGA)
 	{
 	  /* Use the static chain register as a temporary (call-clobbered)
 	     GOT pointer for this function.  We can use the static chain
@@ -7267,3 +7279,57 @@ m68k_use_lra_p ()
 }
 
 #include "gt-m68k.h"
+
+
+extern bool
+m68k_68000_10_costs (rtx x, machine_mode mode, int outer_code,
+		int opno, int *total, bool speed );
+
+extern bool
+m68k_68020_costs (rtx x, machine_mode mode, int outer_code,
+		int opno, int *total, bool speed );
+
+extern bool
+m68k_68030_costs (rtx x, machine_mode mode, int outer_code,
+		int opno, int *total, bool speed );
+
+extern bool
+m68k_68040_costs (rtx x, machine_mode mode, int outer_code,
+		int opno, int *total, bool speed );
+
+extern bool
+m68k_68080_costs (rtx x, machine_mode mode, int outer_code,
+		int opno, int *total, bool speed );
+
+static bool
+m68k_rtx_costs (rtx x, machine_mode mode, int outer_code,
+		int opno,
+		int *total, bool speed )
+{
+  bool r;
+  if (TUNE_68000_10)
+    r =  m68k_68000_10_costs(x, mode, outer_code, opno, total, speed);
+  else
+  if (m68k_tune == u68020)
+    r = m68k_68020_costs(x, mode, outer_code, opno, total, speed);
+  else
+  if (m68k_tune == u68030)
+    r = m68k_68030_costs(x, mode, outer_code, opno, total, speed);
+  else
+  if (m68k_tune == u68040 || m68k_tune == u68020_40)
+    r = m68k_68040_costs(x, mode, outer_code, opno, total, speed);
+  else
+    r = m68k_68080_costs(x, mode, outer_code, opno, total, speed);
+
+  return r;
+}
+
+int m68k_address_cost(rtx x, machine_mode mode, addr_space_t t ATTRIBUTE_UNUSED, bool speed)
+{
+  static class rtx_def mem;
+  mem.code = MEM;
+  mem.u.fld[0].rt_rtx = x;
+  int total = 0;
+  m68k_rtx_costs(&mem, mode, SET, 0, &total, speed);
+  return total;
+}

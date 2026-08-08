@@ -104,7 +104,11 @@ do {								\
 #define DEBUGGER_REGNO(REGNO) (REGNO)
 
 #if 0
+<<<<<<< HEAD
 /* SVR4 m68k assembler is bitching on the `comm i,1,1' which askes for
+=======
+/* SVR4 m68k assembler is bitching on the %'comm i,1,1' which askes for 
+>>>>>>> bee2f3bc66c (migrate basic amiga-gcc features to gcc-13)
    1 byte alignment. Don't generate alignment for COMMON seems to be
    safer until we the assembler is fixed.  */
 #undef ASM_OUTPUT_ALIGNED_COMMON
