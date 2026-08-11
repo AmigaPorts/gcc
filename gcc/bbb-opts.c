@@ -5904,15 +5904,40 @@ opt_shift (void)
 
       int dy = ii.get_dst_regno();
 
-      // check the next insn if only a word/byte is used.
-      insn_info & next = (*infos)[index + 1];
-      int usedSize = next.getX(dy);
-      if (usedSize >= 4)
+      /* Find the first real use/def after the shift.  Looking only at
+	 infos[index+1] mis-classifies when that entry is a label/jump
+	 that does not mention dy while a later insn uses the full
+	 SImode result (e.g. `reg |= wid << 16` after `if (!wid) wid=1`).  */
+      int usedSize = 0;
+      bool found_use = false;
+      for (int next_index = index + 1; next_index < (int) infos->size ();
+	   ++next_index)
+	{
+	  insn_info &cand = (*infos)[next_index];
+	  if (cand.is_label ())
+	    continue;
+	  int xs = cand.getX (dy);
+	  if (xs != 0 || cand.is_def (dy) || cand.is_myuse (dy))
+	    {
+	      usedSize = xs;
+	      found_use = true;
+	      break;
+	    }
+	}
+      if (!found_use || usedSize == 0 || usedSize >= 4)
 	continue;
 
 //      debug(ii.get_insn());
       machine_mode mode = usedSize == 1 ? QImode : HImode;
       int srcop = ii.get_src_op(); // can be changed
+
+      /* Refuse reductions whose shift count does not fit the narrowed
+	 mode (e.g. SI << 16 must not become HI << 16 -> clr.w).  */
+      {
+	rtx amt = XEXP (SET_SRC (PATTERN (ii.get_insn ())), 1);
+	if (CONST_INT_P (amt) && INTVAL (amt) >= GET_MODE_BITSIZE (mode))
+	  continue;
+      }
 
       // are there insns like move.l dx,dy in front of that can be changed too?
       bool reduce = false;
