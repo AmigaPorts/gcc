@@ -1427,6 +1427,9 @@ m68k_ok_for_sibcall_p (tree decl, tree exp)
 {
   enum m68k_function_kind kind;
 
+  if (!m68k_is_ok_for_sibcall(decl, exp))
+    return false;
+
   /* We cannot use sibcalls for nested functions because we use the
      static chain register for indirect calls.  */
   if (CALL_EXPR_STATIC_CHAIN (exp))
