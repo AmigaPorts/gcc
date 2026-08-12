@@ -7666,7 +7666,8 @@ m68k_emit_setmemsi(rtx blkdest, rtx val, rtx length, rtx alignment)
       else
 	{
 	  src = gen_reg_rtx(SImode);
-          emit_move_insn(src, GEN_INT(((char)value << 24) | (value << 16) | (value << 8) | value));
+          emit_move_insn(dst,
+               gen_int_mode((unsigned char)value * 0x01010101u, SImode));
 	}
     }
   else
@@ -7695,6 +7696,7 @@ m68k_emit_setmemsi(rtx blkdest, rtx val, rtx length, rtx alignment)
 
   int nloops = size / n - 1;
 
+  /* Above this size, the generic implementation using MOVEM is faster. */
   if (nloops > 160)
     return false;
 
@@ -7704,20 +7706,20 @@ m68k_emit_setmemsi(rtx blkdest, rtx val, rtx length, rtx alignment)
     single += n;
   else if (nloops > 0)
     {
-      rtx counter = gen_reg_rtx (nloops < 0x10000 ? HImode : SImode);
-      rtx looplabel = gen_label_rtx ();
-      emit_move_insn (counter,
-		      GEN_INT(nloops < 0x10000 ? (short)nloops : nloops));
-      emit_label (looplabel);
-      while (n-- > 0)
-	{
-	  rtx_insn *insn = emit_move_insn (dst, src);
-	  add_reg_note (insn, REG_INC, regdst);
-	}
-      emit_jump_insn (
-	  nloops < 0x10000 ?
-	      gen_dbne_hi (counter, looplabel) :
-	      gen_dbne_si (counter, looplabel));
+      rtx counter = gen_reg_rtx(HImode);
+      rtx looplabel = gen_label_rtx();
+
+      emit_move_insn(counter, GEN_INT(nloops));
+      emit_label(looplabel);
+
+      int count = n;
+      while (count-- > 0)
+        {
+          rtx_insn *insn = emit_move_insn(dst, src);
+          add_reg_note(insn, REG_INC, regdst);
+        }
+
+      emit_jump_insn(gen_dbne_hi(counter, looplabel));    
     }
 
   while (single-- > 0)
@@ -7756,85 +7758,98 @@ m68k_emit_movmemsi(rtx blkdest, rtx blksrc, rtx length, rtx alignment)
   rtx src, dst;
   int rest = 0;
 
-  // tmp regs for auto inc
-  src = gen_reg_rtx (SImode);
-  rtx_insn *sinsn = emit_move_insn (src, regsrc);
-  add_reg_note (sinsn, REG_INC, src);
+  /* Temporary registers for auto-increment.  */
+  src = gen_reg_rtx(SImode);
+  rtx_insn *sinsn = emit_move_insn(src, regsrc);
+  add_reg_note(sinsn, REG_INC, src);
   regsrc = src;
 
-  dst = gen_reg_rtx (SImode);
-  rtx_insn *dinsn = emit_move_insn (dst, regdst);
-  add_reg_note (dinsn, REG_INC, dst);
+  dst = gen_reg_rtx(SImode);
+  rtx_insn *dinsn = emit_move_insn(dst, regdst);
+  add_reg_note(dinsn, REG_INC, dst);
   regdst = dst;
 
-  /* move bytes. */
+  /* Move bytes on 68000/68010.  */
   if (align == 1 && TUNE_68000_10)
     {
-      src = gen_rtx_MEM (QImode, gen_rtx_POST_INC(SImode, regsrc));
-      dst = gen_rtx_MEM (QImode, gen_rtx_POST_INC(SImode, regdst));
+      src = gen_rtx_MEM(QImode,
+                        gen_rtx_POST_INC(SImode, regsrc));
+      dst = gen_rtx_MEM(QImode,
+                        gen_rtx_POST_INC(SImode, regdst));
     }
   else
     {
-      align = 4;
       rest = size % 4;
       size /= 4;
-      src = gen_rtx_MEM (SImode, gen_rtx_POST_INC(SImode, regsrc));
-      dst = gen_rtx_MEM (SImode, gen_rtx_POST_INC(SImode, regdst));
+
+      src = gen_rtx_MEM(SImode,
+                        gen_rtx_POST_INC(SImode, regsrc));
+      dst = gen_rtx_MEM(SImode,
+                        gen_rtx_POST_INC(SImode, regdst));
     }
 
   int nloops = size / n - 1;
 
+  /*
+   * This is an empirical performance limit.  Above 160 loop
+   * iterations, the MOVEM-based implementation is faster.
+   */
   if (nloops > 160)
     return false;
 
   int single = size % n;
 
-  rtx add = GEN_INT(align);
-
   if (nloops == 0)
     single += n;
   else if (nloops > 0)
     {
-      rtx counter = gen_reg_rtx (nloops < 0x10000 ? HImode : SImode);
-      rtx looplabel = gen_label_rtx ();
-      emit_move_insn (counter,
-		      GEN_INT(nloops < 0x10000 ? (short )nloops : nloops));
-      emit_label (looplabel);
-      while (n-- > 0)
-	{
-	  rtx_insn *insn = emit_move_insn (dst, src);
-	  add_reg_note (insn, REG_INC, regsrc);
-	  add_reg_note (insn, REG_INC, regdst);
-	}
-      emit_jump_insn (
-	  nloops < 0x10000 ?
-	      gen_dbne_hi (counter, looplabel) :
-	      gen_dbne_si (counter, looplabel));
+      rtx counter = gen_reg_rtx(HImode);
+      rtx looplabel = gen_label_rtx();
+
+      emit_move_insn(counter, GEN_INT(nloops));
+      emit_label(looplabel);
+
+      int count = n;
+      while (count-- > 0)
+        {
+          rtx_insn *insn = emit_move_insn(dst, src);
+          add_reg_note(insn, REG_INC, regsrc);
+          add_reg_note(insn, REG_INC, regdst);
+        }
+
+      emit_jump_insn(gen_dbne_hi(counter, looplabel));
     }
 
   while (single-- > 0)
     {
-      rtx_insn *insn = emit_move_insn (dst, src);
-      add_reg_note (insn, REG_INC, regsrc);
-      add_reg_note (insn, REG_INC, regdst);
+      rtx_insn *insn = emit_move_insn(dst, src);
+      add_reg_note(insn, REG_INC, regsrc);
+      add_reg_note(insn, REG_INC, regdst);
     }
 
-  // move trailing data
+  /* Move trailing data.  */
   if (rest & 2)
     {
-      src = gen_rtx_MEM (HImode, gen_rtx_POST_INC(SImode, regsrc));
-      dst = gen_rtx_MEM (HImode, gen_rtx_POST_INC(SImode, regdst));
-      rtx_insn *insn = emit_move_insn (dst, src);
-      add_reg_note (insn, REG_INC, regsrc);
-      add_reg_note (insn, REG_INC, regdst);
+      src = gen_rtx_MEM(HImode,
+                        gen_rtx_POST_INC(SImode, regsrc));
+      dst = gen_rtx_MEM(HImode,
+                        gen_rtx_POST_INC(SImode, regdst));
+
+      rtx_insn *insn = emit_move_insn(dst, src);
+      add_reg_note(insn, REG_INC, regsrc);
+      add_reg_note(insn, REG_INC, regdst);
     }
+
   if (rest & 1)
     {
-      src = gen_rtx_MEM (QImode, gen_rtx_POST_INC(SImode, regsrc));
-      dst = gen_rtx_MEM (QImode, gen_rtx_POST_INC(SImode, regdst));
-      rtx_insn *insn = emit_move_insn (dst, src);
-      add_reg_note (insn, REG_INC, regsrc);
-      add_reg_note (insn, REG_INC, regdst);
+      src = gen_rtx_MEM(QImode,
+                        gen_rtx_POST_INC(SImode, regsrc));
+      dst = gen_rtx_MEM(QImode,
+                        gen_rtx_POST_INC(SImode, regdst));
+
+      rtx_insn *insn = emit_move_insn(dst, src);
+      add_reg_note(insn, REG_INC, regsrc);
+      add_reg_note(insn, REG_INC, regdst);
     }
 
   return true;
