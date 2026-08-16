@@ -7,508 +7,437 @@
 #include "cfghooks.h"
 #include "tree.h"
 #include "rtl.h"
-#include "insn-modes.h"
 
-bool
-m68k_68080_costs (rtx x, machine_mode mode, int outer_code, int opno,
-		  int *total, bool speed);
+#define USE_MOVQ(i)	((unsigned) ((i) + 128) <= 255)
 
-enum mycosts {
-  cost_base,
-  cost_reg,
-  cost_mem,
-  cost_int_moveq,
-  cost_int_addq,
-  cost_word,
-  cost_long,
-  cost_float,
-  cost_double,
-  cost_extended,
-  cost_addr_ax,
-  cost_addr_nax,
-  cost_addr_symbol,
-  cost_addr_axdx,
-  cost_addr_n8axdx,
-  cost_addr_n16axdx,
-  cost_addr_n32axdx,
-  cost_addr_with_mem,
-  cost_shift,
-  cost_mult,
-  cost_div,
-  cost_call,
-  cost_if,
-  cost_bcc,
-  cost_max
-};
+/* ============================================
+   APOLLO 68080 KOSTEN-MAKROS (Speed / Size)
+   ============================================ */
+#define COST_REG                    (speed ? 0  : 5)
+#define COST_MEM_PLUS_REG_DISP      (speed ? 0  : 1)
+#define COST_MEM_PLUS_REG_REG       (speed ? 3  : 0)
+#define COST_MEM_OTHER              (speed ? 5  : 1)
+#define COST_CONST_INT_Q            (speed ? 8  : 20)
+#define COST_CONST_INT_W            (speed ? 0  : 1)
+#define COST_CONST_INT_L            (speed ? 3  : 0)
+#define COST_CONST_DOUBLE           (speed ? 0  : 9)
+#define COST_SYMBOL                 (speed ? 0  : 12)
+#define COST_PLUS_REG_REG           (speed ? 13 : 5)
+#define COST_PLUS_REG_CONSTQ        (speed ? 0  : 20)
+#define COST_PLUS_REG_CONSTW        (speed ? 0  : 0)
+#define COST_PLUS_REG_CONSTL        (speed ? 2  : 1)
+#define COST_PLUS_OTHER             (speed ? 23 : 12)
+#define COST_LOGIC_REG_CONST        (speed ? 0  : 8)
+#define COST_SHIFT_CONST            (speed ? 2  : 2)
+#define COST_SHIFT_CONST_W          (speed ? 10 : 0)
+#define COST_BRANCH                 (speed ? 10 : 0)
+#define COST_SET_REG_REG            (speed ? 5  : 1)
+#define COST_CALL_OTHER             (speed ? 0  : 11)
 
-static int thecosts0[cost_max] = {
-    0, // set
-    2, // reg
-    5, // mem
-    2, // int moveq
-    2, // int addq
-    2, // int word was 1
-    2, // int long was 2
-    2, // fix/float SF
-    4, // double DF
-    6, // extended XF
-    0, // (ax)
-    1, // (n,ax), was 1
-    1, // symbol, was 1
-    2, // (ax,dy) was 3
-    2, // (n8,ax,dy) was 3
-    2, // (n16,ax,dy) was 4
-    3, // (n32,ax,dy) was 5
-    35, // other address
-    0, // shift
-    8, // mult
-    60, // div
-    7, // call
-    16, // if then else
-    16, // bcc
-};
+/* ============================================
+   APOLLO 68080 MULT / DIV KOSTEN
+   ============================================ */
+#define COST_MUL_L              4       /* mul.l Dn, Dm (Apollo: 4 Zyklen) */
+#define COST_MUL_W              3       /* mul.w Dn, Dm (Apollo: 3 Zyklen) */
+#define COST_DIV_L              6       /* div.l Dn, Dm (Apollo: 6 Zyklen) */
+#define COST_DIV_W              4       /* div.w Dn, Dm (Apollo: 4 Zyklen) */
+#define COST_ADD_L              0       /* add.l Dn, Dm (Apollo: 1 Zyklus) */
+#define COST_SUB_L              0       /* sub.l Dn, Dm (Apollo: 1 Zyklus) */
+#define COST_MOVE_L             0       /* move.l Dn, Dm (Apollo: 1 Zyklus) */
+#define COST_MOVEQ              0       /* moveq #0, Dn (Apollo: 1 Zyklus) */
+#define COST_LSL_SHIFT(shift)   (1 + (shift) * 1)  /* lsl.l #shift, Dn (1-2 Zyklen) */
 
-#if 0
-static int thecosts2[cost_max] = {
-    2, // set
-    1, // reg
-    4, // mem
-    1, // int moveq
-    1, // int addq
-    1, // int word was 1
-    1, // int long was 2
-    3, // fix/float SF
-    5, // double DF
-    7, // extended XF
-    0, // (ax)
-    0, // (n,ax), was 1
-    0, // symbol, was 1
-    0, // (ax,dy) was 3
-    0, // (n8,ax,dy) was 3
-    0, // (n16,ax,dy) was 4
-    0, // (n32,ax,dy) was 5
-    35, // other address
-    0, // shift
-    8, // mult
-    60, // div
-    7, // call
-    16, // if then else
-    16, // bcc
-};
-
-static int thecosts4[cost_max] = {
-    4, // set
-    0, // reg
-    3, // mem
-    0, // moveq
-    0, // addq
-    0, // word was 1
-    0, // long was 2
-    4, // fix/float SF
-    6, // double DF
-    8, // extended XF
-    0, // (ax)
-    0, // (n,ax), was 1
-    0, // symbol, was 1
-    4, // (ax,dy) was 3
-    4, // (n8,ax,dy) was 3
-    8, // (n16,ax,dy) was 4
-    8, // (n32,ax,dy) was 5
-    35, // other address
-    0, // shift
-    8, // mult
-    60, // div
-    7, // call
-    16, // if then else
-    16, // bcc
-};
-#endif
-
-static int * thecosts = thecosts0;
-
-#if 0
-static int ttotal;
-#define TEST(a,r) {ttotal = 0; m68k_68080_costs(a, SImode, 0, 0, &ttotal, 1); if (ttotal != r) {debug(a);printf("%d <> %d: %s\n", ttotal, r, #a);}}
-
-void
-selftest_m68k_68080_costs (void)
+/* ============================================
+   m68k_68080_costs_intern
+   ============================================ */
+static bool
+m68k_68080_costs_intern (rtx x,
+                         machine_mode mode,
+                         int outer_code ATTRIBUTE_UNUSED,
+                         int opno ATTRIBUTE_UNUSED,
+                         int *total,
+                         bool speed)
 {
-  rtx d0 = gen_rtx_REG (SImode, 0);
-  rtx d1 = gen_rtx_REG (SImode, 1);
-  rtx a7 = gen_rtx_REG (SImode, 15);
+    int code = GET_CODE (x);
+    int total2;
 
-  rtx c120 = GEN_INT(120);
-
-  rtx mem_120ia0 = gen_rtx_MEM (SImode, gen_rtx_PLUS(SImode, a7, c120));
-
-  rtx dummy = gen_rtx_SYMBOL_REF(SImode, "dummy");
-  rtx minusa7 = gen_rtx_MEM(SImode, gen_rtx_PRE_DEC(SImode, a7));
-
-  rtx movel_d0_d1 = gen_rtx_SET(d1, d0);
-  TEST(movel_d0_d1, thecosts[cost_base] + thecosts[cost_reg] * 2);
-
-  rtx add_d0_d1 = gen_rtx_SET(d1, gen_rtx_PLUS(SImode, d1, d0));
-  TEST(add_d0_d1, thecosts[cost_base] + thecosts[cost_reg] * 2);
-
-  rtx movel_120ia0_d0 = gen_rtx_SET(d0, mem_120ia0);
-  TEST(movel_120ia0_d0, thecosts[cost_base] + thecosts[cost_reg]  + thecosts[cost_mem] + thecosts[cost_addr_ax]);
-
-  rtx ashl_8_d0 = gen_rtx_SET(d0, gen_rtx_ASHIFT(SImode, d0, GEN_INT(8)));
-  TEST(ashl_8_d0, thecosts[cost_base] + thecosts[cost_reg] + thecosts[cost_int_addq]);
-
-  rtx pea_sym = gen_rtx_SET(minusa7, dummy);
-  TEST(pea_sym, thecosts[cost_base] + thecosts[cost_long]  + thecosts[cost_mem] + thecosts[cost_addr_ax]);
-
-  rtx pea_32 = gen_rtx_SET(minusa7, GEN_INT(32));
-  TEST(pea_32, thecosts[cost_base] + thecosts[cost_reg]  + thecosts[cost_mem] + thecosts[cost_addr_nax]);
-
-  rtx addq8sp = gen_rtx_SET(a7, gen_rtx_PLUS(SImode, a7, GEN_INT(8)));
-  TEST(addq8sp, thecosts[cost_base] + thecosts[cost_reg] * 2);
-
-  rtx cmpd0a7 = gen_rtx_SET(cc0_rtx, gen_rtx_COMPARE(SImode, d0, a7));
-  TEST(cmpd0a7, thecosts[cost_base] + thecosts[cost_reg] * 2);
-}
-static int run;
-#endif
-
-
-/**
- * calculate costs for the 68080.
- * opno == 1: calculate as if dst is a register
- * opno == 0: calculate difference to register assignment
- */
-bool
-m68k_68080_costs (rtx x, machine_mode mode, int outer_code ATTRIBUTE_UNUSED, int opno ATTRIBUTE_UNUSED,
-		  int *total, bool speed)
-{
-//  if (!run)
-//    {
-//      run = 1;
-//      selftest_m68k_68080_costs ();
-//    }
-
-  int code = GET_CODE(x);
-  int total2 = 0;
-  *total = 0;
-
-  if (outer_code == ADDRESS)
+    switch (code)
     {
-      if (GET_CODE (x) == CONST)
-	x = XEXP(x, 0);
-      if (REG_P(x) || GET_CODE(x) == POST_INC || GET_CODE(x) == PRE_DEC)
-	{
-	  *total = thecosts[cost_addr_ax]; // (ax), (ax)+, -(ax)
-	  return true;
-	}
-      if (GET_CODE(x) == SYMBOL_REF || GET_CODE(x) == LABEL_REF || CONST_INT_P(x))
-	{
-	  *total = thecosts[cost_addr_symbol];
-	  return true;
-	}
-      if (GET_CODE(x) == MULT)
-	{
-	  *total = thecosts[cost_addr_axdx];
-	  return true;
-	}
-
-      if (GET_CODE(x) == PLUS)
-	{
-	  rtx b = XEXP(x, 0);
-	  if (GET_CODE(b) == CONST)
-	    b = XEXP(b, 0);
-	  rtx c = XEXP(x, 1);
-	  if (GET_CODE(c) == CONST)
-	    c = XEXP(c, 0);
-
-	  if ((GET_CODE(b) == SYMBOL_REF || GET_CODE(b) == LABEL_REF  || CONST_INT_P(b))
-	      && CONST_INT_P(c))
-	    {
-	      *total = thecosts[cost_addr_symbol]; // sym+n
-	      return true;
-	    }
-
-	  if (REG_P(b) && GET_CODE(c) == CONST_INT && INTVAL(c) >= -32768
-	      && INTVAL(c) <= 37267)
-	    {
-	      *total = thecosts[cost_addr_nax]; // 16(An),Dn
-	      return true;
-	    }
-	  if (REG_P(b) || GET_CODE(b) == MULT || GET_CODE(b) == ASHIFT)
-	    {
-	      if (REG_P(c))
-		{
-		  *total = thecosts[cost_addr_axdx]; // (An,Xn*S)
-		  return true;
-		}
-	      if (REG_P(c) || GET_CODE(c) == SYMBOL_REF
-		  || GET_CODE(c) == CONST_INT)
-		{
-		  *total = thecosts[cost_addr_n32axdx]; // (32,Xn*S)
-		  return true;
-		}
-	    }
-	  if (GET_CODE(b) == PLUS)
-	    {
-	      rtx b0 = XEXP(b, 0);
-	      rtx b1 = XEXP(b, 1);
-	      if (REG_P(b0) || GET_CODE(b0) == MULT || GET_CODE(b0) == ASHIFT)
-		{
-		  if (GET_CODE(c) == CONST_INT)
-		    {
-		      *total = INTVAL(c) >= -8 && INTVAL(c) <= 8 ? thecosts[cost_addr_n8axdx] // 8(An,Xn*S)
-			  :
-			       INTVAL(c) >= -32768 && INTVAL(c) <= 32767 ? thecosts[cost_addr_n16axdx] // (16,An,Xn*S)
-				   : thecosts[cost_addr_n32axdx]; // (32,An,Xn*S)
-		      return true;
-		    }
-		  if (GET_CODE(c) == SYMBOL_REF || GET_CODE(c) == LABEL_REF || CONST_INT_P(c))
-		    {
-		      *total = thecosts[cost_addr_n32axdx];
-		      return true;
-		    }
-		}
-	      if (GET_CODE(b0) == SYMBOL_REF && CONST_INT_P(b1))
-		{
-		  *total = thecosts[cost_addr_n32axdx];
-		  return true;
-		}
-	    }
-	  if (GET_CODE(c) == PLUS)
-	    {
-	      *total = thecosts[cost_addr_n32axdx];
-	      return true;
-	    }
-	}
-      *total = thecosts[cost_addr_ax];
-      return true;
-    }
-
-  switch (code)
-    {
-    case PC:
-    case REG:
-      *total = thecosts[cost_reg];
-      return true;
+    /* Alle Fälle, die 0 zurückgeben */
+    case PRE_DEC:
+    case POST_INC:
+    case IF_THEN_ELSE:
+    case ZERO_EXTEND:
+    case SIGN_EXTEND:
+    case TRUNCATE:
+    case ROTATE:
+    case ROTATERT:
+    case LABEL_REF:
+    case SUBREG:
+    case STRICT_LOW_PART:
+    case NEG:
+    case NOT:
+        *total = 0;
+        return true;
 
     case CONST_INT:
-      {
-	int iv = INTVAL(x);
-	switch (outer_code)
-	{
-	  case SET: // moveq
-	    if (iv >= -0x100 && iv <= 0xff)
-	      {
-		*total = thecosts[cost_int_moveq];
-		break;
-	      }
-	    goto Defconst;
-	  case PLUS:
-	  case MINUS:
-	    if (iv >= -8 && iv <= 8)
-	      {
-		*total = thecosts[cost_int_addq];
-		break;
-	      }
-	    goto Defconst;
-	  case ASHIFT:
-	  case ASHIFTRT:
-	  case LSHIFTRT:
-		*total = thecosts[cost_int_addq];
-	    break;
-	  default:
-Defconst:
-	    if (iv == 0) // used in compares
-	      break;
+    {
+        HOST_WIDE_INT v = INTVAL(x);
 
-	    if ((outer_code == MEM || outer_code == COMPARE || outer_code == PLUS ||
-		GET_MODE_SIZE(mode) < 4) && iv >= -32768 && iv <= 32767)
-	      *total = thecosts[cost_word];
-	    else
-	      *total = thecosts[cost_long];
-	    break;
-	}
-      }
-      return true;
+        if (USE_MOVQ(v))
+            *total = COST_CONST_INT_Q;
+        else if (v >= -32768 && v <= 32767)
+            *total = COST_CONST_INT_W;
+        else
+            *total = COST_CONST_INT_L;
+
+        return true;
+    }
 
     case CONST_DOUBLE:
-      *total = mode == SFmode ? thecosts[cost_float] : mode == DFmode ? thecosts[cost_double] : thecosts[cost_extended];
-      return true;
+        *total = COST_CONST_DOUBLE;
+        return true;
 
-    case FLOAT:
-    case FLOAT_TRUNCATE:
-    case FIX:
-      *total = thecosts[cost_float]; // guessed
-      return true;
+    case SYMBOL_REF:
+        *total = COST_SYMBOL;
+        return true;
 
-    case MULT:
-      {
-	rtx op = XEXP(x, 0);
-	if (CONST_INT_P(op) && exact_log2 (INTVAL(op)))
-	  total2 = thecosts[cost_shift]; // same as shift
-	else
-	  total2 = thecosts[cost_mult];
-	goto OpCost;
-      }
-      break;
+    case CONST:
+    {
+        rtx inner = XEXP(x, 0);
+        if (GET_CODE(inner) == PLUS
+            && SYMBOL_REF_P(XEXP(inner, 0))
+            && CONST_INT_P(XEXP(inner, 1)))
+            *total = COST_SYMBOL;
+        else
+            *total = 0;
+        return true;
+    }
 
-    case UDIV:
-    case MOD:
-    case DIV:
-      total2 = thecosts[cost_div]; // always in a parallel with DIV and MOD -> half costs
-      goto OpCost;
+    case REG:
+        *total = COST_REG;
+        return true;
+
+    case MEM:
+    {
+        rtx addr = XEXP(x, 0);
+
+        switch (GET_CODE(addr))
+        {
+        case REG:
+        case POST_INC:
+        case PRE_DEC:
+            *total = 0;
+            break;
+
+        case PLUS:
+        {
+            rtx a = XEXP(addr, 0);
+            rtx b = XEXP(addr, 1);
+
+            if ((REG_P(a) && CONST_INT_P(b)))
+            {
+                HOST_WIDE_INT off = INTVAL(b);
+                if (off >= -32768 && off <= 32767)
+                    *total = COST_MEM_PLUS_REG_DISP;
+                else
+                    *total = COST_MEM_PLUS_REG_REG;
+            }
+            else if (REG_P(a) && REG_P(b))
+                *total = COST_MEM_PLUS_REG_REG;
+            else
+                *total = COST_MEM_OTHER;
+
+            break;
+        }
+
+        case SYMBOL_REF:
+        case LABEL_REF:
+        case CONST:
+        default:
+            *total = COST_MEM_OTHER;
+            break;
+        }
+
+        if (GET_MODE_SIZE(mode) > 2)
+            *total += 2;
+
+        return true;
+    }
+
+    case PLUS:
+    case MINUS:
+    {
+        rtx a = XEXP(x, 0);
+        rtx b = XEXP(x, 1);
+
+        if (REG_P(a) && REG_P(b))
+        {
+            *total = COST_PLUS_REG_REG;
+            return true;
+        }
+
+        if (REG_P(a) && CONST_INT_P(b))
+        {
+            HOST_WIDE_INT v = INTVAL(b);
+
+            if (v >= -8 && v <= 8)
+            {
+                *total = COST_PLUS_REG_CONSTQ;
+                return true;
+            }
+
+            if (REGNO(a) == SP_REG)
+            {
+                *total = 8;
+                return true;
+            }
+
+            *total = GET_MODE_SIZE(mode) > 2
+                     ? COST_PLUS_REG_CONSTL
+                     : COST_PLUS_REG_CONSTW;
+            return true;
+        }
+
+        *total = (GET_CODE(a) == PLUS
+                  ? COST_PLUS_OTHER
+                  : COST_PLUS_OTHER / 2);
+        return true;
+    }
+
+    case AND:
+    case IOR:
+    case XOR:
+    case COMPARE:
+    {
+        rtx a = XEXP(x, 0);
+        rtx b = XEXP(x, 1);
+
+        if (REG_P(a) && REG_P(b))
+        {
+            *total = (code == XOR) ? 0 : 1;
+            return true;
+        }
+
+        if ((REG_P(a) && CONST_INT_P(b))
+            || (REG_P(b) && CONST_INT_P(a)))
+        {
+            *total = GET_MODE_SIZE(mode) > 2
+                     ? COST_LOGIC_REG_CONST + 2
+                     : COST_LOGIC_REG_CONST;
+            return true;
+        }
+
+        *total = 0;
+        return true;
+    }
 
     case ASHIFT:
     case ASHIFTRT:
     case LSHIFTRT:
-    case PLUS:
-    case MINUS:
-    case AND:
-    case IOR:
-    case XOR:
+    {
+        rtx a = XEXP(x, 0);
+        rtx b = XEXP(x, 1);
+
+        if (REG_P(a) && CONST_INT_P(b))
+        {
+            *total = (GET_MODE_SIZE(mode) > 2
+                      ? COST_SHIFT_CONST
+                      : COST_SHIFT_CONST_W);
+            return true;
+        }
+
+        *total = 0;
+        return true;
+    }
+
+    case MULT:
       {
-	OpCost: rtx a = XEXP(x, 0);
-	rtx b = XEXP(x, 1);
+        rtx dst = XEXP (x, 0);
+        rtx src = XEXP (x, 1);
 
-	// reg or mem
-	m68k_68080_costs (a, mode, code, 0, total, speed);
-	total2 += *total;
+        if (CONST_INT_P (src))
+          {
+            HOST_WIDE_INT n = INTVAL (src);
 
-	// add cost for 2nd
-	m68k_68080_costs (b, mode, code, 0, total, speed);
-	*total += total2;
-	return true;
+            /* 1. Special case: multiplication by 0 or 1. */
+            if (n == 0 || n == 1)
+              {
+                *total = COST_MOVEQ;
+                return true;
+              }
+
+            unsigned HOST_WIDE_INT un;
+
+            if (n < 0)
+              un = -(unsigned HOST_WIDE_INT) n;
+            else
+              un = (unsigned HOST_WIDE_INT) n;
+
+            /* 2. Special case: power of 2 -> lsl.l #shift, Dn.
+               Negative constants are excluded because they also need neg.l. */
+            if (n > 0)
+              {
+                int shift = exact_log2 (un);
+
+                if (shift >= 0)
+                  {
+                    *total = COST_LSL_SHIFT (shift);
+                    return true;
+                  }
+              }
+
+            /* 3. Special case: (2^shift + 1) -> lsl.l + add.l */
+            if (n > 0 && un > 1 && (un & (un - 1)) == 1)
+              {
+                int shift = exact_log2 (un - 1);
+
+                if (shift >= 0)
+                  {
+                    *total = COST_LSL_SHIFT (shift) + COST_ADD_L;
+                    return true;
+                  }
+              }
+
+            /* 4. Special case: (2^shift - 1) -> lsl.l + sub.l */
+            if (n > 0 && un > 2 && (un & (un + 1)) == 0)
+              {
+                int shift = exact_log2 (un + 1);
+
+                if (shift >= 0)
+                  {
+                    *total = COST_LSL_SHIFT (shift) + COST_SUB_L;
+                    return true;
+                  }
+              }
+
+            /* 5. General case with bit population count. */
+            {
+              int bits = 0;
+              int l = 0;
+              HOST_WIDE_INT nn = n;
+
+              if (nn > 0)
+                {
+                  if (GET_CODE (dst) == ZERO_EXTEND || REG_P (dst))
+                    {
+                      while (nn)
+                        {
+                          if (nn & 1)
+                            ++bits;
+                          nn >>= 1;
+                        }
+
+                      if (bits == 1 && REG_P (dst))
+                        {
+                          *total = COST_MOVEQ;
+                          return true;
+                        }
+                    }
+                  else
+                    {
+                      while (nn || l)
+                        {
+                          if ((nn & 1) != l)
+                            {
+                              l = !l;
+                              ++bits;
+                            }
+
+                          nn >>= 1;
+                        }
+                    }
+
+                  *total = 12 + bits;
+                  return true;
+                }
+            }
+          }
+
+        /* 6. Fallback: mul.l / mul.w */
+        *total = GET_MODE_SIZE (mode) > 2
+                 ? COST_MUL_L
+                 : COST_MUL_W;
+        return true;
       }
-      break;
+    case DIV:
+    case UDIV:
+    case MOD:
+    case UMOD:
+        *total = GET_MODE_SIZE(mode) > 2 ? COST_DIV_L : COST_DIV_W;
+        return true;
 
-    case SUBREG:
-    case STRICT_LOW_PART:
-    case SIGN_EXTRACT:
-    case ZERO_EXTRACT:
-    case TRUNCATE:
-    case ZERO_EXTEND:
-    case NOT:
-    case NEG:
-    case SIGN_EXTEND:
-    case CONST:
-      // no additional cost
-      return m68k_68080_costs (XEXP(x, 0), mode, code, 0, total, speed);
+    case EQ:
+    case NE:
+    case LT:
+    case LE:
+    case GT:
+    case GE:
+    case LTU:
+    case LEU:
+    case GTU:
+    case GEU:
+        *total = COST_BRANCH;
+        return true;
+
+    case SET:
+    {
+        rtx dest = XEXP(x, 0);
+        rtx src = XEXP(x, 1);
+
+        if (REG_P(dest) && REG_P(src))
+        {
+            *total = COST_SET_REG_REG;
+            return true;
+        }
+
+        if (!m68k_68080_costs_intern(dest, mode, code, 0, total, speed))
+            return false;
+        if (!m68k_68080_costs_intern(src, mode, code, 1, &total2, speed))
+            return false;
+        *total += total2;
+
+        /* CLR - überschreibt Summe */
+        if (CONST_INT_P(src) && INTVAL(src) == 0)
+        {
+            if (REG_P(dest))
+                *total = 0;
+            else if (MEM_P(dest))
+                *total = 0;  /* COST_SET_CLR_MEM_L = 0 */
+        }
+
+        return true;
+    }
 
     case CALL:
-      {
-	bool r = m68k_68080_costs (XEXP(x, 0), mode, code, 0, total, speed);
-	*total += thecosts[cost_call];
-	return r;
-      }
+    {
+        rtx mem = XEXP(x, 0);
+        rtx b = XEXP(mem, 0);
 
-    case MEM:
-      {
-	// ADDRESS cost + 3
-	bool r = m68k_68080_costs (XEXP(x, 0), mode, ADDRESS, 0, total, speed);
-	*total += thecosts[cost_mem];
-	return r;
-      }
+        if (REG_P(b) || GET_CODE(b) == PLUS)
+            *total = 0;
+        else
+            *total = COST_CALL_OTHER;
 
-    case SYMBOL_REF:
-    case LABEL_REF:
-      *total = thecosts[cost_long];
-      return true;
-
-    case NE:
-    case EQ:
-    case GE:
-    case GT:
-    case LE:
-    case LT:
-    case GEU:
-    case GTU:
-    case LEU:
-    case LTU:
-    case COMPARE:
-      {
-	rtx dst = XEXP(x, 0);
-	rtx src = XEXP(x, 1);
-	bool r = m68k_68080_costs (dst, mode, code, 0, total, speed);
-	total2 = *total;
-	r &= m68k_68080_costs (src, mode, code, 0, total, speed);
-	*total += total2;
-	return r;
-      }
-    case SET:
-      {
-	total2 = thecosts[cost_base];
-
-	rtx dst = XEXP(x, 0);
-	rtx src = XEXP(x, 1);
-	if (GET_CODE(dst) == PC)
-	  {
-	    if (GET_CODE(src) == IF_THEN_ELSE)
-	      {
-		*total = thecosts[cost_if];
-		return true;
-	      }
-	    bool r = m68k_68080_costs (src, mode, ADDRESS, 0, total, speed);
-	    *total += total2;
-	    return r;
-	  }
-/*
-	if (GET_CODE(dst) == CC0)
-	  {
-	    bool r = m68k_68080_costs (src, mode, code, 0, total, speed);
-	    *total += total2;
-	    return r;
-	  }
-*/
-	// big penalty for 32x32->64 mul/div
-	if (m68k_tune == u68060 || m68k_tune == u68020_60)
-	  {
-	    if (GET_CODE (src) == MULT || GET_CODE (src) == DIV)
-	      {
-		if (GET_MODE (dst) == DImode)
-		  {
-		    *total = 100;
-		    return true;
-		  }
-	      }
-	  }
-
-	bool r = m68k_68080_costs (dst, mode, code, 0, total, speed);
-	total2 += *total;
-
-	// binops have dst as first argument - check for binop
-	const char *format = GET_RTX_FORMAT(GET_CODE(src));
-	if (format && format[0] == 'e' && format[1] == 'e')
-	  {
-	    if (reload_completed)
-	      {
-		rtx p0 = XEXP(src, 0);
-		if (SUBREG_P(p0))
-		  p0 = XEXP(p0, 0);
-		// reset cost if p0 == dst - do not add cost twice
-		if (GET_CODE(src) == PLUS && !rtx_equal_p (p0, dst))
-		  {
-		    bool r = m68k_68080_costs (src, mode, ADDRESS, 0, total, speed);
-		    *total += total2;
-		    return r;
-		  }
-	      }
-	    // modify dst with dst
-	    total2 = thecosts[cost_base]; // reset to base cost
-	  }
-
-	r &= m68k_68080_costs (src, mode, MEM_P(dst) ? MEM : code, 0, total, speed);
-	*total += total2;
-
-	return r;
-      }
-      break;
-
-    case IF_THEN_ELSE:
-      *total = thecosts[cost_bcc]; // bcc
-      return true;
-
-    case ASM_OPERANDS:
-    case ASM_INPUT:
-      return false;
+        return true;
     }
-  return false;
+
+    default:
+        *total = 4;
+        return true;
+    }
+}
+
+/* ============================================
+   EXPORTIERTE FUNKTION
+   ============================================ */
+bool
+m68k_68080_costs (rtx x,
+                  machine_mode mode,
+                  int outer_code ATTRIBUTE_UNUSED,
+                  int opno ATTRIBUTE_UNUSED,
+                  int *total,
+                  bool speed)
+{
+    return m68k_68080_costs_intern(x, mode, outer_code, opno, total, speed);
 }

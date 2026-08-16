@@ -67,6 +67,8 @@ along with GCC; see the file COPYING3.  If not see
 #include "builtins.h"
 #include "rtl-iter.h"
 #include "toplev.h"
+#include "df.h"
+
 
 /* This file should be included last.  */
 #include "target-def.h"
@@ -932,6 +934,42 @@ m68k_initial_elimination_offset (int from, int to)
     }
 }
 
+/**
+ * Optimize the epilogue register mask by removing registers that were
+ * only read (e.g., input arguments) but never modified within the function.
+ */
+static bool
+m68k_is_reg_written (int regno)
+{
+  /* Traverse all definitions (write accesses) of this register */
+  for (df_ref def = DF_REG_DEF_CHAIN (regno); def != NULL;
+	   def = DF_REF_NEXT_REG (def))
+	{
+	  /* Ignore incoming register arguments at ENTRY_BLOCK */
+	  if (DF_REF_IS_ARTIFICIAL (def))
+		continue;
+
+	  rtx_insn *insn = DF_REF_INSN (def);
+
+	  /* Ignore debug instructions to maintain code consistency */
+	  if (!NONDEBUG_INSN_P (insn))
+		continue;
+
+	  rtx set = single_set (insn);
+	  if (set)
+	    {
+		  rtx src = SET_SRC(set);
+		  rtx dst = SET_DEST(set);
+		  if (REG_P (src) && REG_P (dst) && REGNO (src) == REGNO (dst))
+			  continue;
+	    }
+
+	  /* A real modification of the register was found */
+	  return true;
+	}
+  return false;
+}
+
 /* Refer to the array `regs_ever_live' to determine which registers
    to save; `regs_ever_live[I]' is nonzero if register number I
    is ever used in the function.  This function is responsible for
@@ -998,6 +1036,9 @@ m68k_save_reg (unsigned int regno, bool interrupt_handler)
   /* Never need to save registers that aren't touched.  */
   if (!df_regs_ever_live_p (regno))
     return false;
+
+  if (!m68k_is_reg_written (regno))
+	return false;
 
   /* Otherwise save everything that isn't call-clobbered.  */
   return !call_used_or_fixed_reg_p (regno);
