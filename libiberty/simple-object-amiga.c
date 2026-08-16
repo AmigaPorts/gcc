@@ -19,6 +19,10 @@ Foundation, 51 Franklin Street - Fifth Floor, Boston, MA 02110-1301, USA.  */
 #include "libiberty.h"
 #include "simple-object.h"
 
+#ifdef HAVE_STDINT_H
+#include <stdint.h>
+#endif
+
 #ifdef HAVE_STDLIB_H
 #include <stdlib.h>
 #endif
@@ -77,13 +81,28 @@ struct simple_object_amiga_section
   char *name;
   off_t offset;
   off_t length;
+  unsigned int hunk_index;
+  struct simple_object_amiga_record *records;
+  struct simple_object_amiga_record **record_tail;
   struct simple_object_amiga_section *next;
+};
+
+/* A record associated with the preceding section hunk.  Relocations and
+   symbols must follow copied early-debug sections into the output object.  */
+
+struct simple_object_amiga_record
+{
+  unsigned long type;
+  off_t offset;
+  off_t length;
+  struct simple_object_amiga_record *next;
 };
 
 struct simple_object_amiga_read
 {
   struct simple_object_amiga_section *sections;
   struct simple_object_amiga_section **tail;
+  unsigned int hunk_count;
 };
 
 struct simple_object_amiga_attributes
@@ -91,9 +110,28 @@ struct simple_object_amiga_attributes
   int unused;
 };
 
+struct simple_object_amiga_write_record
+{
+  unsigned long type;
+  unsigned char *data;
+  size_t length;
+  struct simple_object_amiga_write_record *next;
+};
+
+/* Records attached to a generic simple-object output section.  */
+
+struct simple_object_amiga_write_section
+{
+  simple_object_write_section *section;
+  struct simple_object_amiga_write_record *records;
+  struct simple_object_amiga_write_record **record_tail;
+  struct simple_object_amiga_write_section *next;
+};
+
 struct simple_object_amiga_write
 {
-  int unused;
+  struct simple_object_amiga_write_section *sections;
+  struct simple_object_amiga_write_section **tail;
 };
 
 static unsigned long
@@ -109,6 +147,22 @@ static unsigned int
 simple_object_amiga_fetch_16 (const unsigned char *buf)
 {
   return (((unsigned int) buf[0] << 8) | (unsigned int) buf[1]);
+}
+
+static void
+simple_object_amiga_store_32 (unsigned char *buf, unsigned long value)
+{
+  buf[0] = (value >> 24) & 0xff;
+  buf[1] = (value >> 16) & 0xff;
+  buf[2] = (value >> 8) & 0xff;
+  buf[3] = value & 0xff;
+}
+
+static void
+simple_object_amiga_store_16 (unsigned char *buf, unsigned int value)
+{
+  buf[0] = (value >> 8) & 0xff;
+  buf[1] = value & 0xff;
 }
 
 static int
@@ -148,10 +202,7 @@ simple_object_amiga_write_32 (int descriptor, off_t offset,
 {
   unsigned char buf[4];
 
-  buf[0] = (value >> 24) & 0xff;
-  buf[1] = (value >> 16) & 0xff;
-  buf[2] = (value >> 8) & 0xff;
-  buf[3] = value & 0xff;
+  simple_object_amiga_store_32 (buf, value);
 
   return simple_object_internal_write (descriptor, offset, buf, sizeof (buf),
 				       errmsg, err);
@@ -187,9 +238,10 @@ simple_object_amiga_write_name (int descriptor, off_t *offset,
   return NULL;
 }
 
-static void
+static struct simple_object_amiga_section *
 simple_object_amiga_add_section (struct simple_object_amiga_read *amiga,
-				 char *name, off_t offset, off_t length)
+				 char *name, off_t offset, off_t length,
+				 unsigned int hunk_index)
 {
   struct simple_object_amiga_section *section;
 
@@ -197,21 +249,57 @@ simple_object_amiga_add_section (struct simple_object_amiga_read *amiga,
   section->name = name;
   section->offset = offset;
   section->length = length;
+  section->hunk_index = hunk_index;
+  section->records = NULL;
+  section->record_tail = &section->records;
   section->next = NULL;
   *amiga->tail = section;
   amiga->tail = &section->next;
+  return section;
+}
+
+static void
+simple_object_amiga_add_record (struct simple_object_amiga_section *section,
+				unsigned long type, off_t offset,
+				off_t length)
+{
+  struct simple_object_amiga_record *record;
+
+  if (section == NULL)
+    return;
+
+  record = XNEW (struct simple_object_amiga_record);
+  record->type = type;
+  record->offset = offset;
+  record->length = length;
+  record->next = NULL;
+  *section->record_tail = record;
+  section->record_tail = &record->next;
 }
 
 static int
-simple_object_amiga_is_lto_section (const char *name)
+simple_object_amiga_is_lto_data_section (const char *name)
 {
   return strncmp (name, ".gnu.lto", 8) == 0;
 }
 
 static int
+simple_object_amiga_is_lto_debug_section (const char *name)
+{
+  return strncmp (name, ".gnu.debuglto", 13) == 0;
+}
+
+static int
+simple_object_amiga_is_lto_section (const char *name)
+{
+  return (simple_object_amiga_is_lto_data_section (name)
+	  || simple_object_amiga_is_lto_debug_section (name));
+}
+
+static int
 simple_object_amiga_is_padded_lto_section (const char *name)
 {
-  if (!simple_object_amiga_is_lto_section (name))
+  if (!simple_object_amiga_is_lto_data_section (name))
     return 0;
 
   if (strcmp (name, ".gnu.lto_.opts") == 0)
@@ -459,6 +547,14 @@ simple_object_amiga_release_sections (struct simple_object_amiga_read *amiga)
   while (section != NULL)
     {
       struct simple_object_amiga_section *next = section->next;
+      struct simple_object_amiga_record *record = section->records;
+
+      while (record != NULL)
+	{
+	  struct simple_object_amiga_record *next_record = record->next;
+	  XDELETE (record);
+	  record = next_record;
+	}
       XDELETEVEC (section->name);
       XDELETE (section);
       section = next;
@@ -472,6 +568,7 @@ simple_object_amiga_match (unsigned char header[SIMPLE_OBJECT_MATCH_HEADER_LEN],
 			   const char **errmsg, int *err)
 {
   struct simple_object_amiga_read *amiga;
+  struct simple_object_amiga_section *current_section;
   char *name;
   off_t pos;
   unsigned long hunk_type;
@@ -486,6 +583,8 @@ simple_object_amiga_match (unsigned char header[SIMPLE_OBJECT_MATCH_HEADER_LEN],
   amiga = XNEW (struct simple_object_amiga_read);
   amiga->sections = NULL;
   amiga->tail = &amiga->sections;
+  amiga->hunk_count = 0;
+  current_section = NULL;
 
   pos = offset + 4;
   name = simple_object_amiga_read_name (descriptor, &pos, errmsg, err);
@@ -522,13 +621,17 @@ simple_object_amiga_match (unsigned char header[SIMPLE_OBJECT_MATCH_HEADER_LEN],
 	    goto fail;
 	  pos += 4;
 	  hunk_size = HUNK_VALUE (hunk_size) * 4;
-	  if (hunk_value == HUNK_DEBUG && name != NULL && name[0] != '\0')
+	  current_section = NULL;
+	  if (name != NULL && name[0] != '\0'
+	      && (hunk_value == HUNK_DEBUG
+		  || simple_object_amiga_is_lto_debug_section (name)))
 	    {
 	      off_t section_offset = pos;
 	      off_t length = hunk_size;
 	      int has_lto_header = 0;
 
-	      if (simple_object_amiga_is_lto_section (name))
+	      if (hunk_value == HUNK_DEBUG
+		  && simple_object_amiga_is_lto_section (name))
 		{
 		  has_lto_header =
 		    simple_object_amiga_read_lto_header (descriptor,
@@ -545,11 +648,12 @@ simple_object_amiga_match (unsigned char header[SIMPLE_OBJECT_MATCH_HEADER_LEN],
 							section_offset,
 							length,
 							errmsg, err);
-	      simple_object_amiga_add_section (amiga, name,
-					       section_offset - offset,
-					       length);
+	      current_section = simple_object_amiga_add_section (
+		amiga, name, section_offset - offset, length,
+		amiga->hunk_count);
 	      name = NULL;
 	    }
+	  amiga->hunk_count++;
 	  pos += hunk_size;
 	  if (name != NULL)
 	    {
@@ -560,6 +664,8 @@ simple_object_amiga_match (unsigned char header[SIMPLE_OBJECT_MATCH_HEADER_LEN],
 
 	case HUNK_BSS:
 	  pos += 4;
+	  current_section = NULL;
+	  amiga->hunk_count++;
 	  if (name != NULL)
 	    {
 	      XDELETEVEC (name);
@@ -576,28 +682,54 @@ simple_object_amiga_match (unsigned char header[SIMPLE_OBJECT_MATCH_HEADER_LEN],
 	case HUNK_RELRELOC32:
 	case HUNK_ABSRELOC16:
 	case HUNK_RELRELOC26:
-	  if (!simple_object_amiga_skip_relocs (descriptor, &pos, errmsg, err))
-	    goto fail;
+	  {
+	    off_t record_offset = pos;
+	    if (!simple_object_amiga_skip_relocs (descriptor, &pos,
+						    errmsg, err))
+	      goto fail;
+	    simple_object_amiga_add_record (current_section, hunk_value,
+					    record_offset - offset,
+					    pos - record_offset);
+	  }
 	  break;
 
 	case HUNK_RELOC32SHORT:
-	  if (!simple_object_amiga_skip_short_relocs (descriptor, &pos,
-						      errmsg, err))
-	    goto fail;
+	  {
+	    off_t record_offset = pos;
+	    if (!simple_object_amiga_skip_short_relocs (descriptor, &pos,
+							  errmsg, err))
+	      goto fail;
+	    simple_object_amiga_add_record (current_section, hunk_value,
+					    record_offset - offset,
+					    pos - record_offset);
+	  }
 	  break;
 
 	case HUNK_SYMBOL:
-	  if (!simple_object_amiga_skip_symbols (descriptor, &pos,
-						 errmsg, err))
-	    goto fail;
+	  {
+	    off_t record_offset = pos;
+	    if (!simple_object_amiga_skip_symbols (descriptor, &pos,
+						     errmsg, err))
+	      goto fail;
+	    simple_object_amiga_add_record (current_section, hunk_value,
+					    record_offset - offset,
+					    pos - record_offset);
+	  }
 	  break;
 
 	case HUNK_EXT:
-	  if (!simple_object_amiga_skip_ext (descriptor, &pos, errmsg, err))
-	    goto fail;
+	  {
+	    off_t record_offset = pos;
+	    if (!simple_object_amiga_skip_ext (descriptor, &pos, errmsg, err))
+	      goto fail;
+	    simple_object_amiga_add_record (current_section, hunk_value,
+					    record_offset - offset,
+					    pos - record_offset);
+	  }
 	  break;
 
 	case HUNK_END:
+	  current_section = NULL;
 	  if (name != NULL)
 	    {
 	      XDELETEVEC (name);
@@ -679,13 +811,254 @@ simple_object_amiga_start_write (void *attributes_data ATTRIBUTE_UNUSED,
 				 const char **errmsg ATTRIBUTE_UNUSED,
 				 int *err ATTRIBUTE_UNUSED)
 {
-  return XNEW (struct simple_object_amiga_write);
+  struct simple_object_amiga_write *amiga;
+
+  amiga = XNEW (struct simple_object_amiga_write);
+  amiga->sections = NULL;
+  amiga->tail = &amiga->sections;
+  return amiga;
+}
+
+static const char *
+simple_object_amiga_remap_relocs (unsigned long type, unsigned char *data,
+				  size_t length, const unsigned int *map,
+				  unsigned int map_count, int *err)
+{
+  size_t pos = 0;
+
+  if (type == HUNK_RELOC32SHORT)
+    {
+      while (1)
+	{
+	  unsigned int count;
+	  unsigned int target;
+
+	  if (length - pos < 2)
+	    goto invalid;
+	  count = simple_object_amiga_fetch_16 (data + pos);
+	  pos += 2;
+	  if (count == 0)
+	    break;
+	  if (length - pos < 2 || count > (length - pos - 2) / 2)
+	    goto invalid;
+	  target = simple_object_amiga_fetch_16 (data + pos);
+	  if (target >= map_count || map[target] >= map_count)
+	    goto discarded;
+	  simple_object_amiga_store_16 (data + pos, map[target]);
+	  pos += (count + 1) * 2;
+	}
+
+      if (length - pos > 2)
+	goto invalid;
+      return NULL;
+    }
+
+  while (1)
+    {
+      unsigned long count;
+      unsigned long target;
+
+      if (length - pos < 4)
+	goto invalid;
+      count = simple_object_amiga_fetch_32 (data + pos);
+      pos += 4;
+      if (count == 0)
+	break;
+      if (length - pos < 4 || count > (length - pos - 4) / 4)
+	goto invalid;
+      target = simple_object_amiga_fetch_32 (data + pos);
+      if (target >= map_count || map[target] >= map_count)
+	goto discarded;
+      simple_object_amiga_store_32 (data + pos, map[target]);
+      pos += (count + 1) * 4;
+    }
+
+  if (pos != length)
+    goto invalid;
+  return NULL;
+
+invalid:
+  *err = 0;
+  return "invalid Amiga relocation hunk";
+
+discarded:
+  *err = 0;
+  return "Amiga LTO debug relocation references a discarded section";
+}
+
+/* Return nonzero for records whose section indexes need remapping when a
+   subset of the input hunks is copied.  */
+
+static int
+simple_object_amiga_is_reloc_hunk (unsigned long type)
+{
+  switch (type)
+    {
+    case HUNK_RELOC32:
+    case HUNK_RELOC16:
+    case HUNK_RELOC8:
+    case HUNK_DREL32:
+    case HUNK_DREL16:
+    case HUNK_DREL8:
+    case HUNK_RELOC32SHORT:
+    case HUNK_RELRELOC32:
+    case HUNK_ABSRELOC16:
+    case HUNK_RELRELOC26:
+      return 1;
+
+    default:
+      return 0;
+    }
+}
+
+static const char *
+simple_object_amiga_copy_record (
+  simple_object_read *sobj, struct simple_object_amiga_record *record,
+  struct simple_object_amiga_write_section *write_section,
+  const unsigned int *map, unsigned int map_count, int *err)
+{
+  struct simple_object_amiga_write_record *write_record;
+  const char *errmsg;
+
+  write_record = XNEW (struct simple_object_amiga_write_record);
+  write_record->type = record->type;
+  write_record->length = record->length;
+  write_record->data = XNEWVEC (unsigned char, write_record->length);
+  write_record->next = NULL;
+
+  if (!simple_object_internal_read (sobj->descriptor,
+				    sobj->offset + record->offset,
+				    write_record->data,
+				    write_record->length, &errmsg, err))
+    {
+      XDELETEVEC (write_record->data);
+      XDELETE (write_record);
+      return errmsg;
+    }
+
+  if (simple_object_amiga_is_reloc_hunk (record->type))
+    {
+      errmsg = simple_object_amiga_remap_relocs (
+	record->type, write_record->data, write_record->length,
+	map, map_count, err);
+      if (errmsg != NULL)
+	{
+	  XDELETEVEC (write_record->data);
+	  XDELETE (write_record);
+	  return errmsg;
+	}
+    }
+
+  *write_section->record_tail = write_record;
+  write_section->record_tail = &write_record->next;
+  return NULL;
+}
+
+static const char *
+simple_object_amiga_copy_lto_debug_sections (simple_object_read *sobj,
+					     simple_object_write *dobj,
+					     char *(*pfn) (const char *),
+					     int *err)
+{
+  struct simple_object_amiga_read *read_amiga =
+    (struct simple_object_amiga_read *) sobj->data;
+  struct simple_object_amiga_write *write_amiga =
+    (struct simple_object_amiga_write *) dobj->data;
+  struct simple_object_amiga_section *section;
+  unsigned int *map;
+  char **names;
+  unsigned int i;
+  unsigned int new_index = 0;
+  const char *errmsg = NULL;
+
+  map = XNEWVEC (unsigned int, read_amiga->hunk_count);
+  names = XCNEWVEC (char *, read_amiga->hunk_count);
+  for (i = 0; i < read_amiga->hunk_count; i++)
+    map[i] = read_amiga->hunk_count;
+
+  /* Ask the generic LTO callback which sections to keep, then build the
+     old-to-new HUNK index map needed by their relocation records.  */
+  for (section = read_amiga->sections; section != NULL;
+	 section = section->next)
+    {
+      char *name = (*pfn) (section->name);
+
+      if (name != NULL)
+	{
+	  map[section->hunk_index] = new_index++;
+	  names[section->hunk_index] = name;
+	}
+    }
+
+  for (section = read_amiga->sections; section != NULL;
+	 section = section->next)
+    if (names[section->hunk_index] != NULL)
+      {
+	struct simple_object_amiga_write_section *write_section;
+	struct simple_object_amiga_record *record;
+	simple_object_write_section *dest;
+	unsigned char *data = NULL;
+
+	dest = simple_object_write_create_section (
+	  dobj, names[section->hunk_index], 2, &errmsg, err);
+	free (names[section->hunk_index]);
+	names[section->hunk_index] = NULL;
+	if (dest == NULL)
+	  goto done;
+
+	if (section->length != 0)
+	  {
+	    data = XNEWVEC (unsigned char, section->length);
+	    if (!simple_object_internal_read (sobj->descriptor,
+					      sobj->offset + section->offset,
+					      data, section->length,
+					      &errmsg, err))
+	      {
+		XDELETEVEC (data);
+		goto done;
+	      }
+
+	    errmsg = simple_object_write_add_data (dobj, dest, data,
+						     section->length, 1, err);
+	    XDELETEVEC (data);
+	    if (errmsg != NULL)
+	      goto done;
+	  }
+
+	write_section = XNEW (struct simple_object_amiga_write_section);
+	write_section->section = dest;
+	write_section->records = NULL;
+	write_section->record_tail = &write_section->records;
+	write_section->next = NULL;
+	*write_amiga->tail = write_section;
+	write_amiga->tail = &write_section->next;
+
+	for (record = section->records; record != NULL;
+	     record = record->next)
+	  {
+	    errmsg = simple_object_amiga_copy_record (
+	      sobj, record, write_section, map,
+	      read_amiga->hunk_count, err);
+	    if (errmsg != NULL)
+	      goto done;
+	  }
+      }
+
+done:
+  for (i = 0; i < read_amiga->hunk_count; i++)
+    free (names[i]);
+  XDELETEVEC (names);
+  XDELETEVEC (map);
+  return errmsg;
 }
 
 static const char *
 simple_object_amiga_write_to_file (simple_object_write *sobj, int descriptor,
 				   int *err)
 {
+  struct simple_object_amiga_write *amiga =
+    (struct simple_object_amiga_write *) sobj->data;
+  struct simple_object_amiga_write_section *write_section = amiga->sections;
   simple_object_write_section *section;
   const char *errmsg;
   off_t offset = 0;
@@ -766,6 +1139,28 @@ simple_object_amiga_write_to_file (simple_object_write *sobj, int descriptor,
 	return errmsg;
       offset += pad;
 
+      if (write_section != NULL && write_section->section == section)
+	{
+	  struct simple_object_amiga_write_record *record;
+
+	  for (record = write_section->records; record != NULL;
+	       record = record->next)
+	    {
+	      if (!simple_object_amiga_write_32 (descriptor, offset,
+						 record->type, &errmsg, err))
+		return errmsg;
+	      offset += 4;
+	      if (record->length != 0
+		  && !simple_object_internal_write (descriptor, offset,
+						    record->data,
+						    record->length,
+						    &errmsg, err))
+		return errmsg;
+	      offset += record->length;
+	    }
+	  write_section = write_section->next;
+	}
+
       if (!simple_object_amiga_write_32 (descriptor, offset, HUNK_END,
 					 &errmsg, err))
 	return errmsg;
@@ -778,7 +1173,26 @@ simple_object_amiga_write_to_file (simple_object_write *sobj, int descriptor,
 static void
 simple_object_amiga_release_write (void *data)
 {
-  XDELETE (data);
+  struct simple_object_amiga_write *amiga =
+    (struct simple_object_amiga_write *) data;
+  struct simple_object_amiga_write_section *section = amiga->sections;
+
+  while (section != NULL)
+    {
+      struct simple_object_amiga_write_section *next_section = section->next;
+      struct simple_object_amiga_write_record *record = section->records;
+
+      while (record != NULL)
+	{
+	  struct simple_object_amiga_write_record *next_record = record->next;
+	  XDELETEVEC (record->data);
+	  XDELETE (record);
+	  record = next_record;
+	}
+      XDELETE (section);
+      section = next_section;
+    }
+  XDELETE (amiga);
 }
 
 const struct simple_object_functions simple_object_amiga_functions =
@@ -792,5 +1206,5 @@ const struct simple_object_functions simple_object_amiga_functions =
   simple_object_amiga_start_write,
   simple_object_amiga_write_to_file,
   simple_object_amiga_release_write,
-  NULL
+  simple_object_amiga_copy_lto_debug_sections
 };
