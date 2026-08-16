@@ -10,63 +10,56 @@
 
 #define USE_MOVQ(i)	((unsigned) ((i) + 128) <= 255)
 
-enum m68k_cost_kind {
-    cost_reg,
+/* ============================================
+   68000 KOSTEN (Speed / Size) - OPTIMIERT
+   ============================================ */
+#define COST_REG                    (speed ? 3  : 5)
+#define COST_MEM_REG                (speed ? 1  : 0)
+#define COST_MEM_PLUS_REG_DISP      (speed ? 1  : 1)
+#define COST_MEM_PLUS_REG_REG       (speed ? 0  : 0)
+#define COST_MEM_OTHER              (speed ? 0  : 1)
+#define COST_CONST_INT_Q            (speed ? 0  : 20)
+#define COST_CONST_INT_W            (speed ? 0  : 1)
+#define COST_CONST_INT_L            (speed ? 5  : 0)
+#define COST_CONST_DOUBLE           (speed ? 0  : 9)
+#define COST_SYMBOL                 (speed ? 7  : 12)
+#define COST_PLUS_REG_REG           (speed ? 3  : 5)
+#define COST_PLUS_REG_CONSTQ        (speed ? 1  : 20)
+#define COST_PLUS_REG_CONSTW        (speed ? 0  : 0)
+#define COST_PLUS_REG_CONSTL        (speed ? 0  : 1)
+#define COST_PLUS_OTHER             (speed ? 6  : 12)
+#define COST_LOGIC_REG_CONST        (speed ? 7  : 8)
+#define COST_SHIFT_CONST            (speed ? 9  : 2)
+#define COST_SHIFT_CONST_W          (speed ? 0  : 0)
+#define COST_NEG_NOT_L              (speed ? 0  : 4)
+#define COST_NEG_NOT_W              (speed ? 0  : 2)
+#define COST_BRANCH                 (speed ? 0  : 0)
+#define COST_SET_REG_REG            (speed ? 0  : 1)
+#define COST_SET_CLR_MEM_L          (speed ? 0  : 0)
+#define COST_CALL_REG               (speed ? 0  : 0)
+#define COST_CALL_OTHER             (speed ? 5  : 11)
 
-    cost_mem_reg,
-    cost_mem_plus_reg_disp,
-    cost_mem_plus_reg_reg,
-    cost_mem_other,
-
-    cost_const_int_q,
-    cost_const_int_w,
-    cost_const_int_l,
-    cost_const_double,
-    cost_symbol,
-
-    cost_plus_reg_reg,
-    cost_plus_reg_constq,
-    cost_plus_reg_constw,
-    cost_plus_reg_constl,
-    cost_plus_other,
-
-    cost_logic_reg_const,
-
-    cost_shift_const,
-    cost_shift_const_w,
-
-    cost_neg_not_l,
-    cost_neg_not_w,
-
-    cost_branch,
-
-    cost_set_reg_reg,
-    cost_set_clr_mem_l,
-
-    cost_call_reg,
-    cost_call_other,
-
-    cost_max
-};
-
-#include "m68k-costs-speed.h"
-#include "m68k-costs-size.h"
+/* ============================================
+   68000 MULT KOSTEN (aus alter Implementierung)
+   ============================================ */
+#define COST_MULU_L_SPEED(shift)    (8 + (shift) * 2)  /* lsl.l + add/sub */
+#define COST_MULU_L_FALLBACK        180                 /* mulu.l Fallback */
+#define COST_MULU_W_FALLBACK        0                   /* mulu.w Fallback (nicht verwendet) */
 
 static bool
-m68k_68000_10_costs_table (rtx x,
+m68k_68000_10_costs_intern (rtx x,
                      machine_mode mode,
                      int outer_code ATTRIBUTE_UNUSED,
                      int opno ATTRIBUTE_UNUSED,
                      int *total,
                      bool speed)
 {
-  const int *thecosts = speed ? m68k_costs_speed : m68k_costs_size;
   int code = GET_CODE (x);
   int total2;
 
   switch (code)
     {
-
+  /* Alle Fälle, die 0 zurückgeben */
   case PRE_DEC:
   case POST_INC:
   case IF_THEN_ELSE:
@@ -78,7 +71,9 @@ m68k_68000_10_costs_table (rtx x,
   case LABEL_REF:
   case SUBREG:
   case STRICT_LOW_PART:
-	  *total = 0;
+  case NEG:
+  case NOT:
+      *total = 0;
     return true;
 
     case CONST_INT:
@@ -86,38 +81,37 @@ m68k_68000_10_costs_table (rtx x,
         HOST_WIDE_INT v = INTVAL (x);
 
         if (USE_MOVQ (v))
-          *total = thecosts[cost_const_int_q];
+          *total = COST_CONST_INT_Q;
         else if (v >= -32768 && v <= 32767)
-          *total = thecosts[cost_const_int_w];
+          *total = COST_CONST_INT_W;
         else
-          *total = thecosts[cost_const_int_l];
+          *total = COST_CONST_INT_L;
 
         return true;
       }
 
     case CONST_DOUBLE:
-      *total = thecosts[cost_const_double];
+      *total = COST_CONST_DOUBLE;
       return true;
 
     case SYMBOL_REF:
-      *total = thecosts[cost_symbol];
+      *total = COST_SYMBOL;
       return true;
 
     case CONST:
       {
         rtx inner = XEXP (x, 0);
-        /* symbol+offset: wie SYMBOL_REF */
         if (GET_CODE (inner) == PLUS
             && SYMBOL_REF_P (XEXP (inner, 0))
             && CONST_INT_P (XEXP (inner, 1)))
-          *total = thecosts[cost_symbol];
+          *total = COST_SYMBOL;
         else
           *total = 0;
         return true;
       }
 
     case REG:
-      *total = thecosts[cost_reg];
+      *total = COST_REG;
       return true;
 
     case MEM:
@@ -128,11 +122,8 @@ m68k_68000_10_costs_table (rtx x,
           {
           case REG:
           case POST_INC:
-            *total = thecosts[cost_mem_reg];
-            break;
-
           case PRE_DEC:
-            *total = 0; // must be free for push
+            *total = 0;
             break;
 
           case PLUS:
@@ -144,14 +135,14 @@ m68k_68000_10_costs_table (rtx x,
                 {
                   HOST_WIDE_INT off = INTVAL (b);
                   if (off >= -32768 && off <= 32767)
-                    *total = thecosts[cost_mem_plus_reg_disp];
+                    *total = COST_MEM_PLUS_REG_DISP;
                   else
-                    *total = thecosts[cost_mem_plus_reg_reg];
+                    *total = COST_MEM_PLUS_REG_REG;
                 }
               else if (REG_P (a) && REG_P (b))
-                *total = thecosts[cost_mem_plus_reg_reg];
+                *total = COST_MEM_PLUS_REG_REG;
               else
-                *total = thecosts[cost_mem_other];
+                *total = COST_MEM_OTHER;
 
               break;
             }
@@ -159,11 +150,8 @@ m68k_68000_10_costs_table (rtx x,
           case SYMBOL_REF:
           case LABEL_REF:
           case CONST:
-            *total = thecosts[cost_mem_other];
-            break;
-
           default:
-            *total = thecosts[cost_mem_other];
+            *total = COST_MEM_OTHER;
             break;
           }
 
@@ -181,7 +169,7 @@ m68k_68000_10_costs_table (rtx x,
 
         if (REG_P (a) && REG_P (b))
           {
-            *total = thecosts[cost_plus_reg_reg];
+            *total = COST_PLUS_REG_REG;
             return true;
           }
 
@@ -191,7 +179,7 @@ m68k_68000_10_costs_table (rtx x,
 
             if (v >= -8 && v <= 8)
               {
-                *total = thecosts[cost_plus_reg_constq];
+                *total = COST_PLUS_REG_CONSTQ;
                 return true;
               }
 
@@ -202,16 +190,17 @@ m68k_68000_10_costs_table (rtx x,
               }
 
             *total = GET_MODE_SIZE (mode) > 2
-                     ? thecosts[cost_plus_reg_constl]
-                     : thecosts[cost_plus_reg_constw];
+                     ? COST_PLUS_REG_CONSTL
+                     : COST_PLUS_REG_CONSTW;
             return true;
           }
 
         *total = (GET_CODE (a) == PLUS
-                  ? thecosts[cost_plus_other]
-                  : thecosts[cost_plus_other] / 2);
+                  ? COST_PLUS_OTHER
+                  : COST_PLUS_OTHER / 2);
         return true;
       }
+
     case AND:
     case IOR:
     case XOR:
@@ -222,11 +211,7 @@ m68k_68000_10_costs_table (rtx x,
 
         if (REG_P (a) && REG_P (b))
           {
-            if (code == XOR)
-              *total = 0;
-            else
-              *total = 1;
-
+            *total = (code == XOR) ? 0 : 1;
             return true;
           }
 
@@ -234,8 +219,8 @@ m68k_68000_10_costs_table (rtx x,
             || (REG_P (b) && CONST_INT_P (a)))
           {
             *total = GET_MODE_SIZE (mode) > 2
-                     ? thecosts[cost_logic_reg_const] + 2
-                     : thecosts[cost_logic_reg_const];
+                     ? COST_LOGIC_REG_CONST + 2
+                     : COST_LOGIC_REG_CONST;
             return true;
           }
 
@@ -252,7 +237,9 @@ m68k_68000_10_costs_table (rtx x,
 
         if (REG_P (a) && CONST_INT_P (b))
           {
-            *total = (GET_MODE_SIZE (mode) > 2 ? thecosts[cost_shift_const] : thecosts[cost_shift_const_w]);
+            *total = (GET_MODE_SIZE (mode) > 2
+                      ? COST_SHIFT_CONST
+                      : COST_SHIFT_CONST_W);
             return true;
           }
 
@@ -260,96 +247,82 @@ m68k_68000_10_costs_table (rtx x,
         return true;
       }
 
-    case NEG:
-    case NOT:
-    	*total = GET_MODE_SIZE(mode) > 2
-    	         ? thecosts[cost_neg_not_l]
-    	         : thecosts[cost_neg_not_w];
-      return true;
+	case MULT:
+	  {
+		rtx a = XEXP (x, 0);
+		rtx b = XEXP (x, 1);
 
-    case MULT:
-      {
-        rtx a = XEXP (x, 0);
-        rtx b = XEXP (x, 1);
+		/* Speed optimization: constant multiplication. */
+		if (CONST_INT_P (b) && speed)
+		  {
+			HOST_WIDE_INT n = INTVAL (b);
 
-        if (CONST_INT_P (b))
-          {
-            HOST_WIDE_INT n = INTVAL (b);
-	    unsigned HOST_WIDE_INT abs_n
-	      = n < 0 ? -(unsigned HOST_WIDE_INT) n
-		      : (unsigned HOST_WIDE_INT) n;
-	    int shift = exact_log2 (abs_n);
+			if (n > 0)
+			  {
+				int shift = exact_log2 (n);
 
-	    if (shift >= 0)
-              {
-                *total = 8 + (shift * 2);
-                return true;
-              }
-          }
+				if (shift >= 0)
+				  {
+					*total = COST_MULU_L_SPEED (shift);
+					return true;
+				  }
+			  }
 
-        if (speed)
-          {
-            int f = GET_MODE_SIZE (mode) > 2 ? 180 : 0;
+			/* General case using bit population count / transitions. */
+			{
+			  int f = GET_MODE_SIZE (mode) > 2 ? 180 : 0;
+			  HOST_WIDE_INT i = n;
 
-            if (GET_CODE (b) == CONST_INT)
-              {
-                HOST_WIDE_INT i = INTVAL (b);
+			  if (i > 0)
+				{
+				  int bits = 0;
+				  int transitions = 0;
+				  int last = 0;
+				  HOST_WIDE_INT t = i;
 
-                if (i > 0)
-                  {
-                    int bits = 0;
-                    int transitions = 0;
-                    int last = 0;
-                    HOST_WIDE_INT t = i;
+				  if (GET_CODE (a) == ZERO_EXTEND)
+					{
+					  while (t)
+						{
+						  bits += t & 1;
+						  t >>= 1;
+						}
 
-                    if (GET_CODE (a) == ZERO_EXTEND)
-                      {
-                        while (t)
-                          {
-                            bits += (t & 1);
-                            t >>= 1;
-                          }
+					  f = 24 + bits * 6;
+					}
+				  else
+					{
+					  while (t || last)
+						{
+						  int bit = t & 1;
 
-                        f = 24 + bits * 6;
-                      }
-                    else
-                      {
-                        while (t || last)
-                          {
-                            int bit = t & 1;
+						  if (bit != last)
+							{
+							  transitions++;
+							  last = bit;
+							}
 
-                            if (bit != last)
-                              {
-                                transitions++;
-                                last = bit;
-                              }
+						  t >>= 1;
+						}
 
-                            t >>= 1;
-                          }
+					  f = 28 + transitions * 7;
+					}
 
-                        f = 28 + transitions * 7;
-                      }
+				  if (GET_MODE_SIZE (mode) > 2)
+					f = (f * 3) / 2;
+				}
 
-                    if (GET_MODE_SIZE (mode) > 2)
-                      f = (f * 3) / 2;
+			  *total = f;
+			  return true;
+			}
+		  }
 
-                    if ((i & (i - 1)) == 0)
-                      f >>= 1;
-                  }
-              }
-
-            *total += f;
-          }
-        else
-          {
-            *total += GET_MODE_SIZE (mode) > 2
-                      ? 48
-                      : 0;
-          }
-
-        return true;
-      }
-
+		/* Fallback: mulu.l (not speed or no constant). */
+		*total = GET_MODE_SIZE (mode) > 2
+				 ? COST_MULU_L_FALLBACK
+				 : COST_MULU_W_FALLBACK;
+		return true;
+	  }
     case DIV:
     case UDIV:
     case MOD:
@@ -367,37 +340,33 @@ m68k_68000_10_costs_table (rtx x,
     case LEU:
     case GTU:
     case GEU:
-      *total = thecosts[cost_branch];
+      *total = COST_BRANCH;
       return true;
-
 
     case SET:
           {
             rtx dest = XEXP (x, 0);
             rtx src  = XEXP (x, 1);
 
-            /* reg -> reg: MOVE - 1 verhindert Dn->An Spills (nbody)
-               ohne SHA1's Register-Rotationen zu bestrafen */
             if (REG_P (dest) && REG_P (src))
               {
-                *total = thecosts[cost_set_reg_reg];
+                *total = COST_SET_REG_REG;
                 return true;
               }
 
-            if (!m68k_68000_10_costs_table (dest, mode, code, 0, total, speed))
+            if (!m68k_68000_10_costs_intern (dest, mode, code, 0, total, speed))
               return false;
-            if (!m68k_68000_10_costs_table (src, mode, code, 1, &total2, speed))
+            if (!m68k_68000_10_costs_intern (src, mode, code, 1, &total2, speed))
               return false;
             *total += total2;
 
-            /* CLR - überschreibt Summe */
             if (CONST_INT_P (src) && INTVAL (src) == 0)
               {
                 if (REG_P (dest))
                   *total = 0;
                 else if (MEM_P (dest))
                   *total = GET_MODE_SIZE (mode) > 2
-                           ? thecosts[cost_set_clr_mem_l]
+                           ? COST_SET_CLR_MEM_L
                            : 0;
               }
 
@@ -406,15 +375,13 @@ m68k_68000_10_costs_table (rtx x,
 
     case CALL:
       {
-        rtx mem = XEXP (x, 0); // always MEM
-		rtx b = XEXP (mem, 0);
+        rtx mem = XEXP (x, 0);
+        rtx b = XEXP (mem, 0);
 
-		if (REG_P (b))
-		  *total = thecosts[cost_call_reg];
-		else if (GET_CODE (b) == PLUS)
-		  *total = 0;
-		else
-		  *total = thecosts[cost_call_other];
+        if (REG_P (b) || GET_CODE (b) == PLUS)
+          *total = 0;
+        else
+          *total = COST_CALL_OTHER;
 
         return true;
       }
@@ -425,84 +392,9 @@ m68k_68000_10_costs_table (rtx x,
     }
 }
 
-struct cost_entry {
-    const char *name;
-    int index;
-};
-
-static const struct cost_entry cost_map[] = {
-    { "cost_reg", cost_reg },
-    { "cost_mem_reg", cost_mem_reg },
-    { "cost_mem_plus_reg_disp", cost_mem_plus_reg_disp },
-    { "cost_mem_plus_reg_reg", cost_mem_plus_reg_reg },
-    { "cost_mem_other", cost_mem_other },
-    { "cost_const_int_q", cost_const_int_q },
-    { "cost_const_int_w", cost_const_int_w },
-    { "cost_const_int_l", cost_const_int_l },
-    { "cost_const_double", cost_const_double },
-    { "cost_symbol", cost_symbol },
-    { "cost_plus_reg_reg", cost_plus_reg_reg },
-    { "cost_plus_reg_constq", cost_plus_reg_constq },
-    { "cost_plus_reg_constw", cost_plus_reg_constw },
-    { "cost_plus_reg_constl", cost_plus_reg_constl },
-    { "cost_plus_other", cost_plus_other },
-    { "cost_logic_reg_const", cost_logic_reg_const },
-    { "cost_shift_const", cost_shift_const },
-    { "cost_shift_const_w", cost_shift_const_w },
-    { "cost_branch", cost_branch },
-    { "cost_call_reg", cost_call_reg },
-    { "cost_call_other", cost_call_other },
-    { "cost_set_reg_reg", cost_set_reg_reg },
-    { "cost_set_clr_mem_l", cost_set_clr_mem_l },
-	{ "cost_neg_not_l", cost_neg_not_l },
-	{ "cost_neg_not_w", cost_neg_not_w },
-};
-
-static void load_cost_overrides(const char *filename, int table[])
-{
-    FILE *f = fopen(filename, "r");
-    if (!f)
-        return;
-
-    char line[256];
-
-    while (fgets(line, sizeof(line), f)) {
-        char *p = line;
-
-        /* Kommentare überspringen */
-        if (*p == '#' || *p == '\n')
-            continue;
-
-        /* name = value parsen */
-        char name[128];
-        int value;
-
-        if (sscanf(p, " %127[^=] = %d", name, &value) != 2)
-            continue;
-
-        /* Whitespace trimmen */
-        for (char *q = name; *q; q++)
-            if (*q == ' ' || *q == '\t')
-                *q = 0;
-
-        /* Lookup */
-        for (size_t i = 0; i < sizeof(cost_map)/sizeof(cost_map[0]); i++) {
-            if (strcmp(cost_map[i].name, name) == 0) {
-                table[cost_map[i].index] = value;
-                break;
-            }
-        }
-    }
-
-    fclose(f);
-}
-
-static void m68k_init_costs(void)
-{
-    load_cost_overrides("m68k-costs-speed.txt", m68k_costs_speed);
-    load_cost_overrides("m68k-costs-size.txt",  m68k_costs_size);
-}
-
+/* ============================================
+   EXPORTIERTE FUNKTION
+   ============================================ */
 bool
 m68k_68000_10_costs (rtx x,
                      machine_mode mode,
@@ -511,11 +403,5 @@ m68k_68000_10_costs (rtx x,
                      int *total,
                      bool speed)
 {
-	static int initialized;
-	if (!initialized) {
-	    initialized = 1;
-	    m68k_init_costs();
-	}
-
-	return m68k_68000_10_costs_table(x, mode, outer_code, opno, total, speed);
+  return m68k_68000_10_costs_intern (x, mode, outer_code, opno, total, speed);
 }
