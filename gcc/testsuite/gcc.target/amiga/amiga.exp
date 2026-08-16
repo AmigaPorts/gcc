@@ -1,0 +1,16 @@
+# AmigaOS-specific GCC tests
+load_lib gcc-dg.exp
+
+set dg-do-what-default compile
+
+if { [istarget m68k-*-amigaos*] } {
+    # Look for tests in the same directory as this exp file
+    set testdir [file dirname [info script]]
+    verbose "Looking for tests in: $testdir" 1
+    
+    foreach src [glob -nocomplain $testdir/*.c] {
+        verbose "Found test: $src" 1
+        dg-runtest $src "" "-O2 -noixemul" 
+    }
+}
+
