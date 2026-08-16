@@ -7666,7 +7666,7 @@ m68k_emit_setmemsi(rtx blkdest, rtx val, rtx length, rtx alignment)
       else
 	{
 	  src = gen_reg_rtx(SImode);
-	  emit_move_insn(src, GEN_INT(value * 0x1010101));
+          emit_move_insn(src, GEN_INT(((char)value << 24) | (value << 16) | (value << 8) | value));
 	}
     }
   else
