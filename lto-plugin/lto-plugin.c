@@ -387,7 +387,7 @@ translate (char *data, char *end, struct plugin_symtab *out)
   syms = xrealloc (out->syms, len * sizeof (struct ld_plugin_symbol));
   aux = xrealloc (out->aux, len * sizeof (struct sym_aux));
   
-  for (n = out->nsyms; data < end; n++) 
+  for (n = out->nsyms; data + 7 < end; n++)
     { 
       aux[n].id = out->id; 
       data = parse_table_entry (data, &syms[n], &aux[n]);
