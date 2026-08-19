@@ -5470,6 +5470,9 @@ opt_autoinc ()
       if (GET_CODE(PATTERN(ii.get_insn())) == PARALLEL)
 	continue;
 
+      if (ii.is_compare())
+	continue;
+
       rtx set = single_set(ii.get_insn());
       if (!set)
 	continue;
