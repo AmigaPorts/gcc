@@ -7666,8 +7666,11 @@ m68k_emit_setmemsi(rtx blkdest, rtx val, rtx length, rtx alignment)
       else
 	{
 	  src = gen_reg_rtx(SImode);
-          emit_move_insn(dst,
-               gen_int_mode((unsigned char)value * 0x01010101u, SImode));
+	  HOST_WIDE_INT v = (unsigned char)value;
+	  v |= v << 8;
+	  v |= v << 16;
+
+	  emit_move_insn(src, gen_int_mode(v, SImode));
 	}
     }
   else
@@ -7719,7 +7722,7 @@ m68k_emit_setmemsi(rtx blkdest, rtx val, rtx length, rtx alignment)
           add_reg_note(insn, REG_INC, regdst);
         }
 
-      emit_jump_insn(gen_dbne_hi(counter, looplabel));    
+      emit_jump_insn(gen_dbne_hi(counter, looplabel));
     }
 
   while (single-- > 0)
