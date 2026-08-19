@@ -480,15 +480,37 @@ extern enum reg_class regno_reg_class[];
 
 #define FIRST_PARM_OFFSET(FNDECL) 8
 
-/* On the m68k the return value defaults to D0.  */
-#define FUNCTION_VALUE(VALTYPE, FUNC)  \
-  gen_rtx_REG (TYPE_MODE (VALTYPE), D0_REG)
+/* Define how to generate (in the callee) the output value of a
+   function and how to find (in the caller) the value returned by a
+   function.  VALTYPE is the data type of the value (as a tree).  If
+   the precise function being called is known, FUNC is its
+   FUNCTION_DECL; otherwise, FUNC is 0.  For m68k/SVR4 generate the
+   result in d0, a0, or fp0 as appropriate.
 
-/* On the m68k the return value defaults to D0.  */
-#define LIBCALL_VALUE(MODE)  gen_rtx_REG (MODE, D0_REG)
+   SBF: we need the libcall calling convention.
+   */
 
-/* On the m68k, D0 is usually the only register used.  */
-#define FUNCTION_VALUE_REGNO_P(N) ((N) == D0_REG)
+#undef FUNCTION_VALUE
+#define FUNCTION_VALUE(VALTYPE, FUNC)					\
+		m68k_libcall_value (TYPE_MODE (VALTYPE))
+
+/* Define how to find the value returned by a library function
+   assuming the value has mode MODE.
+   For m68k/SVR4 look for integer values in d0, pointer values in d0
+   (returned in both d0 and a0), and floating values in fp0.  */
+
+#undef LIBCALL_VALUE
+#define LIBCALL_VALUE(MODE)						\
+  m68k_libcall_value (MODE)
+
+/* 1 if N is a possible register number for a function value.  For
+   m68k/SVR4 allow d0, a0, or fp0 as return registers, for integral,
+   pointer, or floating types, respectively.  Reject fp0 if not using
+   a 68881 coprocessor.  */
+
+#undef FUNCTION_VALUE_REGNO_P
+#define FUNCTION_VALUE_REGNO_P(N) \
+  ((N) == D0_REG || (N) == A0_REG || (TARGET_68881 && (N) == FP0_REG))
 
 /* Define this to be true when FUNCTION_VALUE_REGNO_P is true for
    more than one register.

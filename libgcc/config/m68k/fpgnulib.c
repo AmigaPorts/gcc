@@ -68,7 +68,7 @@ long __cmpdf2(double, double);
 #ifdef EXTFLOAT
 #ifndef __mcoldfire__
 /* Extended precision prototypes - these override the non-EXTFLOAT versions */
-long double __truncxfdf2 (long double);
+double __truncxfdf2 (long double);
 int __unordxf2 (long double, long double);
 long double __extenddfxf2 (double);
 long double __extendsfxf2 (float);
@@ -500,7 +500,6 @@ __extenddfxf2 (double d)
   register long exp;
 
   dl.d = d;
-  /*printf ("dfxf in: %g\n", d);*/
 
   ldl.l.upper = SIGND (dl);
   if ((dl.l.upper & ~SIGNBIT) == 0 && !dl.l.lower)
@@ -547,12 +546,10 @@ __extenddfxf2 (double d)
   /* 32 - 21: # bits of dl.l.lower in ldl.l.middle */
   ldl.l.lower = dl.l.lower << (32 - 21);
 
-  /*printf ("dfxf out: %s\n", dumpxf (ldl.ld));*/
   return ldl.ld;
 }
 #endif
 
-#ifndef EXTFLOAT
 #ifdef __TRUNCXFDF2
 /* convert long double to double */
 double
@@ -563,7 +560,6 @@ __truncxfdf2 (long double ld)
   register union long_double_long ldl;
 
   ldl.ld = ld;
-  /*printf ("xfdf in: %s\n", dumpxf (ld));*/
 
   dl.l.upper = SIGNX (ldl);
   if ((ldl.l.upper & ~SIGNBIT) == 0 && !ldl.l.middle && !ldl.l.lower)
@@ -611,10 +607,8 @@ __truncxfdf2 (long double ld)
   dl.l.lower = (ldl.l.middle & MANTXMASK) << (32 - (EXPDBITS + 1 - 1));
   dl.l.lower |= ldl.l.lower >> (EXPDBITS + 1 - 1);
 
-  /*printf ("xfdf out: %g\n", dl.d);*/
   return dl.d;
 }
-#endif
 #endif
 
 #ifdef __EXTENDSFXF2
@@ -788,7 +782,6 @@ __gexf2 (long double x1, long double x2)
 }
 #endif
 
-#ifdef EXTFLOAT
 #ifdef __TRUNCXFDF2
 /* convert long double to double */
 double
@@ -799,7 +792,6 @@ __truncxfdf2 (long double ld)
   register union long_double_long ldl;
 
   ldl.ld = ld;
-  /*printf ("xfdf in: %s\n", dumpxf (ld));*/
 
   dl.l.upper = SIGNX (ldl);
   if ((ldl.l.upper & ~SIGNBIT) == 0 && !ldl.l.middle && !ldl.l.lower)
@@ -818,10 +810,8 @@ __truncxfdf2 (long double ld)
   dl.l.lower = (ldl.l.middle & MANTXMASK) << (32 - (EXPDBITS + 1 - 1));
   dl.l.lower |= ldl.l.lower >> (EXPDBITS + 1 - 1);
 
-  /*printf ("xfdf out: %g\n", dl.d);*/
   return dl.d;
 }
-#endif
 #endif
 
 #endif /* EXTFLOATCMP */
