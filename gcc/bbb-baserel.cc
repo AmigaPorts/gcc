@@ -223,23 +223,34 @@ namespace
 	 * There are shared CONST(PLUS(SYMBOL, CONST_INT)) rtx! (evil!)
 	 * Make a copy if one is seen, to avoid double replacement.
 	 */
-      case CONST:
-	if (GET_CODE(XEXP(*x, 0)) == PLUS && GET_CODE(XEXP(XEXP(*x, 0), 0)) == SYMBOL_REF)
-	  {
-	    /* copy_rtx can't unshare, so do it by hand. */
-	    rtx c = gen_rtx_CONST(GET_MODE(*x), gen_rtx_PLUS(GET_MODE(XEXP(*x, 0)), XEXP(XEXP(*x, 0), 0), XEXP(XEXP(*x, 0), 1)));
-	    *x = c;
+    case CONST:
+      if (GET_CODE(XEXP(*x, 0)) == PLUS && GET_CODE(XEXP(XEXP(*x, 0), 0)) == SYMBOL_REF)
+        {
+          rtx symbol = XEXP(XEXP(*x, 0), 0);
+          rtx offset = XEXP(XEXP(*x, 0), 1);
 
-	    if (!make_pic_ref(insn, &XEXP(*x, 0), use_tmp))
-	      return 0;
+          // Immer temporäres Register verwenden
+          rtx pic_ref = gen_rtx_PLUS(Pmode, picreg,
+					gen_rtx_CONST(Pmode,
+					gen_rtx_UNSPEC(Pmode,
+					gen_rtvec(2, symbol, GEN_INT(0)),
+					UNSPEC_RELOC16)));
 
-	    // remove CONST
-	    *x = XEXP(*x, 0);
+          rtx tmp = gen_reg_rtx(Pmode);
+          rtx set = gen_rtx_SET(tmp, pic_ref);
+          emit_insn_before(set, insn);
 
-	    return 1;
-	  }
-	break;
-	/*
+          rtx result = offset != const0_rtx ? gen_rtx_PLUS(Pmode, tmp, offset) : tmp;
+
+          if (!validate_unshare_change(insn, x, result, 0))
+            {
+              *x = result;
+              return -1;
+            }
+          return 1;
+        }
+      break;
+    /*
 	 * Default: try in place first.
 	 */
       default:
