@@ -2166,9 +2166,82 @@ make_parameter_declarator (cp_decl_specifier_seq *decl_specifiers,
   parameter->default_argument = default_argument;
   parameter->template_parameter_pack_p = template_parameter_pack_p;
   parameter->loc = loc;
+#if defined(TARGET_M68K)
+  parameter->asmspec = NULL_TREE;
+#endif
 
   return parameter;
 }
+
+#if defined(TARGET_M68K)
+/* Attach asmreg(N) to a PARM_DECL's type via a type-variant copy.
+   Must not use build_type_attribute_qual_variant: that rejects
+   attributes on already-defined ENUMERAL_TYPE / RECORD_TYPE.  */
+static void
+cp_apply_asmreg_to_parm (tree decl, tree asmspec_tree)
+{
+  tree atype;
+  const char *asmspec;
+  int offset;
+  int reg_number;
+  unsigned add;
+  tree ttasm, value, attrs, t;
+
+  if (!asmspec_tree || !decl || decl == error_mark_node)
+    return;
+
+  atype = TREE_TYPE (decl);
+  if (!atype || atype == error_mark_node)
+    return;
+
+  asmspec = TREE_STRING_POINTER (asmspec_tree);
+  if (*asmspec == '%')
+    ++asmspec;
+
+  offset = 1;
+  reg_number = -1;
+  if (asmspec[0] == 'd')
+    reg_number = 0;
+  else if (asmspec[0] == 'a')
+    reg_number = 8;
+  else if (asmspec[0] == 'f' && asmspec[1] == 'p')
+    {
+      reg_number = 16;
+      offset = 2;
+    }
+  add = asmspec[offset] - '0';
+  if (reg_number < 0 || add > 7)
+    {
+      error ("invalid register specified %s", asmspec);
+      return;
+    }
+  reg_number += add;
+
+  ttasm = get_identifier ("asmreg");
+  value = tree_cons (ttasm, build_int_cst (NULL_TREE, reg_number), NULL_TREE);
+  attrs = tree_cons (ttasm, value, NULL_TREE);
+
+  for (t = TYPE_MAIN_VARIANT (atype); t; t = TYPE_NEXT_VARIANT (t))
+    if (attribute_list_equal (TYPE_ATTRIBUTES (t), attrs)
+	&& TYPE_ALIGN (t) == TYPE_ALIGN (atype)
+	&& TYPE_QUALS (t) == TYPE_QUALS (atype))
+      break;
+  if (t)
+    atype = t;
+  else
+    {
+      tree m = TYPE_MAIN_VARIANT (atype);
+      atype = copy_node (atype);
+      TYPE_POINTER_TO (atype) = 0;
+      TYPE_REFERENCE_TO (atype) = 0;
+      TYPE_NEXT_VARIANT (atype) = TYPE_NEXT_VARIANT (m);
+      TYPE_NEXT_VARIANT (m) = atype;
+      TYPE_ATTRIBUTES (atype)
+	= chainon (attrs, TYPE_ATTRIBUTES (atype));
+    }
+  TREE_TYPE (decl) = atype;
+}
+#endif
 
 /* Returns true iff DECLARATOR  is a declaration for a function.  */
 
@@ -28331,6 +28404,10 @@ cp_parser_parameter_declaration_list (cp_parser* parser,
 	cplus_decl_attributes (&decl,
 			       parameter->decl_specifiers.attributes,
 			       0);
+#if defined(TARGET_M68K)
+      if (parameter->asmspec)
+	cp_apply_asmreg_to_parm (decl, parameter->asmspec);
+#endif
       if (DECL_NAME (decl))
 	{
 	  /* We cannot always pushdecl while parsing tentatively because
@@ -28818,48 +28895,24 @@ cp_parser_parameter_declaration (cp_parser *parser,
 					input_location);
 
 #ifdef TARGET_M68K
- if (pasmspec)
-   {
-     const char *asmspec = TREE_STRING_POINTER(pasmspec);
-     if (*asmspec == '%')
-       ++asmspec;
-     int offset = 1;
-     int reg_number = -1;
-     if (asmspec[0] == 'd')
-       reg_number = 0;
-     else if (asmspec[0] == 'a')
-       reg_number = 8;
-     else if (asmspec[0] == 'f' && asmspec[1] == 'p')
-       {
-         reg_number = 16;
-         offset = 2;
-       }
-     unsigned add = asmspec[offset] - '0';
-     if (reg_number < 0 || add > 7)
-          error("invalid register specified %s", asmspec);
-     reg_number += add;
-
- /* Build tree for __attribute__ ((asmreg(regnum))). */
-     tree ttasm = get_identifier("asmreg");
-     tree value = tree_cons(ttasm, build_int_cst(NULL, reg_number), NULL_TREE);
-     tree attrs = tree_cons(ttasm, value, NULL_TREE);
-
-     /* search outmost declarator, e.g. int * needs the attribute at the pointer not the int. */
-     cp_declarator * d = declarator;
-     if (d)
-       {
-     while (d->kind != cdk_id && d->declarator)
-      d = d->declarator;
-     d->attributes = chainon(attrs, d->attributes);
-     }
-   }
+  /* Store asm("xy") for later attachment via type-variant copy.
+     Do not push asmreg through declarator attributes: that path uses
+     build_type_attribute_qual_variant, which ignores attrs on defined
+     ENUMERAL_TYPE / RECORD_TYPE.  */
 #endif
 
-  return make_parameter_declarator (&decl_specifiers,
-				    declarator,
-				    default_argument,
-				    param_loc,
-				    template_parameter_pack_p);
+  {
+    cp_parameter_declarator *parameter
+      = make_parameter_declarator (&decl_specifiers,
+				   declarator,
+				   default_argument,
+				   param_loc,
+				   template_parameter_pack_p);
+#if defined(TARGET_M68K)
+    parameter->asmspec = pasmspec;
+#endif
+    return parameter;
+  }
 }
 
 /* Parse a default argument and return it.
