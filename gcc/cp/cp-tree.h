@@ -7050,6 +7050,10 @@ struct cp_parameter_declarator {
   bool template_parameter_pack_p;
   /* Location within source.  */
   location_t loc;
+#if defined(TARGET_M68K)
+  /* Optional asm register name (STRING_CST), e.g. "d7" / "a0".  */
+  tree asmspec;
+#endif
 };
 
 /* A declarator.  */
