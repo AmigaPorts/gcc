@@ -1077,6 +1077,7 @@ simple_object_amiga_write_to_file (simple_object_write *sobj, int descriptor,
       struct simple_object_write_section_buffer *buffer;
       size_t size = 0;
       size_t lto_header_size = 0;
+      size_t debug_size_prefix = 0;
       size_t hunk_size;
       size_t pad;
       unsigned char zero[3] = { 0, 0, 0 };
@@ -1085,7 +1086,13 @@ simple_object_amiga_write_to_file (simple_object_write *sobj, int descriptor,
 	size += buffer->size;
       if (simple_object_amiga_is_lto_section (section->name))
 	lto_header_size = AMIGA_LTO_DEBUG_HEADER_SIZE;
-      hunk_size = size + lto_header_size;
+      /* The BFD hunk backend prepends the unpadded byte size to the
+	 payload of .debug* sections and expects it when reading them
+	 back; without it the reader misparses the leading DWARF
+	 unit length as that size field.  */
+      else if (strncmp (section->name, ".debug", 6) == 0)
+	debug_size_prefix = 4;
+      hunk_size = size + lto_header_size + debug_size_prefix;
 
       if (!simple_object_amiga_write_32 (descriptor, offset, HUNK_NAME,
 					 &errmsg, err))
@@ -1115,6 +1122,14 @@ simple_object_amiga_write_to_file (simple_object_write *sobj, int descriptor,
 					     &errmsg, err))
 	    return errmsg;
 	  offset += 4;
+	  if (!simple_object_amiga_write_32 (descriptor, offset, size,
+					     &errmsg, err))
+	    return errmsg;
+	  offset += 4;
+	}
+
+      if (debug_size_prefix != 0)
+	{
 	  if (!simple_object_amiga_write_32 (descriptor, offset, size,
 					     &errmsg, err))
 	    return errmsg;
