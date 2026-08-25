@@ -726,11 +726,50 @@ __negxf2 (long double x1)
 
 #else /* EXTFLOATCMP */
 
+/* Compare two extended precision values exactly, from their sign,
+   exponent and mantissa fields.  Converting to double first would map
+   every value beyond the double range to infinity, so that for
+   instance LDBL_MAX compared equal to infinity and isinf() was wrong.
+   Returns -1, 0 or 1, or 2 if either argument is a NaN.  */
+static int
+__xfcmp (long double a, long double b)
+{
+  union long_double_long x, y;
+  long xexp, yexp;
+  int xsign, ysign, mag;
+
+  x.ld = a;
+  y.ld = b;
+  xexp = EXPX (x);
+  yexp = EXPX (y);
+  if ((xexp == EXPXMASK && ((x.l.middle & MANTXMASK) != 0 || x.l.lower != 0))
+      || (yexp == EXPXMASK && ((y.l.middle & MANTXMASK) != 0 || y.l.lower != 0)))
+    return 2;
+  /* +0 and -0 are equal.  */
+  if (xexp == 0 && x.l.middle == 0 && x.l.lower == 0
+      && yexp == 0 && y.l.middle == 0 && y.l.lower == 0)
+    return 0;
+  xsign = SIGNX (x) != 0;
+  ysign = SIGNX (y) != 0;
+  if (xsign != ysign)
+    return xsign ? -1 : 1;
+  if (xexp != yexp)
+    mag = xexp < yexp ? -1 : 1;
+  else if (x.l.middle != y.l.middle)
+    mag = x.l.middle < y.l.middle ? -1 : 1;
+  else if (x.l.lower != y.l.lower)
+    mag = x.l.lower < y.l.lower ? -1 : 1;
+  else
+    mag = 0;
+  return xsign ? -mag : mag;
+}
+
 #ifdef __CMPXF2
 long
 __cmpxf2 (long double x1, long double x2)
 {
-  return __cmpdf2 ((double) x1, (double) x2);
+  int r = __xfcmp (x1, x2);
+  return r == 2 ? 1 : r;
 }
 #endif
 
@@ -738,7 +777,8 @@ __cmpxf2 (long double x1, long double x2)
 long
 __eqxf2 (long double x1, long double x2)
 {
-  return __cmpdf2 ((double) x1, (double) x2);
+  int r = __xfcmp (x1, x2);
+  return r == 2 ? 1 : r;
 }
 #endif
 
@@ -746,7 +786,8 @@ __eqxf2 (long double x1, long double x2)
 long
 __nexf2 (long double x1, long double x2)
 {
-  return __cmpdf2 ((double) x1, (double) x2);
+  int r = __xfcmp (x1, x2);
+  return r == 2 ? 1 : r;
 }
 #endif
 
@@ -754,7 +795,8 @@ __nexf2 (long double x1, long double x2)
 long
 __ltxf2 (long double x1, long double x2)
 {
-  return __cmpdf2 ((double) x1, (double) x2);
+  int r = __xfcmp (x1, x2);
+  return r == 2 ? 1 : r;
 }
 #endif
 
@@ -762,7 +804,8 @@ __ltxf2 (long double x1, long double x2)
 long
 __lexf2 (long double x1, long double x2)
 {
-  return __cmpdf2 ((double) x1, (double) x2);
+  int r = __xfcmp (x1, x2);
+  return r == 2 ? 1 : r;
 }
 #endif
 
@@ -770,7 +813,8 @@ __lexf2 (long double x1, long double x2)
 long
 __gtxf2 (long double x1, long double x2)
 {
-  return __cmpdf2 ((double) x1, (double) x2);
+  int r = __xfcmp (x1, x2);
+  return r == 2 ? -1 : r;
 }
 #endif
 
@@ -778,7 +822,8 @@ __gtxf2 (long double x1, long double x2)
 long
 __gexf2 (long double x1, long double x2)
 {
-  return __cmpdf2 ((double) x1, (double) x2);
+  int r = __xfcmp (x1, x2);
+  return r == 2 ? -1 : r;
 }
 #endif
 
