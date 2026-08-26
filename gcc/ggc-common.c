@@ -29,7 +29,9 @@ along with GCC; see the file COPYING3.  If not see
 #include "params.h"
 #include "hosthooks.h"
 #include "plugin.h"
+#ifdef HAVE_SYS_RESOURCE_H
 #include <sys/resource.h>
+#endif
 
 /* When set, ggc_collect will do collection.  */
 bool ggc_force_collect;
@@ -729,8 +731,7 @@ mmap_gt_pch_use_address (void *base, size_t size, int fd, size_t offset)
 static double
 ggc_rlimit_bound (double limit)
 {
-#if defined(HAVE_GETRLIMIT)
-// && !defined __amiga__
+#if defined(HAVE_GETRLIMIT) && !defined(__amigaos__)
   struct rlimit rlim;
 # if defined (RLIMIT_AS)
   /* RLIMIT_AS is what POSIX says is the limit on mmap.  Presumably
@@ -792,7 +793,7 @@ ggc_min_heapsize_heuristic (void)
      bound of 128M (when RAM >= 1GB).  */
   phys_kbytes /= 8;
 
-#if defined(HAVE_GETRLIMIT) && defined (RLIMIT_RSS)
+#if defined(HAVE_GETRLIMIT) && defined (RLIMIT_RSS) && !defined(__amigaos__)
   /* Try not to overrun the RSS limit while doing garbage collection.
      The RSS limit is only advisory, so no margin is subtracted.  */
  {

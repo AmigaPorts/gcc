@@ -23,12 +23,20 @@ does the return value.  The third argument is unused in @libib{}.
 #include <sys/wait.h>
 #endif
 
+#ifdef __MINGW32__
+#include <process.h>
+#endif
+
 pid_t
 waitpid (pid_t pid, int *stat_loc, int options ATTRIBUTE_UNUSED)
 {
   for (;;)
     {
+#ifdef __MINGW32__
+      int wpid = _cwait (stat_loc, pid, _WAIT_CHILD);
+#else
       int wpid = wait(stat_loc);
+#endif
       if (wpid == pid || wpid == -1)
 	return wpid;
     }
