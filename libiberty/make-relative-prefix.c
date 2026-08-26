@@ -68,6 +68,7 @@ relative prefix can be found, return @code{NULL}.
 #include <mach-o/dyld.h>
 #endif
 #ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #endif
 
