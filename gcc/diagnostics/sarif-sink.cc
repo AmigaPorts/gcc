@@ -32,8 +32,8 @@ struct sockaddr_un {
 };
 #endif
 #else
-#include <sys/un.h>
 #include <sys/socket.h>
+#include <sys/un.h>
 #endif
 #endif
 
