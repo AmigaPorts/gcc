@@ -2063,6 +2063,13 @@ ACX_ELF_TARGET_IFELSE([# ELF platforms build the lto-plugin always.
   esac
 ])
 
+# The LTO front end can be built for AmigaOS, but lto-plugin is a shared
+# library loaded by the linker.  AmigaOS has no shared-library support, so
+# retain LTO while omitting only the linker plugin for an AmigaOS host.
+case $host in
+  *-*-amigaos*) build_lto_plugin=no ;;
+esac
+
 AC_ARG_ENABLE(linker-plugin-configure-flags,
   [AS_HELP_STRING([[--enable-linker-plugin-configure-flags=FLAGS]],
     [additional flags for configuring linker plugins @<:@none@:>@])],
