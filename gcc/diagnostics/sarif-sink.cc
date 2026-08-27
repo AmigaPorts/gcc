@@ -20,6 +20,7 @@ along with GCC; see the file COPYING3.  If not see
 
 #include "config.h"
 
+#if HAVE_AF_UNIX
 #ifdef __MINGW32__
 #include <winsock2.h>
 #ifdef HAVE_AFUNIX_H
@@ -33,6 +34,7 @@ struct sockaddr_un {
 #else
 #include <sys/un.h>
 #include <sys/socket.h>
+#endif
 #endif
 
 #define INCLUDE_LIST
@@ -4184,6 +4186,8 @@ private:
   output_file m_output_file;
 };
 
+#if HAVE_AF_UNIX
+
 class unique_fd
 {
 public:
@@ -4298,6 +4302,8 @@ private:
 
   unique_fd m_fd;
 };
+
+#endif /* HAVE_AF_UNIX */
 
 /* Print the start of an embedded link to PP, as per 3.11.6.  */
 
@@ -4627,6 +4633,7 @@ sarif_generation_options::dump (FILE *outfile, int indent) const
 void
 maybe_open_sarif_sink_for_socket (context &dc)
 {
+#if HAVE_AF_UNIX
   gcc_assert (line_table);
 
   const char * const env_var_name = "EXPERIMENTAL_SARIF_SOCKET";
@@ -4663,6 +4670,9 @@ maybe_open_sarif_sink_for_socket (context &dc)
      std::move (sfd));
   sink_->update_printer ();
   dc.add_sink (std::move (sink_));
+#else
+  (void)dc;
+#endif
 }
 
 #if CHECKING_P
