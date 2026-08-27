@@ -239,7 +239,7 @@ simple_object_amiga_write_name (int descriptor, off_t *offset,
 }
 
 static struct simple_object_amiga_section *
-simple_object_amiga_add_section (struct simple_object_amiga_read *amiga,
+simple_object_amiga_add_section (struct simple_object_amiga_read *amiga_data,
 				 char *name, off_t offset, off_t length,
 				 unsigned int hunk_index)
 {
@@ -253,8 +253,8 @@ simple_object_amiga_add_section (struct simple_object_amiga_read *amiga,
   section->records = NULL;
   section->record_tail = &section->records;
   section->next = NULL;
-  *amiga->tail = section;
-  amiga->tail = &section->next;
+  *amiga_data->tail = section;
+  amiga_data->tail = &section->next;
   return section;
 }
 
@@ -540,9 +540,9 @@ simple_object_amiga_skip_symbols (int descriptor, off_t *offset,
 }
 
 static void
-simple_object_amiga_release_sections (struct simple_object_amiga_read *amiga)
+simple_object_amiga_release_sections (struct simple_object_amiga_read *amiga_data)
 {
-  struct simple_object_amiga_section *section = amiga->sections;
+  struct simple_object_amiga_section *section = amiga_data->sections;
 
   while (section != NULL)
     {
@@ -567,7 +567,7 @@ simple_object_amiga_match (unsigned char header[SIMPLE_OBJECT_MATCH_HEADER_LEN],
 			   const char *segment_name ATTRIBUTE_UNUSED,
 			   const char **errmsg, int *err)
 {
-  struct simple_object_amiga_read *amiga;
+  struct simple_object_amiga_read *amiga_data;
   struct simple_object_amiga_section *current_section;
   char *name;
   off_t pos;
@@ -580,17 +580,17 @@ simple_object_amiga_match (unsigned char header[SIMPLE_OBJECT_MATCH_HEADER_LEN],
       return NULL;
     }
 
-  amiga = XNEW (struct simple_object_amiga_read);
-  amiga->sections = NULL;
-  amiga->tail = &amiga->sections;
-  amiga->hunk_count = 0;
+  amiga_data = XNEW (struct simple_object_amiga_read);
+  amiga_data->sections = NULL;
+  amiga_data->tail = &amiga_data->sections;
+  amiga_data->hunk_count = 0;
   current_section = NULL;
 
   pos = offset + 4;
   name = simple_object_amiga_read_name (descriptor, &pos, errmsg, err);
   if (name == NULL)
     {
-      XDELETE (amiga);
+      XDELETE (amiga_data);
       return NULL;
     }
   XDELETEVEC (name);
@@ -649,11 +649,11 @@ simple_object_amiga_match (unsigned char header[SIMPLE_OBJECT_MATCH_HEADER_LEN],
 							length,
 							errmsg, err);
 	      current_section = simple_object_amiga_add_section (
-		amiga, name, section_offset - offset, length,
-		amiga->hunk_count);
+		amiga_data, name, section_offset - offset, length,
+		amiga_data->hunk_count);
 	      name = NULL;
 	    }
-	  amiga->hunk_count++;
+	  amiga_data->hunk_count++;
 	  pos += hunk_size;
 	  if (name != NULL)
 	    {
@@ -665,7 +665,7 @@ simple_object_amiga_match (unsigned char header[SIMPLE_OBJECT_MATCH_HEADER_LEN],
 	case HUNK_BSS:
 	  pos += 4;
 	  current_section = NULL;
-	  amiga->hunk_count++;
+	  amiga_data->hunk_count++;
 	  if (name != NULL)
 	    {
 	      XDELETEVEC (name);
@@ -747,13 +747,13 @@ done:
     XDELETEVEC (name);
   *errmsg = NULL;
   *err = 0;
-  return amiga;
+  return amiga_data;
 
 fail:
   if (name != NULL)
     XDELETEVEC (name);
-  simple_object_amiga_release_sections (amiga);
-  XDELETE (amiga);
+  simple_object_amiga_release_sections (amiga_data);
+  XDELETE (amiga_data);
   return NULL;
 }
 
@@ -763,11 +763,12 @@ simple_object_amiga_find_sections (simple_object_read *sobj,
 					       off_t offset, off_t length),
 				   void *data, int *err ATTRIBUTE_UNUSED)
 {
-  struct simple_object_amiga_read *amiga =
+  struct simple_object_amiga_read *amiga_data =
     (struct simple_object_amiga_read *) sobj->data;
   struct simple_object_amiga_section *section;
 
-  for (section = amiga->sections; section != NULL; section = section->next)
+  for (section = amiga_data->sections; section != NULL;
+       section = section->next)
     if (!(*pfn) (data, section->name, section->offset, section->length))
       break;
 
@@ -785,11 +786,11 @@ simple_object_amiga_fetch_attributes (simple_object_read *sobj ATTRIBUTE_UNUSED,
 static void
 simple_object_amiga_release_read (void *data)
 {
-  struct simple_object_amiga_read *amiga =
+  struct simple_object_amiga_read *amiga_data =
     (struct simple_object_amiga_read *) data;
 
-  simple_object_amiga_release_sections (amiga);
-  XDELETE (amiga);
+  simple_object_amiga_release_sections (amiga_data);
+  XDELETE (amiga_data);
 }
 
 static const char *
@@ -811,12 +812,12 @@ simple_object_amiga_start_write (void *attributes_data ATTRIBUTE_UNUSED,
 				 const char **errmsg ATTRIBUTE_UNUSED,
 				 int *err ATTRIBUTE_UNUSED)
 {
-  struct simple_object_amiga_write *amiga;
+  struct simple_object_amiga_write *amiga_data;
 
-  amiga = XNEW (struct simple_object_amiga_write);
-  amiga->sections = NULL;
-  amiga->tail = &amiga->sections;
-  return amiga;
+  amiga_data = XNEW (struct simple_object_amiga_write);
+  amiga_data->sections = NULL;
+  amiga_data->tail = &amiga_data->sections;
+  return amiga_data;
 }
 
 static const char *
@@ -1056,9 +1057,10 @@ static const char *
 simple_object_amiga_write_to_file (simple_object_write *sobj, int descriptor,
 				   int *err)
 {
-  struct simple_object_amiga_write *amiga =
+  struct simple_object_amiga_write *amiga_data =
     (struct simple_object_amiga_write *) sobj->data;
-  struct simple_object_amiga_write_section *write_section = amiga->sections;
+  struct simple_object_amiga_write_section *write_section =
+    amiga_data->sections;
   simple_object_write_section *section;
   const char *errmsg;
   off_t offset = 0;
@@ -1188,9 +1190,9 @@ simple_object_amiga_write_to_file (simple_object_write *sobj, int descriptor,
 static void
 simple_object_amiga_release_write (void *data)
 {
-  struct simple_object_amiga_write *amiga =
+  struct simple_object_amiga_write *amiga_data =
     (struct simple_object_amiga_write *) data;
-  struct simple_object_amiga_write_section *section = amiga->sections;
+  struct simple_object_amiga_write_section *section = amiga_data->sections;
 
   while (section != NULL)
     {
@@ -1207,7 +1209,7 @@ simple_object_amiga_release_write (void *data)
       XDELETE (section);
       section = next_section;
     }
-  XDELETE (amiga);
+  XDELETE (amiga_data);
 }
 
 const struct simple_object_functions simple_object_amiga_functions =
