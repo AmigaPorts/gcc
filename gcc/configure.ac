@@ -1825,7 +1825,7 @@ fi
 # Local socket connectivity wants AF_UNIX networking
 # Check for AF_UNIX networking
 AC_CACHE_CHECK(for AF_UNIX, ac_cv_af_unix, [
-AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
+AC_LINK_IFELSE([AC_LANG_PROGRAM([[
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/un.h>
