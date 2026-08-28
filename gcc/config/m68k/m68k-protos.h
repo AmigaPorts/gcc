@@ -113,5 +113,6 @@ extern const char *m68k_cpp_cpu_family (const char *);
 extern void init_68881_table (void);
 extern rtx m68k_legitimize_call_address (rtx);
 extern rtx m68k_legitimize_sibcall_address (rtx);
+extern bool m68k_is_ok_for_sibcall (tree, tree);
 extern int m68k_hard_regno_rename_ok(unsigned int, unsigned int);
 extern poly_int64 m68k_push_rounding (poly_int64);

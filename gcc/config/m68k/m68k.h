@@ -948,5 +948,3 @@ extern int m68k_sched_address_bypass_p (rtx_insn *, rtx_insn *);
 extern int m68k_sched_indexed_address_bypass_p (rtx_insn *, rtx_insn *);
 
 #define CPU_UNITS_QUERY 1
-
-extern bool m68k_is_ok_for_sibcall(tree decl, tree exp);
