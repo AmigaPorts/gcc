@@ -1,0 +1,60 @@
+# Copyright (C) 2026 Free Software Foundation, Inc.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with GCC; see the file COPYING3.  If not see
+# <http://www.gnu.org/licenses/>.
+
+# Tests for the AmigaOS m68k register-parameter ABI and related extensions
+# (register parameters via __asm ("reg"), the regparm attribute, inline
+# library-call macros, and the amiga predefined macros).  These exist only on
+# m68k-*-amigaos*.
+
+load_lib gcc-dg.exp
+load_lib c-torture.exp
+load_lib torture-options.exp
+
+if { ![istarget m68k-*-amigaos*] } {
+    return
+}
+
+# Codegen (scan-assembler) tests.  Each fixes its own -O via dg-options;
+# allocator and CPU are scan-invariant, so a single run is enough.  The
+# runtime test and its companion are handled separately below.
+dg-init
+set scan_tests {}
+foreach f [lsort [glob -nocomplain $srcdir/$subdir/*.c]] {
+    if { ![string match "*-run.c" $f] && ![string match "*-run-lib.c" $f] } {
+	lappend scan_tests $f
+    }
+}
+dg-runtest $scan_tests "" ""
+
+# Runtime register-ABI check, swept over -O level, allocator and CPU (the
+# result is invariant, so every combination must pass once fixed).  The caller
+# lives in a companion TU (*-run-lib.c, pulled in by dg-additional-sources)
+# that sees only the prototype, so it uses the register ABI while the
+# definition's type is composited -- the case that dropped the bindings.  Run
+# via gcc-dg-runtest so the test can carry a dg-do-run xfail for the pre-fix
+# state.  CPU is limited to what the amigaos simulator board runs (68020).
+# This stays inside the single dg session (dg-finish is called once, at the
+# end) so gcc-dg-runtest's dg-test calls run against live dg state.
+torture-init
+set-torture-options {
+    "-O0" "-O1" "-O2" "-O3" "-Os"
+    "-O1 -mlra" "-O2 -mlra" "-Os -mlra"
+    "-O2 -m68000" "-Os -m68000"
+}
+gcc-dg-runtest [lsort [glob -nocomplain $srcdir/$subdir/*-run.c]] "" ""
+torture-finish
+
+dg-finish
