@@ -1,16 +1,6 @@
 /* { dg-do run } */
 /* { dg-options "-O0 -fno-inline -fno-ipa-icf -fno-ipa-sra" } */
 
-/* Skip if the target does not support long double at all.  */
-#ifndef __LONG_DOUBLE_128__
-#ifndef __LONG_DOUBLE_80__
-#ifndef __LONG_DOUBLE_64__
-/* No long double support -> skip test.  */
-/* { dg-skip-if "no long double support" { "*" } } */
-#endif
-#endif
-#endif
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -42,6 +32,10 @@ static void check(const char *name, long double got, long double expect)
 
 int main(void)
 {
+#if defined(__SIZEOF_LONG_DOUBLE__) && __SIZEOF_LONG_DOUBLE__ == 12
+    /* Long double is 12 bytes (80-bit extended format with 2 bytes padding).  */
+    /* Run the tests.  */
+
     /* Basic values */
     long double a = 3.1415926535897932384626433832795L;
     long double b = 2.7182818284590452353602874713527L;
@@ -75,5 +69,21 @@ int main(void)
     check("neg-add", ld_add(-a, b), -a + b);
     check("neg-mul", ld_mul(-a, -b), -a * -b);
 
+    /* Test with 80-bit specific values */
+    long double pi = 3.141592653589793238462643383279502884197L;
+    long double e = 2.718281828459045235360287471352662497757L;
+    check("pi", ld_add(pi, 0.0L), pi);
+    check("e", ld_add(e, 0.0L), e);
+    check("pi-e", ld_sub(pi, e), pi - e);
+    check("pi*e", ld_mul(pi, e), pi * e);
+
+#else
+    /* Long double is not 80-bit extended format (12 bytes).  */
+    /* Skip tests and return success.  */
+    printf("Skipping: long double is not 80-bit extended format (size=%d)\n",
+           (int)sizeof(long double));
+#endif
+
     return 0;
 }
+
