@@ -9,7 +9,7 @@ LIB2ADD += xfpgnulib.c xfpgnulib__unordsf2.c xfpgnulib__unorddf2.c \
 	xfpgnulib__divxf3.c xfpgnulib__negxf2.c \
 	xfpgnulib__cmpxf2.c xfpgnulib__eqxf2.c xfpgnulib__nexf2.c \
 	xfpgnulib__ltxf2.c xfpgnulib__lexf2.c xfpgnulib__gtxf2.c \
-	xfpgnulib__gexf2.c
+	xfpgnulib__gexf2.c xfpgnulib__pack.c xfpgnulib__unpack.c
 
 xfpgnulib__unordsf2.c: $(srcdir)/config/m68k/fpgnulib.c
 	echo '#define __UNORDSF2' > xfpgnulib__unordsf2.c
@@ -157,6 +157,18 @@ xfpgnulib__gexf2.c: $(srcdir)/config/m68k/fpgnulib.c
 	echo '#define EXTFLOATCMP' >> xfpgnulib__gexf2.c
 	echo '#define __GEXF2' >> xfpgnulib__gexf2.c
 	cat $< >> xfpgnulib__gexf2.c
+
+xfpgnulib__pack.c: $(srcdir)/config/m68k/fpgnulib.c
+	echo '#define EXTFLOAT' > xfpgnulib__pack.c
+	echo '#define EXTFLOATCMP' >> xfpgnulib__pack.c
+	echo '#define __PACK' >> xfpgnulib__pack.c
+	cat $< >> xfpgnulib__pack.c
+
+xfpgnulib__unpack.c: $(srcdir)/config/m68k/fpgnulib.c
+	echo '#define EXTFLOAT' > xfpgnulib__unpack.c
+	echo '#define EXTFLOATCMP' >> xfpgnulib__unpack.c
+	echo '#define __UNPACK' >> xfpgnulib__unpack.c
+	cat $< >> xfpgnulib__unpack.c
 
 xfpgnulib.c: $(srcdir)/config/m68k/fpgnulib.c
 	echo '#define EXTFLOAT' > xfpgnulib.c

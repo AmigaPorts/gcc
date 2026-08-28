@@ -2100,27 +2100,51 @@ __fixtfdi (TFtype a)
 UDWtype
 __fixunsxfDI (XFtype a)
 {
-  if (a < 0)
-    return 0;
+#if TARGET_M68K
+    extern void __xf_unpack(XFtype, USItype *, SItype *, UDWtype *);
 
-  /* Compute high word of result, as a flonum.  */
-  const XFtype b = (a / Wtype_MAXp1_F);
-  /* Convert that to fixed (but not to DWtype!),
-     and shift it into the high word.  */
-  UDWtype v = (UWtype) b;
-  v <<= W_TYPE_SIZE;
-  /* Remove high part from the XFtype, leaving the low part as flonum.  */
-  a -= (XFtype)v;
-  /* Convert that to fixed (but not to DWtype!) and add it in.
-     Sometimes A comes out negative.  This is significant, since
-     A has more bits than a long int does.  */
-  if (a < 0)
-    v -= (UWtype) (- a);
-  else
-    v += (UWtype) a;
-  return v;
+    USItype sign;
+    SItype  exp;   /* unbiased exponent */
+    UDWtype mant;  /* 64-bit mantissa, integer bit at bit 63 */
+
+    __xf_unpack(a, &sign, &exp, &mant);
+
+    /* negative cannot be represented as unsigned */
+    if (sign)
+        return (UDWtype)0;
+
+    /* subnormal or zero -> 0 */
+    if (exp < 0)
+        return (UDWtype)0;
+
+    /* overflow: value >= 2^64 -> libgcc usually saturates or returns 0.
+       Here we choose saturation to ~0ULL. */
+    if (exp > 63)
+        return (UDWtype)~(UDWtype)0;
+
+    /* reconstruct integer:
+       mant has integer bit at 63, so:
+       value = mant >> (63 - exp)
+    */
+    return mant >> (63 - exp);
+#else
+    if (a < 0)
+        return 0;
+
+    /* original generic libgcc path */
+    const XFtype b = (a / Wtype_MAXp1_F);
+    UDWtype v = (UWtype)b;
+    v <<= W_TYPE_SIZE;
+    a -= (XFtype)v;
+    if (a < 0)
+        v -= (UWtype)(-a);
+    else
+        v += (UWtype)a;
+    return v;
+#endif
 }
 #endif
+
 
 #if defined(L_fixxfdi) && LIBGCC2_HAS_XF_MODE
 DWtype
@@ -2224,13 +2248,34 @@ __fixsfdi (SFtype a)
 XFtype
 __floatdixf (DWtype u)
 {
-#if W_TYPE_SIZE > __LIBGCC_XF_MANT_DIG__
+#if TARGET_M68K
+	extern XFtype __xf_pack(USItype, SItype, UDWtype);
+
+    /* DWtype is signed 64-bit */
+    if (u == 0)
+        return __xf_pack(0, 0, 0);
+
+    /* extract sign and magnitude */
+    USItype sign = (u < 0);
+    UDWtype mag = sign ? -(UDWtype)u
+                                  :  (UDWtype)u;
+
+    /* highest set bit in magnitude (0..63) */
+    SItype exp = 63 - __builtin_clzll(mag);
+
+    /* normalize: move highest bit to integer bit position (bit 63) */
+    UDWtype mant = mag << (63 - exp);
+
+    /* pack sign, unbiased exponent, normalized mantissa */
+    return __xf_pack(sign, exp, mant);
+#elif W_TYPE_SIZE > __LIBGCC_XF_MANT_DIG__
 # error
-#endif
+#else
   XFtype d = (Wtype) (u >> W_TYPE_SIZE);
   d *= Wtype_MAXp1_F;
   d += (UWtype)u;
   return d;
+#endif
 }
 #endif
 
@@ -2238,13 +2283,29 @@ __floatdixf (DWtype u)
 XFtype
 __floatundixf (UDWtype u)
 {
-#if W_TYPE_SIZE > __LIBGCC_XF_MANT_DIG__
+#ifdef TARGET_M68K
+	extern XFtype __xf_pack(USItype, SItype, UDWtype);
+
+    /* Zero maps to +0.0 in extended precision */
+    if (u == 0)
+        return __xf_pack(0, 0, 0);
+
+    /* Find index of highest set bit (0..63) */
+    SItype exp = 63 - __builtin_clzll(u);
+
+    /* Normalize: shift so that the highest bit becomes the integer bit (bit 63) */
+    UDWtype mant = u << (63 - exp);
+
+    /* Pack sign=0, unbiased exponent, and normalized mantissa */
+    return __xf_pack(0, exp, mant);
+#elif W_TYPE_SIZE > __LIBGCC_XF_MANT_DIG__
 # error
-#endif
+#else
   XFtype d = (UWtype) (u >> W_TYPE_SIZE);
   d *= Wtype_MAXp1_F;
   d += (UWtype)u;
   return d;
+#endif
 }
 #endif
 
