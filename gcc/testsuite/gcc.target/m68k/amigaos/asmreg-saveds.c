@@ -16,5 +16,4 @@ long f (long a __asm ("d0"), long b __asm ("d1"))		/* saveds -> mismatch */
   return a + b;
 }
 
-/* xfail marks the pre-fix state; the fix commit drops it.  */
-/* { dg-final { scan-assembler "add.l d1,d0" { xfail m68k-*-amigaos* } } } */
+/* { dg-final { scan-assembler "add.l d1,d0" } } */

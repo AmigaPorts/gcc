@@ -72,6 +72,10 @@ struct m68k_args
   int last_arg_reg;
   int last_arg_len;
   tree current_param_type; /* New field: formal type of the current argument.  */
+  tree current_parm_decl;  /* Callee PARM_DECL cursor: its type keeps the asmreg
+			      attribute that composite_type strips from fntype's
+			      arg types on a prototype/definition spelling
+			      mismatch.  */
   tree fntype; /* initial function type */
 };
 
@@ -192,6 +196,14 @@ m68k_init_cumulative_args (CUMULATIVE_ARGS *cump, tree fntype, tree decl)
   else
     /* Call to compiler-support function. */
     cum->current_param_type = cum->fntype = 0;
+
+  /* When compiling the callee, the register-parameter bindings survive on the
+     PARM_DECL types even when composite_type stripped them from fntype's arg
+     types (prototype/definition spelling mismatch).  Walk the PARM_DECLs in
+     parallel and prefer them for the asmreg lookup.  */
+  cum->current_parm_decl = (decl && decl == current_function_decl
+			    && TREE_CODE (decl) == FUNCTION_DECL)
+			   ? DECL_ARGUMENTS (decl) : 0;
   DPRINTF((stderr, "9m68k_init_cumulative_args %p -> %d\r\n", cum, cum->num_of_regs));
 }
 
@@ -240,6 +252,8 @@ void m68k_function_arg_advance (cumulative_args_t cum_v,
 
   if (cum->current_param_type)
     cum->current_param_type = TREE_CHAIN(cum->current_param_type);
+  if (cum->current_parm_decl)
+    cum->current_parm_decl = DECL_CHAIN(cum->current_parm_decl);
 }
 
 /* Define where to put the arguments to a function.
@@ -330,7 +344,10 @@ rtx m68k_function_arg (cumulative_args_t cum_v, const function_arg_info & ai)
 
   struct m68k_args *cum = *get_cumulative_args (cum_v) ? &mycum : &othercum;
 
-  tree asmtree = ai.type && cum->current_param_type ? lookup_attribute("asmreg", TYPE_ATTRIBUTES(TREE_VALUE(cum->current_param_type))) : NULL_TREE;
+  tree ptype = cum->current_parm_decl ? TREE_TYPE (cum->current_parm_decl)
+	       : (cum->current_param_type ? TREE_VALUE (cum->current_param_type)
+					  : NULL_TREE);
+  tree asmtree = ai.type && ptype ? lookup_attribute("asmreg", TYPE_ATTRIBUTES(ptype)) : NULL_TREE;
 
   if (asmtree)
     {

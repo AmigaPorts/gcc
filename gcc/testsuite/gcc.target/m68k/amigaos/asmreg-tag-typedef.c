@@ -17,7 +17,4 @@ F *f (long a __asm ("d0"), long b __asm ("d1"))			/* definition: typedef */
   return (F *) (a + b);
 }
 
-/* Without the m68k backend fix the composited type drops the bindings and the
-   argument comes off the stack; xfail marks that pre-fix state (the fix commit
-   drops the xfail).  */
-/* { dg-final { scan-assembler "add.l d1,d0" { xfail m68k-*-amigaos* } } } */
+/* { dg-final { scan-assembler "add.l d1,d0" } } */

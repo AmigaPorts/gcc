@@ -9,11 +9,9 @@
 
    amigaos.exp sweeps this over the -O level, allocator and CPU (via
    gcc-dg-runtest with a torture list); the companion TU (asmreg-run-lib.c) is
-   pulled in by dg-additional-sources.  The xfail marks the pre-fix behaviour:
-   without the m68k backend fix the run aborts, so it is an expected failure;
-   the fix commit drops the xfail.  */
+   pulled in by dg-additional-sources.  */
 
-/* { dg-do run { xfail m68k-*-amigaos* } } */
+/* { dg-do run } */
 /* { dg-additional-sources "asmreg-run-lib.c" } */
 
 typedef struct _F { long x; } F;
