@@ -453,7 +453,8 @@ write_topn_counters (const struct gcov_ctr_info *ci_ptr,
   if (list_sizes == NULL || counters > list_size_length)
     {
       list_size_length = MAX (LIST_SIZE_MIN_LENGTH, 2 * counters);
-#if !defined(inhibit_libc) && HAVE_SYS_MMAN_H
+#if !defined(inhibit_libc) && HAVE_SYS_MMAN_H \
+    && (!IN_GCOV_TOOL || HAVE_MMAP)
       list_sizes
 	= (unsigned *)malloc_mmap (list_size_length * sizeof (unsigned));
 #endif

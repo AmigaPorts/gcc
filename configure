@@ -9774,6 +9774,12 @@ else
 
 fi
 
+# The LTO front end can be built for AmigaOS, but lto-plugin is a shared
+# library loaded by the linker.  AmigaOS has no shared-library support, so
+# retain LTO while omitting only the linker plugin for an AmigaOS host.
+case $host in
+  *-*-amigaos*) build_lto_plugin=no ;;
+esac
 
 # Check whether --enable-linker-plugin-configure-flags was given.
 if test "${enable_linker_plugin_configure_flags+set}" = set; then :
@@ -22565,4 +22571,3 @@ if test -n "$ac_unrecognized_opts" && test "$enable_option_checking" != no; then
   { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: unrecognized options: $ac_unrecognized_opts" >&5
 $as_echo "$as_me: WARNING: unrecognized options: $ac_unrecognized_opts" >&2;}
 fi
-
