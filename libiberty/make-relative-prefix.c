@@ -68,6 +68,10 @@ relative prefix can be found, return @code{NULL}.
 #include <mach-o/dyld.h>
 #endif
 
+#if defined(_WIN32)
+#include <windows.h>
+#endif
+
 #include "ansidecl.h"
 #include "libiberty.h"
 
@@ -283,8 +287,8 @@ make_relative_prefix_1 (const char *progname, const char *bin_prefix,
 #if defined(__amiga__)
   strcpy(buf, "GCC:");
   n = strlen("GCC:");
-#elif defined(__MSYS__)
-  n = GetModuleFileNameA(0, buf, 1023);
+#elif defined(_WIN32)
+  n = GetModuleFileNameA (NULL, buf, sizeof (buf));
 #elif defined(__MACH__)
   n = 1022;
   n |= _NSGetExecutablePath(buf, &n);
