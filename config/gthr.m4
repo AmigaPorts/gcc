@@ -16,7 +16,8 @@ AC_DEFUN([GCC_AC_THREAD_MODEL],
 # 'single' means single threaded -- without threads.
 AC_CACHE_CHECK([for the threading model used by GCC], [gcc_cv_target_thread_file], [
   # Set new cache variable
-  gcc_cv_target_thread_file=`$CC -v 2>&1 | sed -n 's/^Thread model: //p'`
+  # A Windows-hosted compiler can emit CRLF when run from a Unix build.
+  gcc_cv_target_thread_file=`$CC -v 2>&1 | sed -n 's/^Thread model: //p' | tr -d '\015'`
 ])
 # Set variable name (not prefixed enough to be a good cache variable
 # name) traditionally used for this purpose, to avoid having to change

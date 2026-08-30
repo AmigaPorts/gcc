@@ -5093,7 +5093,8 @@ if ${gcc_cv_target_thread_file+:} false; then :
 else
 
   # Set new cache variable
-  gcc_cv_target_thread_file=`$CC -v 2>&1 | sed -n 's/^Thread model: //p'`
+  # A Windows-hosted compiler can emit CRLF when run from a Unix build.
+  gcc_cv_target_thread_file=`$CC -v 2>&1 | sed -n 's/^Thread model: //p' | tr -d '\015'`
 
 fi
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $gcc_cv_target_thread_file" >&5
