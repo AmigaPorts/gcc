@@ -28,6 +28,10 @@ noixemul
 Target RejectNegative
 Do not use ixemul.library - use libnix instead to link
 
+pthread
+Driver
+Link with the POSIX threads library
+
 ramiga-dev
 Target RejectNegative
 Use devinit.o as start file
