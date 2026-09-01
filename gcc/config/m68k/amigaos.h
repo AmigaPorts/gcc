@@ -177,6 +177,8 @@ do									\
       }									\
     if (!TARGET_68020 && flag_pic==4)					\
       error ("%'-fbaserel32%' is not supported on the 68000 or 68010");	\
+    if (flag_sanitize)							\
+      error ("%<-fsanitize%> is not supported on this target");		\
   }									\
 while (0)
 
