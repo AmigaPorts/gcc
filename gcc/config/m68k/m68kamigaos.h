@@ -454,6 +454,7 @@ if (target_flags & (MASK_RESTORE_A4|MASK_ALWAYS_RESTORE_A4)) \
   "%{mcrt=ixemul:%(lib_ixemul)} " \
   "%{mcrt=clib2:%(lib_clib2)} " \
   "%{!mcrt=*:%{!noixemul:%(lib_newlib)}} " \
+  "%{fprofile-arcs|fprofile-generate*|coverage:-lgcov} " \
   "-lamiga -lgcc "\
   __LPTHREAD__ \
   "%{lm:-lm } "\
