@@ -35,6 +35,12 @@ along with GCC; see the file COPYING3.  If not see
 #undef HAVE_GAS_CFI_PERSONALITY_DIRECTIVE
 #define HAVE_GAS_CFI_PERSONALITY_DIRECTIVE false
 
+/* The hunk format has no symbol visibility.  The configure probe only
+   tests .hidden, which gas accepts as a no-op, but .internal errors out;
+   drop the whole feature so the visibility attribute warns and is
+   ignored instead of emitting directives.  */
+#undef HAVE_GAS_HIDDEN
+
 #define HAS_INIT_SECTION
 
 #define MAX_OFILE_ALIGNMENT (1024*8)
