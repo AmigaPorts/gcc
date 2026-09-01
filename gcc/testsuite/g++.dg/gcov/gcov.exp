@@ -20,6 +20,12 @@
 load_lib g++-dg.exp
 load_lib gcov.exp
 
+# The whole suite needs a profiling runtime; skip it if the target
+# cannot link -fprofile-arcs programs.
+if { ![check_profiling_available "-fprofile-arcs"] } {
+    return
+}
+
 global GXX_UNDER_TEST
 global GCOV_UNDER_TEST
 

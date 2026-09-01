@@ -871,6 +871,7 @@ proc check_profiling_available { test_what } {
 	     || [istarget h8300-*-*]
 	     || [istarget lm32-*-*]
 	     || [istarget m32c-*-elf]
+	     || [istarget m68k-*-amigaos*]
 	     || [istarget m68k-*-elf]
 	     || [istarget m68k-*-uclinux*]
 	     || [istarget mips*-*-elf*]
