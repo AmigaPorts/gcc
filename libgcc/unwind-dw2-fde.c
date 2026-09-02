@@ -1237,7 +1237,7 @@ _Unwind_Find_FDE (void *pc, struct dwarf_eh_bases *bases)
 	f = search_object (ob, pc);
 	if (f)
 	  goto fini;
-#ifndef __amigaos__
+#ifndef __amigaos3__
 	break;
 #endif
       }
