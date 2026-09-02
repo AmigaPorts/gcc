@@ -1225,15 +1225,21 @@ _Unwind_Find_FDE (void *pc, struct dwarf_eh_bases *bases)
   __gthread_mutex_lock (&object_mutex);
 
   /* Linear search through the classified objects, to find the one
-     containing the pc.  Note that pc_begin is sorted descending, and
-     we expect objects to be non-overlapping.  */
+     containing the pc.  Note that pc_begin is sorted descending.
+     Objects would normally be non-overlapping, so the search could
+     stop at the first candidate; the AmigaOS hunk linker however
+     groups the .text.<symbol> sections of all objects together, far
+     from each object's .text, so the registered objects overlap and
+     every one whose pc_begin is below the pc must be searched.  */
   for (ob = seen_objects; ob; ob = ob->next)
     if (pc >= ob->pc_begin)
       {
 	f = search_object (ob, pc);
 	if (f)
 	  goto fini;
+#ifndef __amigaos3__
 	break;
+#endif
       }
 
   /* Classify and search the objects we've not yet processed.  */
