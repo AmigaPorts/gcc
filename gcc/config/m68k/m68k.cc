@@ -197,6 +197,8 @@ m68k_excess_precision (enum excess_precision_type);
 static unsigned int m68k_hard_regno_nregs (unsigned int, machine_mode);
 static bool m68k_hard_regno_mode_ok (unsigned int, machine_mode);
 static bool m68k_modes_tieable_p (machine_mode, machine_mode);
+static bool m68k_can_change_mode_class (machine_mode, machine_mode,
+				       reg_class_t);
 static machine_mode m68k_promote_function_mode (const_tree, machine_mode,
 						int *, const_tree, int);
 static void m68k_asm_final_postscan_insn (FILE *, rtx_insn *insn, rtx [], int);
@@ -360,6 +362,9 @@ static bool m68k_use_lra_p (void);
 
 #undef TARGET_MODES_TIEABLE_P
 #define TARGET_MODES_TIEABLE_P m68k_modes_tieable_p
+
+#undef TARGET_CAN_CHANGE_MODE_CLASS
+#define TARGET_CAN_CHANGE_MODE_CLASS m68k_can_change_mode_class
 
 #undef TARGET_PROMOTE_FUNCTION_MODE
 #define TARGET_PROMOTE_FUNCTION_MODE m68k_promote_function_mode
@@ -5828,6 +5833,18 @@ m68k_modes_tieable_p (machine_mode mode1, machine_mode mode2)
 	       || GET_MODE_CLASS (mode1) == MODE_COMPLEX_FLOAT)
 	      == (GET_MODE_CLASS (mode2) == MODE_FLOAT
 		  || GET_MODE_CLASS (mode2) == MODE_COMPLEX_FLOAT)));
+}
+
+/* Implement TARGET_CAN_CHANGE_MODE_CLASS.  FPU registers hold values in
+   an internal floating-point format, not the memory representation of SF,
+   DF or XF mode.  Reinterpreting a register in a different mode therefore
+   cannot be implemented by taking the lowpart of its spill slot.  */
+
+static bool
+m68k_can_change_mode_class (machine_mode from, machine_mode to,
+			    reg_class_t rclass)
+{
+  return from == to || !reg_classes_intersect_p (FP_REGS, rclass);
 }
 
 /* Implement SECONDARY_RELOAD_CLASS.  */
