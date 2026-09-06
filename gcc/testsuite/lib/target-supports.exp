@@ -1274,6 +1274,10 @@ proc check_effective_target_fopenmp {} {
     # does not make sense to test it as an openmp host.
     if [istarget nvptx-*-*] { return 0 }
     if [istarget amdgcn-*-*] { return 0 }
+    # libgomp is not built for m68k-amigaos, so -fopenmp programs cannot
+    # link; the compile-only tests would only report m68k alignment and
+    # sanitizer differences.
+    if [istarget m68k-*-amigaos*] { return 0 }
 
     return [check_no_compiler_messages fopenmp object {
 	void foo (void) { }
