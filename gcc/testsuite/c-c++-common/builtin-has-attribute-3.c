@@ -4,6 +4,7 @@
    { dg-options "-Wall -Wno-narrowing -Wno-unused-local-typedefs -ftrack-macro-expansion=0" { target c++ } } 
    { dg-additional-options "-DSKIP_ALIAS" { target { { *-*-darwin* hppa*-*-hpux } || { ! alias } } } }
 */
+/* { dg-skip-if "small alignment" { m68k-*-amigaos* } } */
 
 #define ATTR(...) __attribute__ ((__VA_ARGS__))
 

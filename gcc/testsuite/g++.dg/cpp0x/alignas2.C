@@ -1,5 +1,6 @@
 // PR c++/65734
 // { dg-do compile { target c++11 } }
+// { dg-skip-if "small alignment" { m68k-*-amigaos* } }
 // { dg-options "" }
 
 template <typename T>

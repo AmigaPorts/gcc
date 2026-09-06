@@ -1,4 +1,4 @@
-/* { dg-skip-if "small alignment" { pdp11-*-* } } */
+/* { dg-skip-if "small alignment" { pdp11-*-* m68k-*-amigaos* } } */
 
 void abort (void);
 

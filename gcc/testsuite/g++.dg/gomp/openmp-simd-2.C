@@ -1,4 +1,5 @@
 /* { dg-do compile } */
+// { dg-skip-if "small alignment" { m68k-*-amigaos* } }
 /* { dg-options "-fopenmp-simd -fdump-tree-original" } */
 
 extern void abort ();

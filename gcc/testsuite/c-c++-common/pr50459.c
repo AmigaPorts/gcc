@@ -1,5 +1,6 @@
 /* PR c/50459 */
 /* { dg-do compile } */
+/* { dg-skip-if "small alignment" { m68k-*-amigaos* } } */
 /* { dg-options "-Wall -Wextra" } */
 /* { dg-additional-options "-fno-common" { target hppa*-*-hpux* } } */
 

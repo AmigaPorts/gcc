@@ -2,6 +2,7 @@
    structures when the auto variable is partially initialized,  fully 
    initialized, or not initialized for -ftrivial-auto-var-init=zero.  */
 /* { dg-do run } */
+/* { dg-skip-if "small alignment" { m68k-*-amigaos* } } */
 /* { dg-options "-ftrivial-auto-var-init=zero" } */
 
 /* Structure with no padding. */

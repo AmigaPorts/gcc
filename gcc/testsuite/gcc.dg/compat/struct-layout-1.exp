@@ -45,6 +45,12 @@ load_lib standard.exp
 load_lib gcc.exp
 load_lib target-libpath.exp
 
+# The hunk loader places sections on 8-byte boundaries at most, and the
+# generated tests rely on aligned(16) globals, which m68k-amigaos rejects.
+if { [istarget m68k-*-amigaos*] } {
+    return
+}
+
 # Load the language-dependent compabibility support procedures.
 load_lib c-compat.exp
 

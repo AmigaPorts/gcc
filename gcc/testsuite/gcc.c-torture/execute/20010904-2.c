@@ -2,6 +2,8 @@
    a #ifdef around the alignment and add your alignment.  */
 #ifdef __pdp11__
 #define alignment 2
+#elif defined(__amigaos__)
+#define alignment 8
 #else
 #define alignment 32
 #endif
@@ -16,7 +18,7 @@ Y y[2];
 
 int main(void)
 {
-  if (((char *)&y[1] - (char *)&y[0]) & 31)
+  if (((char *)&y[1] - (char *)&y[0]) & (alignment - 1))
     abort ();
   exit (0);
 }                

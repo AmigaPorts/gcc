@@ -1,5 +1,6 @@
 // PR c++/91360 - Implement C++20 P1143R2: constinit
 // { dg-do compile { target c++20 } }
+// { dg-skip-if "small alignment" { m68k-*-amigaos* } }
 // From PR83428.
 
 struct S1

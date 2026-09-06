@@ -1,4 +1,5 @@
 // { dg-do compile { target c++11 } }
+// { dg-skip-if "small alignment" { m68k-*-amigaos* } }
 
 struct A {int i;}  a [[gnu::aligned(16)]];
 struct B {int i;} __attribute__((aligned(16))) b;

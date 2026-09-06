@@ -1,3 +1,4 @@
+// { dg-skip-if "small alignment" { m68k-*-amigaos* } }
 // There were two related problems here, depending on the vintage.  At
 // one time:
 //

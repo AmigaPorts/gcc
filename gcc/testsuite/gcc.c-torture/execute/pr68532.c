@@ -1,3 +1,4 @@
+/* { dg-skip-if "small alignment" { m68k-*-amigaos* } } */
 /* { dg-options "-O2 -ftree-vectorize -fno-vect-cost-model" } */
 /* { dg-additional-options "-fno-common" { target hppa*-*-hpux* } } */
 

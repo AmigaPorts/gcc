@@ -1,5 +1,6 @@
 // C++ 26 P3394R4 - Annotations for Reflection
 // { dg-do compile { target c++26 } }
+// { dg-skip-if "small alignment" { m68k-*-amigaos* } }
 
 struct [[=0]] A;
 struct [[=1, =2]] A {
