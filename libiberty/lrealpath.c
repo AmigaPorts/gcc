@@ -303,4 +303,9 @@ lrealpath (const char *filename)
     return res;
   }
 #endif // _WIN32
+
+  /* No canonicalization method is available on this host.  Fall back
+     to a copy of the name so callers such as canonical_filename_eq still
+     compare the strings instead of an undefined return value.  */
+  return strdup (filename);
 }
