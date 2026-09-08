@@ -1,5 +1,6 @@
 /* { dg-do compile }
    { dg-options "-Wall -Wattributes -ftrack-macro-expansion=0" } */
+/* { dg-skip-if "small alignment" { m68k-*-amigaos* } } */
 
 #define ATTR(attrlist) __attribute__ (attrlist)
 

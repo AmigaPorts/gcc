@@ -1,4 +1,5 @@
 // { dg-do compile { target c++26 } }
+// { dg-skip-if "small alignment" { m68k-*-amigaos* } }
 // { dg-additional-options "-freflection" }
 // Test std::meta::define_aggregate.
 

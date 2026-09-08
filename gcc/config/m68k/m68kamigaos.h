@@ -43,7 +43,9 @@ along with GCC; see the file COPYING3.  If not see
 
 #define HAS_INIT_SECTION
 
-#define MAX_OFILE_ALIGNMENT (1024*8)
+/* A hunk is placed by LoadSeg with AllocMem, which returns MEM_BLOCKSIZE
+   (8 byte) aligned memory, and the hunk format cannot ask for more.  */
+#define MAX_OFILE_ALIGNMENT (8*8)
 
 #undef PIC_REG
 #define PIC_REG 12

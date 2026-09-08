@@ -2,6 +2,7 @@
    structures when the auto variable is partially initialized,  fully 
    initialized, or not initialized for -ftrivial-auto-var-init=pattern.  */
 /* { dg-do run } */
+/* { dg-skip-if "small alignment" { m68k-*-amigaos* } } */
 /* { dg-options "-ftrivial-auto-var-init=pattern" } */
 
 /* Structure with no padding. */

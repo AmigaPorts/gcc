@@ -1,5 +1,6 @@
 /* PR c/52181 */
 /* { dg-do compile } */
+/* { dg-skip-if "small alignment" { m68k-*-amigaos* } } */
 
 extern const int v1[];
 const int __attribute__((aligned(16))) v1[] = { 1 };

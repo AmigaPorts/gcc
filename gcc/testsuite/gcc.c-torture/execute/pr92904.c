@@ -1,3 +1,4 @@
+/* { dg-skip-if "small alignment" { m68k-*-amigaos* } } */
 /* PR target/92904 */
 
 #include <stdarg.h>

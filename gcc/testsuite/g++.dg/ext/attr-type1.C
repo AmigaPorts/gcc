@@ -1,5 +1,6 @@
 // PR c++/90750
 // { dg-do compile { target c++11 } }
+// { dg-skip-if "small alignment" { m68k-*-amigaos* } }
 
 template <typename> struct S
 {

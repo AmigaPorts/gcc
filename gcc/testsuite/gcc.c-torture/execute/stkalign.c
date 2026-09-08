@@ -4,7 +4,11 @@
 
 #include <assert.h>
 
+#ifdef __amigaos__
+#define ALIGNMENT 8
+#else
 #define ALIGNMENT 64
+#endif
 
 unsigned test(unsigned n, unsigned p)
 {

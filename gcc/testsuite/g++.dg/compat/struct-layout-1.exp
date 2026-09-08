@@ -42,6 +42,12 @@ load_lib standard.exp
 load_lib g++.exp
 load_lib target-libpath.exp
 
+# The hunk loader places sections on 8-byte boundaries at most, and the
+# generated tests rely on aligned(16) globals, which m68k-amigaos rejects.
+if { [istarget m68k-*-amigaos*] } {
+    return
+}
+
 #
 # compat-use-alt-compiler -- make the alternate compiler the default
 # 
