@@ -1053,8 +1053,14 @@ main (int argc, char **argv)
   /* Extract COMPILER_PATH and PATH into our prefix list.  */
   prefix_from_env ("COMPILER_PATH", &cpath);
 #ifdef __amiga__
-  setenv("PATH", "GCC:bin", 0);
-#endif  prefix_from_env ("PATH", &path);
+  /* The driver's COMPILER_PATH never reaches us: AmigaOS passes no
+     environment to a child process.  Look where the driver lives, and do
+     not go through PATH, which would be split on the ':' that ends an
+     AmigaDOS volume name.  */
+  add_prefix (&path, "GCC:bin/");
+#else
+  prefix_from_env ("PATH", &path);
+#endif
 
   /* Try to discover a valid linker/nm/strip to use.  */
 
