@@ -22,8 +22,9 @@ Boston, MA 02110-1301, USA.  */
    command synchronously, and pex-unix's child branch then _exit()s the
    parent.  Run the child through SystemTagList() instead, like the DJGPP
    backend does with spawn(), and hand the redirected file handles to the
-   shell.  The environment is not passed on: AmigaOS programs see only the
-   shell's local and global variables.  */
+   shell.  The child inherits the process's local variables, which is how
+   libnix's setenv() passes the environment on; an explicit env argument
+   is not supported.  */
 
 #include "config.h"
 #include "libiberty.h"

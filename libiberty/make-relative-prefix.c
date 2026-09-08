@@ -66,6 +66,10 @@ relative prefix can be found, return @code{NULL}.
 #include "ansidecl.h"
 #include "libiberty.h"
 
+#ifdef __amiga__
+#include <proto/dos.h>
+#endif
+
 #ifndef R_OK
 #define R_OK 4
 #define W_OK 2
@@ -239,6 +243,29 @@ make_relative_prefix_1 (const char *progname, const char *bin_prefix,
 
   if (progname == NULL || bin_prefix == NULL || prefix == NULL)
     return NULL;
+
+#ifdef __amiga__
+  /* The shell keeps its search path in the process, not in PATH.  AmigaOS
+     records the directory a program was loaded from and exposes it as
+     PROGDIR:; resolve that to a real path, since the result is handed to
+     child processes whose own PROGDIR: is a different directory.  */
+  if (lbasename (progname) == progname)
+    {
+      BPTR dir = GetProgramDir ();
+      const size_t len = 1024;
+      char *nstore = (char *) malloc (len);
+
+      if (dir != 0 && nstore != NULL
+	  && NameFromLock (dir, (STRPTR) nstore, len)
+	  && AddPart ((STRPTR) nstore, (CONST_STRPTR) progname, len))
+	{
+	  alloc_ptr = nstore;
+	  progname = nstore;
+	}
+      else
+	free (nstore);
+    }
+#endif
 
   /* If there is no full pathname, try to find the program by checking in each
      of the directories specified in the PATH environment variable.  */
