@@ -764,6 +764,7 @@ fi
 case "${host}" in
      *-*-mingw* | *-*-winnt*)	pexecute=pex-win32  ;;
      *-*-msdosdjgpp*)		pexecute=pex-djgpp  ;;
+     *-*-amigaos*)		pexecute=pex-amigaos ;;
      *-*-msdos*)		pexecute=pex-msdos  ;;
      *)				pexecute=pex-unix   ;;
 esac
