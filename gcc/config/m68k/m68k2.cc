@@ -87,9 +87,13 @@ bool m68k_is_ok_for_sibcall(tree decl, tree exp);
  * a1 is used for the sibcall
  * others might be trashed due to stack pop.
  */
-bool m68k_is_ok_for_sibcall(tree decl, tree exp)
+bool m68k_is_ok_for_sibcall(tree decl ATTRIBUTE_UNUSED, tree exp)
 {
-  tree fntype = decl ? TREE_TYPE (decl) : TREE_TYPE (TREE_TYPE (CALL_EXPR_FN (exp)));
+  /* othercum describes the call expand_call just set up with the function
+     type of the call expression.  Compare with that type, not with the
+     decl's: after a prototype/definition spelling mismatch the decl's
+     composited type is a different node and the sibcall was refused.  */
+  tree fntype = TREE_TYPE (TREE_TYPE (CALL_EXPR_FN (exp)));
   if (othercum.fntype == fntype)
     return (othercum.regs_already_used & ~0x010103) == 0;
   return false;
