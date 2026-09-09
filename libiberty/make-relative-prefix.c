@@ -89,6 +89,9 @@ relative prefix can be found, return @code{NULL}.
 #    define DIR_SEPARATOR_2 '\\'
 #  endif
 #  define PATH_SEPARATOR ';'
+#elif defined (__amiga__)
+/* A colon ends an AmigaDOS volume or assign name.  */
+#  define PATH_SEPARATOR ';'
 #else
 #  define PATH_SEPARATOR ':'
 #endif
