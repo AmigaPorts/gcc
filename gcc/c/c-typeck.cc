@@ -1068,9 +1068,41 @@ composite_type_internal (tree t1, tree t2, tree cond,
 	    mv1 = transparent_union_replacement (mv1, mv2);
 	    mv2 = transparent_union_replacement (mv2, mv1);
 
-	    *endp = tree_cons (NULL_TREE,
-			       composite_type_internal (mv1, mv2, cond, cache),
-			       NULL_TREE);
+	    tree newtype = composite_type_internal (mv1, mv2, cond, cache);
+#ifdef TARGET_M68K
+	    /* A parameter declared with __asm("reg") carries the register
+	       as an asmreg attribute on its type, which remove_qualifiers
+	       dropped with the main variant.  Put it back when both sides
+	       bind the same register, or the merged declaration passes the
+	       argument on the stack while the definition reads the register.
+	       Reuse an existing variant the way push_parm_decl does.  */
+	    tree asmattr = lookup_attribute ("asmreg",
+					     TYPE_ATTRIBUTES (TREE_VALUE (p1)));
+	    tree asmattr2 = lookup_attribute ("asmreg",
+					      TYPE_ATTRIBUTES (TREE_VALUE (p2)));
+	    if (asmattr && asmattr2
+		&& tree_int_cst_equal (TREE_VALUE (TREE_VALUE (asmattr)),
+				       TREE_VALUE (TREE_VALUE (asmattr2)))
+		&& !lookup_attribute ("asmreg", TYPE_ATTRIBUTES (newtype)))
+	      {
+		tree attrs = tree_cons (TREE_PURPOSE (asmattr),
+					TREE_VALUE (asmattr), NULL_TREE);
+		tree t;
+		for (t = TYPE_MAIN_VARIANT (newtype); t; t = TYPE_NEXT_VARIANT (t))
+		  if (comptypes (t, newtype) == 1
+		      && attribute_list_equal (TYPE_ATTRIBUTES (t), attrs))
+		    break;
+		if (t)
+		  newtype = t;
+		else
+		  {
+		    newtype = build_variant_type_copy (newtype);
+		    TYPE_ATTRIBUTES (newtype)
+		      = chainon (attrs, TYPE_ATTRIBUTES (newtype));
+		  }
+	      }
+#endif
+	    *endp = tree_cons (NULL_TREE, newtype, NULL_TREE);
 
 	    endp = &TREE_CHAIN (*endp);
 	  }

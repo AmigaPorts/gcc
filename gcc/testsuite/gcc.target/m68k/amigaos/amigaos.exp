@@ -52,6 +52,7 @@ torture-init
 set-torture-options {
     "-O0" "-O1" "-O2" "-O3" "-Os"
     "-O1 -mlra" "-O2 -mlra" "-Os -mlra"
+    "-O2 -flto" "-Os -flto"
     "-O2 -m68000" "-Os -m68000"
 }
 gcc-dg-runtest [lsort [glob -nocomplain $srcdir/$subdir/*-run.c]] "" ""
