@@ -2,7 +2,8 @@
    type differently (struct tag vs typedef), so the C front-end composites
    the function type.  A caller in the same translation unit and the callee
    must still agree on the __asm("reg") registers.  Swept over the torture
-   options by amigaos.exp like asmreg-run.c.  */
+   options by amigaos.exp like asmreg-run.c, including the -flto variants;
+   noipa keeps the call in place there.  */
 
 /* { dg-do run } */
 
@@ -16,7 +17,7 @@ struct _Handle *open_handle (char *name __asm ("a0"),
 			     long form __asm ("d1"));
 
 /* definition: typedef */
-__attribute__ ((noinline))
+__attribute__ ((noinline, noipa))
 Handle *open_handle (char *name __asm ("a0"),
 		     unsigned short mode __asm ("d0"),
 		     long form __asm ("d1"))
@@ -26,7 +27,7 @@ Handle *open_handle (char *name __asm ("a0"),
   return (Handle *) name;
 }
 
-__attribute__ ((noinline))
+__attribute__ ((noinline, noipa))
 Handle *caller (char *name, unsigned short mode, long form)
 {
   return open_handle (name, mode, form);
