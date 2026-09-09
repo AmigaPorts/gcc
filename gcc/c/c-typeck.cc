@@ -2259,6 +2259,27 @@ type_lists_compatible_p (const_tree args1, const_tree args2,
       if (TREE_CODE (a1) == ERROR_MARK
 	       || TREE_CODE (a2) == ERROR_MARK)
 	;
+#ifdef TARGET_M68K
+      /* A parameter's __asm("reg") binding, kept as an asmreg attribute
+	 on its type, is part of the calling convention: a type that
+	 binds a register is not compatible with one binding another or
+	 none, or a call through the other type passes the argument on
+	 the stack while the callee reads the register.  */
+      else if (lookup_attribute ("asmreg", TYPE_ATTRIBUTES (a1)) != NULL_TREE
+	       || lookup_attribute ("asmreg", TYPE_ATTRIBUTES (a2)) != NULL_TREE)
+	{
+	  tree r1 = lookup_attribute ("asmreg", TYPE_ATTRIBUTES (a1));
+	  tree r2 = lookup_attribute ("asmreg", TYPE_ATTRIBUTES (a2));
+	  if (r1 == NULL_TREE || r2 == NULL_TREE
+	      || !tree_int_cst_equal (TREE_VALUE (TREE_VALUE (r1)),
+				      TREE_VALUE (TREE_VALUE (r2)))
+	      || !comptypes_internal (mv1, mv2, data))
+	    {
+	      data->different_types_p = true;
+	      return false;
+	    }
+	}
+#endif
       else if (!comptypes_internal (mv1, mv2, data))
 	{
 	  data->different_types_p = true;
