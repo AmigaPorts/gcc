@@ -48,3 +48,12 @@ MULTILIB_EXTRA_OPTS =
 MULTILIB_EXCEPTIONS = fbaserel/m68881 fbaserel/mcpu=68060/m68881 \
                       fbaserel32 fbaserel32/m68881 fbaserel32/mcpu=68060/m68881 \
                       m68881 mcpu=68060/m68881
+# Every spelling of a 68020-class or better CPU selects the multilib built for
+# it. Without these matches only -m68020, -mcpu=68020, -m68060 and -mcpu=68060
+# leave the 68000 libraries: -m68030, -m68040, -m68020-40, -m68020-60 and every
+# -march= spelling linked the 68000 libgcc, libstdc++ and libnix into code
+# generated for an 020 or better.
+MULTILIB_MATCHES    = mcpu?68020=mcpu?68030 mcpu?68020=mcpu?68040 \
+                      mcpu?68020=m68020-40 mcpu?68020=m68020-60 \
+                      mcpu?68020=march?68020 mcpu?68020=march?68030 \
+                      mcpu?68020=march?68040 mcpu?68060=march?68060
