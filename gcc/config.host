@@ -213,6 +213,9 @@ case ${host} in
     out_host_hook_obj=host-solaris.o
     host_xmake_file="${host_xmake_file} x-solaris"
     ;;
+  m68k-*-amigaos*)
+    host_xm_file=m68k/xm-amigaos.h
+    ;;
   i[34567]86-pc-msdosdjgpp*)
     host_xm_file=i386/xm-djgpp.h
     host_exeext=.exe
