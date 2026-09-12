@@ -2202,7 +2202,46 @@ load_register_parameters (struct arg_data *args, int num_actuals,
 
 	  else if (nregs == -1)
 	    {
-	      emit_move_insn (reg, args[i].value);
+#ifdef TARGET_M68K
+	  rtx val = args[i].value;
+	  machine_mode reg_mode = GET_MODE (reg);
+	  machine_mode val_mode = GET_MODE (val);
+
+      if (MEM_P(val))
+      {
+        if (known_lt (GET_MODE_SIZE (reg_mode), GET_MODE_SIZE (val_mode)))
+        {
+          /* Adjust the MEM mode to match reg_mode (taking the low part) */
+          rtx low_mem = adjust_address(val, reg_mode, 0);
+          emit_move_insn(reg, low_mem);
+        }
+        else
+        {
+          emit_move_insn(reg, val);
+        }
+      }
+      else if (REG_P(val))
+      {
+        if (known_lt (GET_MODE_SIZE (reg_mode), GET_MODE_SIZE (val_mode)))
+        {
+          rtx subreg = gen_lowpart(reg_mode, val);
+          emit_move_insn(reg, subreg);
+        }
+        else
+        {
+          emit_move_insn(reg, val);
+        }
+      }
+      else
+      {
+        /* For CONST_INT or void-mode constants, gen_lowpart handles truncation */
+        rtx low_val = gen_lowpart_if_possible(reg_mode, val);
+        emit_move_insn(reg, low_val ? low_val : val);
+      }
+#else
+      emit_move_insn(reg, args[i].value);
+#endif
+
 #ifdef BLOCK_REG_PADDING
 	      /* Handle case where we have a value that needs shifting
 		 up to the msb.  eg. a QImode value and we're padding
