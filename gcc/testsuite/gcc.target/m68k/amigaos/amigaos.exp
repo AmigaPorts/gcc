@@ -39,6 +39,67 @@ foreach f [lsort [glob -nocomplain $srcdir/$subdir/*.c]] {
 }
 dg-runtest $scan_tests "" ""
 
+# Multilib selection.  Every spelling of a 68020-class or better CPU must
+# select the multilib built for it; before the MULTILIB_MATCHES entries in
+# t-amigaos, -m68030, -m68040, -m68020-40, -m68020-60 and every -march=
+# spelling fell through to the 68000 multilib.  Driver-only: nothing is
+# compiled or run, so this holds on every board.  Skipped when the board
+# itself pins a CPU or float option, as those would override the flags
+# under test (same rule as gcc.target/arm/multilib.exp).
+proc amigaos_check_multi_dir { gcc_opts multi_dir } {
+    global tool
+
+    set options [list "additional_flags=[concat "--print-multi-directory" $gcc_opts]"]
+    set gcc_output [${tool}_target_compile "" "" "none" $options]
+    if { [string match "$multi_dir\n" $gcc_output] } {
+	pass "multilibdir $gcc_opts $multi_dir"
+    } else {
+	fail "multilibdir $gcc_opts $multi_dir (got [string trim $gcc_output])"
+    }
+}
+
+set multilib_pinned 0
+foreach flagsvar {multilib_flags cflags} {
+    if { [board_info [target_info name] exists $flagsvar]
+	 && [regexp {(-m680[0-9]+(-[0-9]+)?|-mcpu=.*|-march=.*|-mtune=.*|-m68881|-msoft-float|-mhard-float|-fbaserel.*)\y} [board_info [target_info name] $flagsvar]] } {
+	verbose "skipping multilib tests due to $flagsvar setting" 1
+	set multilib_pinned 1
+    }
+}
+if { !$multilib_pinned } {
+    foreach {opts dir} {
+	{-m68000}			"."
+	{-m68010}			"."
+	{-m68020}			"libm020"
+	{-mcpu=68020}			"libm020"
+	{-m68030}			"libm020"
+	{-mcpu=68030}			"libm020"
+	{-m68040}			"libm020"
+	{-mcpu=68040}			"libm020"
+	{-m68020-40}			"libm020"
+	{-m68020-60}			"libm020"
+	{-march=68020}			"libm020"
+	{-march=68030}			"libm020"
+	{-march=68040}			"libm020"
+	{-m68060}			"libm060"
+	{-mcpu=68060}			"libm060"
+	{-march=68060}			"libm060"
+	{-m68020 -m68881}		"libm020/libm881"
+	{-m68030 -m68881}		"libm020/libm881"
+	{-m68040 -m68881}		"libm020/libm881"
+	{-fbaserel}			"libb"
+	{-fbaserel -m68020}		"libb/libm020"
+	{-fbaserel -m68040}		"libb/libm020"
+	{-fbaserel -m68060}		"libb/libm060"
+	{-fbaserel -m68040 -m68881}	"libb/libm020/libm881"
+	{-fbaserel32 -m68020}		"libb32/libm020"
+	{-fbaserel32 -m68030}		"libb32/libm020"
+	{-fbaserel32 -m68060}		"libb32/libm060"
+    } {
+	amigaos_check_multi_dir $opts $dir
+    }
+}
+
 # Runtime register-ABI check, swept over -O level, allocator and CPU (the
 # result is invariant, so every combination must pass once fixed).  The caller
 # lives in a companion TU (*-run-lib.c, pulled in by dg-additional-sources)
