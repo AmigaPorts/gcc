@@ -112,7 +112,7 @@ if { !$multilib_pinned } {
 torture-init
 set-torture-options {
     "-O0" "-O1" "-O2" "-O3" "-Os"
-    "-O1 -mlra" "-O2 -mlra" "-Os -mlra"
+    "-O1 -mno-lra" "-O2 -mno-lra" "-Os -mno-lra"
     "-O2 -flto" "-Os -flto"
     "-O2 -m68000" "-Os -m68000"
 }
