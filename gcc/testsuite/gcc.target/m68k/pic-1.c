@@ -1,4 +1,5 @@
 /* { dg-do compile { target m68k-*-* fido-*-* } }  */
+/* { dg-skip-if "no GOT on amigaos" { m68k-*-amigaos* } } */
 /* { dg-options "-O2 -fpic" }  */
 
 extern void Foo (void *);

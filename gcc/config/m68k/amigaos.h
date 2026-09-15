@@ -177,6 +177,13 @@ do									\
       }									\
     if (!TARGET_68020 && flag_pic==4)					\
       error ("%'-fbaserel32%' is not supported on the 68000 or 68010");	\
+    /* flag_pic 1 and 2 are the generic -fpic/-fPIC (and -fpie/-fPIE);	\
+       the hunk linker has no GOT, so only the a4-relative modes 3 and 4 \
+       above are valid.  -mpcrel also sets flag_pic to 1 but uses	\
+       direct pc-relative addressing, not a GOT, so let it through.  */	\
+    if ((flag_pic == 1 || flag_pic == 2) && !TARGET_PCREL)		\
+      error ("%'-fpic%', %'-fPIC%' and %'-fpie%' are not supported on " \
+	     "this target, use %'-fbaserel%' instead");			\
     if (flag_sanitize)							\
       error ("%<-fsanitize%> is not supported on this target");		\
   }									\
