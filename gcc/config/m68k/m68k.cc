@@ -2216,14 +2216,17 @@ static bool
 m68k_decompose_address (machine_mode mode, rtx x,
 			bool strict_p, struct m68k_address *address)
 {
-  unsigned int reach;
+  /* Displacements are accepted up to LIMIT - REACH.  */
+  unsigned int reach = GET_MODE_SIZE (mode);
 
   memset (address, 0, sizeof (*address));
 
-  if (mode == BLKmode)
+  /* A mode without a size (BLKmode, or VOIDmode when LRA checks a bare
+     address operand such as the "p" of *lea) accesses nothing, but the
+     displacement itself must still be encodable: a reach of 0 would
+     let 128 and 0x8000 through.  */
+  if (reach == 0)
     reach = 1;
-  else
-    reach = GET_MODE_SIZE (mode);
 
   /* Check for (An) (mode 2).  */
   if (m68k_legitimate_base_reg_p (x, strict_p))
