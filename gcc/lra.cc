@@ -1985,6 +1985,32 @@ lra_process_new_insns (rtx_insn *insn, rtx_insn *before, rtx_insn *after,
 	  emit_insn_after (after, insn);
 	  push_insns (last, insn);
 	  setup_sp_offset (after, last);
+	  /* The reload insns were generated with eliminable register
+	     offsets relative to the sp offset of INSN.  If INSN itself
+	     changes sp (e.g. a push), the insns after it see a different sp
+	     offset and their offsets have to be adjusted, as done above for
+	     INSN when the insns before it change sp.  */
+	  poly_int64 insn_sp_offset = lra_get_insn_recog_data (insn)->sp_offset;
+	  for (rtx_insn *curr = after; curr != NEXT_INSN (last);
+	       curr = NEXT_INSN (curr))
+	    {
+	      poly_int64 curr_sp_offset
+		= lra_get_insn_recog_data (curr)->sp_offset;
+	      if (maybe_ne (insn_sp_offset, curr_sp_offset))
+		{
+		  if (lra_dump_file != NULL)
+		    {
+		      fprintf (lra_dump_file, "    Changing sp offset from ");
+		      print_dec (insn_sp_offset, lra_dump_file);
+		      fprintf (lra_dump_file, " to ");
+		      print_dec (curr_sp_offset, lra_dump_file);
+		      fprintf (lra_dump_file, " for insn");
+		      dump_rtl_slim (lra_dump_file, curr, NULL, -1, 0);
+		    }
+		  eliminate_regs_in_insn (curr, false, false,
+					  insn_sp_offset - curr_sp_offset);
+		}
+	    }
 	  if (fixup_reg_args_size)
 	    {
 	      rtx note = find_reg_note (insn, REG_ARGS_SIZE, NULL_RTX);
