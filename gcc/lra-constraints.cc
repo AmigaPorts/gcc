@@ -5583,6 +5583,54 @@ combine_reload_insn (rtx_insn *from, rtx_insn *to)
   return false;
 }
 
+static bool
+virtual_reg_p (const_rtx reg)
+{
+  return (VIRTUAL_REGISTER_P (reg)
+	  || (REGNO(reg) == ARG_POINTER_REGNUM
+	      && !HARD_FRAME_POINTER_IS_ARG_POINTER)
+	  || (REGNO(reg) == FRAME_POINTER_REGNUM
+	      && !HARD_FRAME_POINTER_IS_FRAME_POINTER));
+}
+
+/* Return true if X contains a virtual register.  */
+static bool
+contains_virtual_reg_p (rtx x)
+{
+  subrtx_iterator::array_type array;
+  FOR_EACH_SUBRTX (iter, array, x, NONCONST)
+    if (REG_P (*iter) && virtual_reg_p (*iter))
+      return true;
+  return false;
+}
+
+/* Return true if pseudo REGNO is an operand of an incdec rtx in any of its
+   insns.  */
+static bool
+reg_has_incdec_p (int regno)
+{
+  unsigned int uid;
+  bitmap_iterator bi;
+  EXECUTE_IF_SET_IN_BITMAP (&lra_reg_info[regno].insn_bitmap, 0, uid, bi)
+    {
+      rtx_insn *insn = lra_insn_recog_data[uid]->insn;
+      if (!NONDEBUG_INSN_P (insn))
+	continue;
+      subrtx_iterator::array_type array;
+      FOR_EACH_SUBRTX (iter, array, PATTERN (insn), NONCONST)
+	{
+	  const_rtx x = *iter;
+	  if ((GET_CODE (x) == PRE_INC || GET_CODE (x) == PRE_DEC
+	       || GET_CODE (x) == POST_INC || GET_CODE (x) == POST_DEC
+	       || GET_CODE (x) == PRE_MODIFY || GET_CODE (x) == POST_MODIFY)
+	      && REG_P (XEXP (x, 0))
+	      && REGNO (XEXP (x, 0)) == (unsigned int) regno)
+	    return true;
+	}
+    }
+  return false;
+}
+
 /* Entry function of LRA constraint pass.  Return true if the
    constraint pass did change the code.	 */
 bool
@@ -5687,7 +5735,15 @@ lra_constraints (bool first_p)
 		    && ((CONST_POOL_OK_P (PSEUDO_REGNO_MODE (i), x)
 			 && (targetm.preferred_reload_class
 			     (x, lra_get_allocno_class (i)) == NO_REGS))
-			|| contains_symbol_ref_p (x))))
+			|| contains_symbol_ref_p (x)))
+		/* PR120165: An inc/dec changes the reg value, so we cannot
+		   substitute the equiv which might contain virtual regs
+		   requiring elimination.  An insn with inc/dec can also change
+		   the value of another reg (e.g. sp) against which we
+		   eliminate.  As we update elimination once per insn and an
+		   inc/dec operand might require input and output reloads, we
+		   can generate a wrong offset for a reload insn.  */
+		|| (contains_virtual_reg_p (x) && reg_has_incdec_p (i)))
 	      ira_reg_equiv[i].defined_p
 		= ira_reg_equiv[i].caller_save_p = false;
 	    if (contains_reg_p (x, false, true))
