@@ -261,14 +261,21 @@ along with GCC; see the file COPYING3.  If not see
 #define TUNE_68000	(m68k_tune == u68000)
 #define TUNE_68010	(m68k_tune == u68010)
 #define TUNE_68000_10	(TUNE_68000 || TUNE_68010)
+#define TUNE_68020	(m68k_tune == u68020 \
+			 || m68k_tune == u68020_40 \
+			 || m68k_tune == u68020_60)
 #define TUNE_68030	(m68k_tune == u68030 \
 			 || m68k_tune == u68020_40 \
 			 || m68k_tune == u68020_60)
 #define TUNE_68040	(m68k_tune == u68040 \
 			 || m68k_tune == u68020_40 \
 			 || m68k_tune == u68020_60)
-#define TUNE_68060	(m68k_tune == u68060 || m68k_tune == u68020_60)
 #define TUNE_68040_60	(TUNE_68040 || TUNE_68060)
+#define TUNE_68060	(m68k_tune == u68060 || m68k_tune == u68020_60)
+#define TUNE_68080	(m68k_tune == u68080)
+#define TUNE_68020_80	(TUNE_68020 || TUNE_68030 || TUNE_68040 || TUNE_68060 || TUNE_68080)
+#define TUNE_68040_80	(TUNE_68040 || TUNE_68060 || TUNE_68080)
+#define TUNE_68060_80	(TUNE_68060 || TUNE_68080)
 #define TUNE_CPU32	(m68k_tune == ucpu32)
 #define TUNE_CFV1       (m68k_tune == ucfv1)
 #define TUNE_CFV2	(m68k_tune == ucfv2)
