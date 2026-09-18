@@ -179,6 +179,9 @@ static bool m68k_tls_symbol_p (rtx);
 static rtx m68k_legitimize_address (rtx, rtx, machine_mode);
 static bool m68k_rtx_costs (rtx, machine_mode, int, int, int *, bool);
 static int m68k_address_cost(rtx x, machine_mode mode, addr_space_t t, bool speed);
+static int m68k_callee_save_cost (spill_cost_type, unsigned int, machine_mode,
+				  unsigned int, int, const HARD_REG_SET &,
+				  bool);
 #if M68K_HONOR_TARGET_STRICT_ALIGNMENT
 static bool m68k_return_in_memory (const_tree, const_tree);
 #endif
@@ -286,6 +289,9 @@ static bool m68k_use_lra_p (void);
 
 #undef TARGET_ADDRESS_COST
 #define TARGET_ADDRESS_COST m68k_address_cost
+
+#undef TARGET_CALLEE_SAVE_COST
+#define TARGET_CALLEE_SAVE_COST m68k_callee_save_cost
 
 #undef TARGET_ATTRIBUTE_TABLE
 #define TARGET_ATTRIBUTE_TABLE m68k_attribute_table
@@ -7336,6 +7342,27 @@ m68k_68040_costs (rtx x, machine_mode mode, int outer_code,
 extern bool
 m68k_68080_costs (rtx x, machine_mode mode, int outer_code,
 		int opno, int *total, bool speed );
+
+/* Implement TARGET_CALLEE_SAVE_COST.
+
+   The default charges a callee-saved register a full memory move to save
+   and another to restore, which the allocator then scales by the entry
+   block frequency, so a value with only a few uses is left in memory
+   rather than given a register that needs saving.  On m68k the prologue
+   and epilogue save integer registers with move.l dN,-(sp) and
+   move.l (sp)+,dN, and from three registers on with a single movem, so an
+   extra saved register costs no code and a few cycles, while a value kept
+   in memory costs a displacement word and a memory access on every use.
+   Charge nothing for integer registers; FPU registers keep the default
+   since fmovem is expensive.  */
+
+static int
+m68k_callee_save_cost (spill_cost_type, unsigned int hard_regno,
+		       machine_mode, unsigned int, int mem_cost,
+		       const HARD_REG_SET &, bool)
+{
+  return INT_REGNO_P (hard_regno) ? 0 : mem_cost;
+}
 
 static bool
 m68k_rtx_costs (rtx x, machine_mode mode, int outer_code,
