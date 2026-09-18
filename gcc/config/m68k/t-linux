@@ -32,24 +32,34 @@ sysroot-suffix.h: $(srcdir)/config/m68k/print-sysroot-suffix.sh
 
 EXTRA_OBJS += m68k2.o m68k_68000_10_costs.o m68k_68020_costs.o m68k_68030_costs.o m68k_68040_costs.o m68k_68080_costs.o
 
-# Extra object file linked to the cc1* executables.
-amigaos.o: $(srcdir)/config/m68k/amigaos.cc $(CONFIG_H)
-	$(CXX) -c $(ALL_CFLAGS) $(ALL_CPPFLAGS) $(INCLUDES) $< $(OUTPUT_OPTION)
+# Extra object files linked to the cc1* executables.  Compile them with
+# $(COMPILE) so their header dependencies are tracked automatically, as the
+# other backends do: with only $(CONFIG_H) as a prerequisite an options.h
+# change left m68k2.o reading the option variables at stale offsets.
+amigaos.o: $(srcdir)/config/m68k/amigaos.cc
+	$(COMPILE) $<
+	$(POSTCOMPILE)
 
-m68k2.o: $(srcdir)/config/m68k/m68k2.cc $(CONFIG_H)
-	$(CXX) -c $(ALL_CFLAGS) $(ALL_CPPFLAGS) $(INCLUDES) $< $(OUTPUT_OPTION)
+m68k2.o: $(srcdir)/config/m68k/m68k2.cc
+	$(COMPILE) $<
+	$(POSTCOMPILE)
 
-m68k_68000_10_costs.o: $(srcdir)/config/m68k/m68k_68000_10_costs.cc $(CONFIG_H)
-	$(CXX) -c $(ALL_CFLAGS) $(ALL_CPPFLAGS) $(INCLUDES) $< $(OUTPUT_OPTION)
+m68k_68000_10_costs.o: $(srcdir)/config/m68k/m68k_68000_10_costs.cc
+	$(COMPILE) $<
+	$(POSTCOMPILE)
 
-m68k_68020_costs.o: $(srcdir)/config/m68k/m68k_68020_costs.cc $(CONFIG_H)
-	$(CXX) -c $(ALL_CFLAGS) $(ALL_CPPFLAGS) $(INCLUDES) $< $(OUTPUT_OPTION)
+m68k_68020_costs.o: $(srcdir)/config/m68k/m68k_68020_costs.cc
+	$(COMPILE) $<
+	$(POSTCOMPILE)
 
-m68k_68030_costs.o: $(srcdir)/config/m68k/m68k_68030_costs.cc $(CONFIG_H)
-	$(CXX) -c $(ALL_CFLAGS) $(ALL_CPPFLAGS) $(INCLUDES) $< $(OUTPUT_OPTION)
+m68k_68030_costs.o: $(srcdir)/config/m68k/m68k_68030_costs.cc
+	$(COMPILE) $<
+	$(POSTCOMPILE)
 
-m68k_68040_costs.o: $(srcdir)/config/m68k/m68k_68040_costs.cc $(CONFIG_H)
-	$(CXX) -c $(ALL_CFLAGS) $(ALL_CPPFLAGS) $(INCLUDES) $< $(OUTPUT_OPTION)
+m68k_68040_costs.o: $(srcdir)/config/m68k/m68k_68040_costs.cc
+	$(COMPILE) $<
+	$(POSTCOMPILE)
 
-m68k_68080_costs.o: $(srcdir)/config/m68k/m68k_68080_costs.cc $(CONFIG_H)
-	$(CXX) -c $(ALL_CFLAGS) $(ALL_CPPFLAGS) $(INCLUDES) $< $(OUTPUT_OPTION)
+m68k_68080_costs.o: $(srcdir)/config/m68k/m68k_68080_costs.cc
+	$(COMPILE) $<
+	$(POSTCOMPILE)
