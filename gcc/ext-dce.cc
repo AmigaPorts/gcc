@@ -210,7 +210,11 @@ ext_dce_process_sets (rtx_insn *insn, rtx obj, bitmap live_tmp)
 	     wider than DImode.  */
 	  scalar_mode outer_mode;
 	  if (!is_a <scalar_mode> (GET_MODE (x), &outer_mode)
-	      || GET_MODE_BITSIZE (outer_mode) > HOST_BITS_PER_WIDE_INT)
+	      || GET_MODE_BITSIZE (outer_mode) > HOST_BITS_PER_WIDE_INT
+#ifdef TARGET_M68K
+	      || (!targetm.lra_p () && GET_MODE_BITSIZE (outer_mode) > HOST_BITS_PER_WIDE_INT/2)
+#endif
+	  )
 	    {
 	      /* Skip the subrtxs of this destination.  There is
 		 little value in iterating into the subobjects, so
