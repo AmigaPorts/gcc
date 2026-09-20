@@ -1586,6 +1586,21 @@ scan_one_insn (rtx_insn *insn)
 
       COSTS (costs, num)->mem_cost
 	-= ira_memory_move_cost[GET_MODE (reg)][cl][1] * frequency;
+
+
+#ifdef TARGET_M68K
+      /* Stefan "Bebbo" Franke (SBFF):
+	 m68k-specific core fix: Prevent the deduction of memory move costs
+	 from causing a negative or artificially low mem_cost for stack-equivalent
+	 pseudos. If the accumulated memory cost drops below the base cost of
+	 a single register-to-memory move operation, we clamp it to that base cost.
+	 This stops the allocator from falsely assuming that memory access is free.
+	 Note: This approach might help generally / elsewhere on register-constrained
+	 or CISC targets where late equivalence passes blindly dominate register choices. */
+      if (COSTS (costs, num)->mem_cost < ira_memory_move_cost[GET_MODE (reg)][cl][1])
+	COSTS (costs, num)->mem_cost = ira_memory_move_cost[GET_MODE (reg)][cl][1];
+#endif
+
       record_address_regs (GET_MODE (SET_SRC (set)),
 			   MEM_ADDR_SPACE (SET_SRC (set)),
 			   XEXP (SET_SRC (set), 0), 0, MEM, SCRATCH,
