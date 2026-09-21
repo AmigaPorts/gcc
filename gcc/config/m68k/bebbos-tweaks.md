@@ -81,3 +81,38 @@
   ""
   "dbra %0,%l1\;clr%.w %0\;subq%.l #1,%0\;jcc %l1"
   [(set_attr "type" "bcc")])
+
+  
+;; =========================================================================
+;; MOVMEMSI / SETMEMSI - SUPPORT use_by_pieces_infrastructure 
+;; =========================================================================
+
+;; Argument 0 is the destination
+;; Argument 1 is the source
+;; Argument 2 is the length
+;; Argument 3 is the alignment
+(define_expand "movmemsi"
+  [(parallel [(set (match_operand:BLK 0 "general_operand")
+		   (match_operand:BLK 1 "general_operand"))
+	      (use (match_operand:SI 2 "const_int_operand"))
+	      (use (match_operand:SI 3 "const_int_operand"))])]
+  ""
+{
+	if (m68k_emit_movmemsi(operands[0], operands[1], operands[2], operands[3]))
+	  DONE;
+	else
+	  FAIL;
+})
+
+(define_expand "setmemsi"
+  [(parallel [(set (match_operand:BLK 0 "" "")
+		   (match_operand:SI 1 "const_int_operand" ""))
+	      (use (match_operand:SI 2 "const_int_operand" ""))
+	      (use (match_operand:SI 3 "const_int_operand" ""))])]
+  ""
+{
+  if (m68k_emit_setmemsi (operands[0], operands[2], operands[1], operands[3]))
+    DONE;
+  else
+    FAIL;
+})

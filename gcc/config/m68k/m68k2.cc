@@ -26,24 +26,56 @@
 #define IN_TARGET_CODE 1
 
 #include "config.h"
+#define INCLUDE_STRING
 #include "system.h"
 #include "coretypes.h"
-#include "tm.h"
-#include "rtl.h"
-#include "output.h"
+#include "backend.h"
+#include "cfghooks.h"
 #include "tree.h"
 #include "stringpool.h"
 #include "attribs.h"
+#include "rtl.h"
+#include "df.h"
+#include "alias.h"
+#include "fold-const.h"
+#include "calls.h"
+#include "stor-layout.h"
+#include "varasm.h"
+#include "regs.h"
+#include "insn-config.h"
+#include "conditions.h"
+#include "output.h"
+#include "insn-attr.h"
+#include "recog.h"
+#include "diagnostic-core.h"
 #include "flags.h"
+#include "expmed.h"
+#include "dojump.h"
+#include "explow.h"
+#include "memmodel.h"
+#include "emit-rtl.h"
+#include "stmt.h"
 #include "expr.h"
-#include "toplev.h"
+#include "reload.h"
 #include "tm_p.h"
 #include "target.h"
-#include "diagnostic-core.h"
-#include "langhooks.h"
-#include "function.h"
-#include "stor-layout.h"
-#include "calls.h"
+#include "debug.h"
+#include "cfgrtl.h"
+#include "cfganal.h"
+#include "lcm.h"
+#include "cfgbuild.h"
+#include "cfgcleanup.h"
+#include "insn-codes.h"
+#include "opts.h"
+#include "optabs.h"
+#include "builtins.h"
+#include "rtl-iter.h"
+#include "toplev.h"
+#include "df.h"
+
+
+/* This file should be included last.  */
+#include "target-def.h"
 
 //#define MYDEBUG 1
 #ifdef MYDEBUG
@@ -252,7 +284,7 @@ m68k_function_value_regno_p(unsigned regno) {
 /* Update the data in CUM to advance over an argument.  */
 
 void m68k_function_arg_advance (cumulative_args_t cum_v,
-				       const function_arg_info & ai)
+				       const function_arg_info & )
 {
   struct m68k_args *cum = *get_cumulative_args (cum_v) ? &mycum : &othercum;
   /* Update the data in CUM to advance over an argument.  */
@@ -582,4 +614,276 @@ m68k_static_chain_rtx (const_tree decl, bool incoming ATTRIBUTE_UNUSED)
     return gen_rtx_REG (Pmode, 14);
 
   return 0;
+}
+
+/* Implement TARGET_USE_MOVE_BY_PIECES_INFRASTRUCTURE_P.
+ */
+bool
+m68k_use_by_pieces_infrastructure_p (unsigned HOST_WIDE_INT size,
+				     unsigned int align ATTRIBUTE_UNUSED,
+				     enum by_pieces_operation op ATTRIBUTE_UNUSED,
+				     bool speed_p ATTRIBUTE_UNUSED)
+{
+  /* no need for small items. */
+  if (align == 16) align = 32;
+  return size * 8 / align < 2;
+}
+
+int
+m68k_emit_setmemsi(rtx blkdest, rtx val, rtx length, rtx alignment)
+{
+  int align = INTVAL(alignment);
+  int size = INTVAL(length);
+  int n = optimize_size ? 4 : 16;
+  rtx regdst = XEXP(blkdest, 0);
+  rtx src, dst;
+  int rest = 0;
+
+  int value = INTVAL(val) & 0xff;
+  if (value != 0)
+    {
+      if (align == 1 && TUNE_68000_10)
+        {
+	  src = gen_reg_rtx(QImode);
+	  emit_move_insn (src, GEN_INT((signed char )value));
+        }
+      else
+	{
+	  src = gen_reg_rtx(SImode);
+	  HOST_WIDE_INT v = (unsigned char)value;
+	  v |= v << 8;
+	  v |= v << 16;
+
+	  emit_move_insn(src, gen_int_mode(v, SImode));
+	}
+    }
+  else
+    src = val;
+
+  /* SBF: allocate tmp reg.
+   * auto-inc-dec may benefit - maybe not.
+   */
+  dst = gen_reg_rtx(SImode);
+  rtx_insn * dinsn = emit_move_insn(dst, regdst);
+  add_reg_note (dinsn, REG_INC, dst);
+
+  regdst = dst;
+
+  /* move bytes. */
+  if (align == 1 && TUNE_68000_10)
+    {
+      dst = gen_rtx_MEM(QImode, gen_rtx_POST_INC(SImode, regdst));
+    }
+  else
+    {
+      rest = size % 4;
+      size /= 4;
+      dst = gen_rtx_MEM(SImode, gen_rtx_POST_INC(SImode, regdst));
+    }
+
+  int nloops = size / n - 1;
+
+  /* Above this size, the generic implementation using MOVEM is faster. */
+  if (nloops > 160)
+    return false;
+
+  int single = size % n;
+
+  if (nloops == 0)
+    single += n;
+  else if (nloops > 0)
+    {
+      rtx counter = gen_reg_rtx(HImode);
+      rtx looplabel = gen_label_rtx();
+
+      emit_move_insn(counter, GEN_INT(nloops));
+      emit_label(looplabel);
+
+      int count = n;
+      while (count-- > 0)
+        {
+          rtx_insn *insn = emit_move_insn(dst, src);
+          add_reg_note(insn, REG_INC, regdst);
+        }
+
+      emit_jump_insn(gen_dbne_hi(counter, looplabel));
+    }
+
+  while (single-- > 0)
+    {
+      rtx_insn *insn = emit_move_insn (dst, src);
+      add_reg_note (insn, REG_INC, regdst);
+    }
+
+  // move trailing data
+  if (rest & 2)
+    {
+      dst = gen_rtx_MEM (HImode, gen_rtx_POST_INC(SImode, regdst));
+      rtx_insn *insn = emit_move_insn (dst,
+				       GEN_INT(value + (signed char )value * 0x100));
+      add_reg_note (insn, REG_INC, regdst);
+    }
+  if (rest & 1)
+    {
+      dst = gen_rtx_MEM (QImode, gen_rtx_POST_INC(SImode, regdst));
+      rtx_insn *insn = emit_move_insn (dst, GEN_INT((signed char )value));
+      add_reg_note (insn, REG_INC, regdst);
+    }
+
+  return true;
+}
+
+int
+m68k_emit_movmemsi(rtx blkdest, rtx blksrc, rtx length, rtx alignment)
+{
+  int align = INTVAL(alignment);
+  int size = INTVAL(length);
+  int n = optimize_size ? 4 : 16;
+
+  rtx regsrc = XEXP(blksrc, 0);
+  rtx regdst = XEXP(blkdest, 0);
+  rtx src, dst;
+  int rest = 0;
+
+  /* Default direction is forward (POST_INC) starting at the beginning. */
+  bool backward = false;
+
+  /* 1. Dynamic Overlap & Direction Check using get_inner_reference. */
+  tree dest_expr = MEM_EXPR (blkdest);
+  tree src_expr = MEM_EXPR (blksrc);
+
+  if (dest_expr && src_expr)
+    {
+      poly_int64 d_bitsize, d_bitpos, s_bitsize, s_bitpos;
+      tree d_offset_tree, s_offset_tree;
+      machine_mode d_mode, s_mode;
+      int d_unsignedp, d_reversep, d_volatilep;
+      int s_unsignedp, s_reversep, s_volatilep;
+
+      tree dest_base = get_inner_reference (dest_expr, &d_bitsize, &d_bitpos, &d_offset_tree,
+					    &d_mode, &d_unsignedp, &d_reversep, &d_volatilep);
+      tree src_base = get_inner_reference (src_expr, &s_bitsize, &s_bitpos, &s_offset_tree,
+					   &s_mode, &s_unsignedp, &s_reversep, &s_volatilep);
+
+      if (dest_base && src_base && dest_base == src_base)
+	{
+	  HOST_WIDE_INT d_off = d_bitpos.to_constant() / BITS_PER_UNIT;
+	  HOST_WIDE_INT s_off = s_bitpos.to_constant() / BITS_PER_UNIT;
+
+	  if (d_offset_tree && TREE_CODE (d_offset_tree) == INTEGER_CST)
+	    d_off += TREE_INT_CST_LOW (d_offset_tree);
+	  if (s_offset_tree && TREE_CODE (s_offset_tree) == INTEGER_CST)
+	    s_off += TREE_INT_CST_LOW (s_offset_tree);
+
+	  if (MEM_OFFSET_KNOWN_P (blkdest))
+	    d_off += MEM_OFFSET (blkdest).to_constant();
+	  if (MEM_OFFSET_KNOWN_P (blksrc))
+	    s_off += MEM_OFFSET (blksrc).to_constant();
+
+	  /* If destination is ahead of source and they overlap, switch to backward. */
+	  if (d_off > s_off && d_off < s_off + size)
+	    backward = true;
+	}
+    }
+
+  /* 2. Adjust starting pointers if copying backward.
+     Two additional instructions are emitted here to calculate the end of the blocks. */
+  if (backward)
+    {
+      regsrc = plus_constant(Pmode, regsrc, size);
+      regdst = plus_constant(Pmode, regdst, size);
+    }
+
+  /* Temporary registers for auto-increment/decrement tracking. */
+  src = gen_reg_rtx(SImode);
+  rtx_insn *sinsn = emit_move_insn(src, regsrc);
+  add_reg_note(sinsn, REG_INC, src);
+  regsrc = src;
+
+  dst = gen_reg_rtx(SImode);
+  rtx_insn *dinsn = emit_move_insn(dst, regdst);
+  add_reg_note(dinsn, REG_INC, dst);
+  regdst = dst;
+
+  /* 3. Dynamically generate either POST_INC or PRE_DEC MEM expressions. */
+  if (align == 1 && TUNE_68000_10)
+    {
+      src = gen_rtx_MEM(QImode, backward ? gen_rtx_PRE_DEC(SImode, regsrc)
+                                         : gen_rtx_POST_INC(SImode, regsrc));
+      dst = gen_rtx_MEM(QImode, backward ? gen_rtx_PRE_DEC(SImode, regdst)
+                                         : gen_rtx_POST_INC(SImode, regdst));
+    }
+  else
+    {
+      rest = size % 4;
+      size /= 4;
+
+      src = gen_rtx_MEM(SImode, backward ? gen_rtx_PRE_DEC(SImode, regsrc)
+                                         : gen_rtx_POST_INC(SImode, regsrc));
+      dst = gen_rtx_MEM(SImode, backward ? gen_rtx_PRE_DEC(SImode, regdst)
+                                         : gen_rtx_POST_INC(SImode, regdst));
+    }
+
+  /* 4. The entire loop unrolling infrastructure remains unchanged! */
+  int nloops = size / n - 1;
+
+  if (nloops > 160)
+    return false;
+
+  int single = size % n;
+
+  if (nloops == 0)
+    single += n;
+  else if (nloops > 0)
+    {
+      rtx counter = gen_reg_rtx(HImode);
+      rtx looplabel = gen_label_rtx();
+
+      emit_move_insn(counter, GEN_INT(nloops));
+      emit_label(looplabel);
+
+      int count = n;
+      while (count-- > 0)
+        {
+          rtx_insn *insn = emit_move_insn(dst, src);
+          add_reg_note(insn, REG_INC, regsrc);
+          add_reg_note(insn, REG_INC, regdst);
+        }
+
+      emit_jump_insn(gen_dbne_hi(counter, looplabel));
+    }
+
+  while (single-- > 0)
+    {
+      rtx_insn *insn = emit_move_insn(dst, src);
+      add_reg_note(insn, REG_INC, regsrc);
+      add_reg_note(insn, REG_INC, regdst);
+    }
+
+  /* Move trailing data (dynamically uses updated MEM expressions from above). */
+  if (rest & 2)
+    {
+      src = gen_rtx_MEM(HImode, backward ? gen_rtx_PRE_DEC(SImode, regsrc)
+                                         : gen_rtx_POST_INC(SImode, regsrc));
+      dst = gen_rtx_MEM(HImode, backward ? gen_rtx_PRE_DEC(SImode, regdst)
+                                         : gen_rtx_POST_INC(SImode, regdst));
+
+      rtx_insn *insn = emit_move_insn(dst, src);
+      add_reg_note(insn, REG_INC, regsrc);
+      add_reg_note(insn, REG_INC, regdst);
+    }
+
+  if (rest & 1)
+    {
+      src = gen_rtx_MEM(QImode, backward ? gen_rtx_PRE_DEC(SImode, regsrc)
+                                         : gen_rtx_POST_INC(SImode, regsrc));
+      dst = gen_rtx_MEM(QImode, backward ? gen_rtx_PRE_DEC(SImode, regdst)
+                                         : gen_rtx_POST_INC(SImode, regdst));
+
+      rtx_insn *insn = emit_move_insn(dst, src);
+      add_reg_note(insn, REG_INC, regsrc);
+      add_reg_note(insn, REG_INC, regdst);
+    }
+
+  return true;
 }
