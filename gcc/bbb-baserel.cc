@@ -115,22 +115,23 @@ namespace
 
 	if (secname == 0)
 	  {
-	    if (decl->base.constant_flag || decl->base.readonly_flag)
-	      return 0;
+	    /* Standardized hook call: Query the official target section selector.
+	       If it decides that this variable belongs into the text_section,
+	       it resides in the read-only segment and must bypass the baserel a4 tracking. */
+	    if (targetm.asm_out.select_section (decl, 0, 0) == text_section)
+	      {
+		return 0; /* Keep it as an absolute text-segment reference, skip a4. */
+	      }
 
-	    // normal constants end up in text.
-	    if (TREE_READONLY (decl))
-	      return 0;
-
-	    tree type = decl->decl_minimal.common.typed.type;
-	    if (type->base.code == ARRAY_TYPE)
-	      type = type->typed.type;
-	    if (type->base.readonly_flag)
+	    /* Fallback for safety if explicitly written section flags exist */
+	    if (decl->base.constant_flag || decl->base.readonly_flag || TREE_READONLY (decl))
 	      return 0;
 	  }
 	else
-	  if (0 == strcmp(".text", secname))
-	    return 0;
+	  {
+	    if (0 == strcmp(".text", secname))
+	      return 0;
+	  }
 
 	if (secname == 0 || strcmp(".data", secname))
 	  {
@@ -223,34 +224,48 @@ namespace
 	 * There are shared CONST(PLUS(SYMBOL, CONST_INT)) rtx! (evil!)
 	 * Make a copy if one is seen, to avoid double replacement.
 	 */
-    case CONST:
-      if (GET_CODE(XEXP(*x, 0)) == PLUS && GET_CODE(XEXP(XEXP(*x, 0), 0)) == SYMBOL_REF)
-        {
-          rtx symbol = XEXP(XEXP(*x, 0), 0);
-          rtx offset = XEXP(XEXP(*x, 0), 1);
+      case CONST:
+        if (GET_CODE(XEXP(*x, 0)) == PLUS && GET_CODE(XEXP(XEXP(*x, 0), 0)) == SYMBOL_REF)
+          {
+            rtx symbol = XEXP(XEXP(*x, 0), 0);
+            rtx offset = XEXP(XEXP(*x, 0), 1);
+            tree decl = SYMBOL_REF_DECL (symbol);
 
-          // Immer temporäres Register verwenden
-          rtx pic_ref = gen_rtx_PLUS(Pmode, picreg,
-					gen_rtx_CONST(Pmode,
-					gen_rtx_UNSPEC(Pmode,
-					gen_rtvec(2, symbol, GEN_INT(0)),
-					UNSPEC_RELOC16)));
+            if (decl)
+              {
+                /* Fix for Amiga -mbaserel (PR36038):
+                   Check if this constant expression points to a read-only symbol
+                   inside the text segment. If targetm says it's text_section,
+                   we MUST return 0 here and leave the absolute address untouched! */
+                if (targetm.asm_out.select_section (decl, 0, 0) == text_section)
+                  return 0;
 
-          rtx tmp = gen_reg_rtx(Pmode);
-          rtx set = gen_rtx_SET(tmp, pic_ref);
-          emit_insn_before(set, insn);
+                if (decl->base.constant_flag || decl->base.readonly_flag || TREE_READONLY (decl))
+                  return 0;
+              }
 
-          rtx result = offset != const0_rtx ? gen_rtx_PLUS(Pmode, tmp, offset) : tmp;
+            /* If it's a real mutable data symbol, proceed with baserel conversion using a tmp reg */
+            rtx pic_ref = gen_rtx_PLUS(Pmode, picreg,
+  					gen_rtx_CONST(Pmode,
+  					gen_rtx_UNSPEC(Pmode,
+  					gen_rtvec(2, symbol, GEN_INT(0)),
+  					UNSPEC_RELOC16)));
 
-          if (!validate_unshare_change(insn, x, result, 0))
-            {
-              *x = result;
-              return -1;
-            }
-          return 1;
-        }
-      break;
-    /*
+            rtx tmp = gen_reg_rtx(Pmode);
+            rtx set = gen_rtx_SET(tmp, pic_ref);
+            emit_insn_before(set, insn);
+
+            rtx result = offset != const0_rtx ? gen_rtx_PLUS(Pmode, tmp, offset) : tmp;
+
+            if (!validate_unshare_change(insn, x, result, 0))
+              {
+                *x = result;
+                return -1;
+              }
+            return 1;
+          }
+        break;
+        /*
 	 * Default: try in place first.
 	 */
       default:
@@ -336,6 +351,34 @@ namespace
 	rtx op1 = XEXP(plus, 1);
 	if (GET_CODE(op1) == CONST)
 	  op1 = XEXP(op1, 0);
+
+	/* Fix for nested baserel address overloads (GCC testsuite 20100416-1)
+	   If we have a structure like (plus (reg) (plus (reg) (const_int))),
+	   this represents too many unresolved register dependencies for the m68k.
+	   Force-extract the nested addition into a clean temporary register. */
+	if (REG_P (op0) && GET_CODE (op1) == PLUS)
+	  {
+	    rtx t_addr = gen_reg_rtx (Pmode);
+	    rtx set_addr = gen_rtx_SET (t_addr, op1);
+	    emit_insn_before (set_addr, insn);
+
+	    validate_change (insn, &XEXP (plus, 1), t_addr, 0);
+	    return;
+	  }
+
+	/* Fix for nested MULT + PLUS address overloads (GCC testsuite 920625-1)
+	   If we have a scaled index (MULT) combined with a nested addition (PLUS),
+	   the m68k reloader will fail to match the indexing mode properly.
+	   Force-extract the nested addition into a temporary register. */
+	if (GET_CODE (op0) == MULT && GET_CODE (op1) == PLUS)
+	  {
+	    rtx t_addr = gen_reg_rtx (Pmode);
+	    rtx set_addr = gen_rtx_SET (t_addr, op1);
+	    emit_insn_before (set_addr, insn);
+
+	    validate_change (insn, &XEXP (plus, 1), t_addr, 0);
+	    return;
+	  }
 
 	// set to MEM - not null
 	rtx op00 = x;
