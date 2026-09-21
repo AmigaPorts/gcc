@@ -289,14 +289,16 @@ replace_ref (df_ref ref, rtx reg)
   rtx oldreg = DF_REF_REAL_REG (ref);
   rtx *loc = DF_REF_REAL_LOC (ref);
   unsigned int uid = DF_REF_INSN_UID (ref);
+  rtx_insn * insn = DF_REF_INSN (ref);
 
-  if (oldreg == reg)
+  /* SBF: ignore regs marked as REG_INC. */
+  if (oldreg == reg || find_reg_note(insn, REG_INC, oldreg))
     return;
   if (dump_file)
     fprintf (dump_file, "Updating insn %i (%i->%i)\n",
 	     uid, REGNO (oldreg), REGNO (reg));
   *loc = reg;
-  df_insn_rescan (DF_REF_INSN (ref));
+  df_insn_rescan (insn);
 }
 
 

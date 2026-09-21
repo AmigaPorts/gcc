@@ -213,6 +213,7 @@ static void m68k_asm_final_postscan_insn (FILE *, rtx_insn *insn, rtx [], int);
 static HARD_REG_SET m68k_zero_call_used_regs (HARD_REG_SET);
 static machine_mode m68k_c_mode_for_floating_type (enum tree_index);
 static bool m68k_use_lra_p (void);
+
 
 /* Modern GCC 16 Doloop Optimization Hooks for m68k (dbra/dbcc) */
 
@@ -261,6 +262,14 @@ m68k_preferred_doloop_mode (machine_mode mode);
 
 #undef TARGET_ASM_FILE_START_APP_OFF
 #define TARGET_ASM_FILE_START_APP_OFF true
+
+extern bool
+m68k_use_by_pieces_infrastructure_p (unsigned HOST_WIDE_INT size,
+				     unsigned int align,
+				     enum by_pieces_operation op,
+				     bool speed_p);
+#undef TARGET_USE_BY_PIECES_INFRASTRUCTURE_P
+#define TARGET_USE_BY_PIECES_INFRASTRUCTURE_P m68k_use_by_pieces_infrastructure_p
 
 #undef TARGET_LEGITIMIZE_ADDRESS
 #define TARGET_LEGITIMIZE_ADDRESS m68k_legitimize_address
@@ -5218,15 +5227,15 @@ m68k_get_reloc_decoration (enum m68k_reloc reloc)
 	}
       else
 	{
-	  if (TARGET_68020)
+	if (TARGET_68020)
 	    {
-	      switch (flag_pic)
-		{
-		case 1:
-		  return ":w";
-		case 2:
-		  return ":l";
-		default:
+	  switch (flag_pic)
+	    {
+	    case 1:
+	      return ":w";
+	    case 2:
+	      return ":l";
+	    default:
 		  return "";
 		}
 	    }
@@ -7386,6 +7395,8 @@ m68k_use_lra_p ()
 {
   return m68k_lra_p;
 }
+
+
 
 #include "gt-m68k.h"
 

@@ -4052,6 +4052,33 @@ peep2_attempt (basic_block bb, rtx_insn *insn, int match_len, rtx_insn *attempt)
       break;
     }
 
+  /* SBF: keep REG_INC notes. */
+  while ((as_note = find_reg_note (old_insn, REG_INC, NULL)))
+    {
+      add_reg_note(attempt, REG_INC, XEXP (as_note, 0));
+      remove_note(old_insn, as_note);
+    }
+
+  /* SBF: move REG_DEAD notes. */
+  for (i = match_len; i >= 0; --i)
+    {
+      int j = peep2_buf_position (peep2_current + i);
+      old_insn = peep2_insn_data[j].insn;
+      while ((as_note = find_reg_note (old_insn, REG_DEAD, NULL)))
+	{
+	  rtx reg = XEXP (as_note, 0);
+	  rtx_insn * p, * last = 0;
+	  for (p = attempt; p; p = NEXT_INSN (p))
+	      if (reg_mentioned_p(reg, p))
+		last = p;
+
+	  if (last)
+	    add_reg_note(last, REG_DEAD, reg);
+
+	  remove_note(old_insn, as_note);
+	}
+    }
+
   /* If we matched any instruction that had a REG_ARGS_SIZE, then
      move those notes over to the new sequence.  */
   as_note = NULL;
@@ -4289,7 +4316,7 @@ peephole2_optimize (void)
 
 	  /* Match the peephole.  */
 	  head = peep2_insn_data[peep2_current].insn;
-	  attempt = peephole2_insns (PATTERN (head), head, &match_len);
+	  attempt = PATTERN (head) ? peephole2_insns (PATTERN (head), head, &match_len) : NULL;
 	  if (attempt != NULL)
 	    {
 	      rtx_insn *last = peep2_attempt (bb, head, match_len, attempt);
