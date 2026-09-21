@@ -375,16 +375,23 @@ amiga_select_section (tree decl, int reloc ATTRIBUTE_UNUSED,
 {
   if (decl->base.code == VAR_DECL)
     {
-      if (decl->base.constant_flag || decl->base.readonly_flag)
+      if (decl->base.constant_flag || decl->base.readonly_flag || TREE_READONLY (decl))
       	return text_section;
 
       char const * secname = DECL_SECTION_NAME(decl);
       if (secname == 0)
 	{
 	  tree type = decl->decl_minimal.common.typed.type;
-	  if (type->base.code == ARRAY_TYPE)
-	    type = type->typed.type;
-	  if (type->base.readonly_flag)
+
+	  /* Fixed array traversal: properly check the elements and qualifiers */
+	  if (type && type->base.code == ARRAY_TYPE)
+	    {
+	      tree elem = type->typed.type;
+	      if (elem && (type->base.readonly_flag || TYPE_READONLY(elem) || TREE_READONLY(elem)))
+		return text_section;
+	    }
+
+	  if (type && type->base.readonly_flag)
 	    return text_section;
 
 	  return data_section;
