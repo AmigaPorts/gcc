@@ -970,3 +970,10 @@ extern int m68k_sched_address_bypass_p (rtx_insn *, rtx_insn *);
 extern int m68k_sched_indexed_address_bypass_p (rtx_insn *, rtx_insn *);
 
 #define CPU_UNITS_QUERY 1
+
+int
+m68k_emit_movmemsi(rtx dest, rtx src, rtx length, rtx alignment);
+
+int
+m68k_emit_setmemsi(rtx dest, rtx val, rtx length, rtx alignment);
+
