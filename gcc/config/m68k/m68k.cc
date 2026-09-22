@@ -780,6 +780,15 @@ m68k_option_override (void)
       opt_fstack_limit_register_no = -1;
     }
 
+  if (optimize >= 1)
+    {
+      /* Stefan "Bebbo" Franke:
+         M68K is CISC not RISC, do not disrupt the code to preserve auto inc!
+       */
+      SET_OPTION_IF_UNSET (&global_options, &global_options_set, flag_tree_dom, 0);
+      SET_OPTION_IF_UNSET (&global_options, &global_options_set, flag_tree_sink, 0);
+    }
+
   SUBTARGET_OVERRIDE_OPTIONS;
 
   /* Setup scheduling options.  */
