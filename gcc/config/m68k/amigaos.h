@@ -194,7 +194,7 @@ do									\
        above are valid.  -mpcrel also sets flag_pic to 1 but uses	\
        direct pc-relative addressing, not a GOT, so let it through.  */	\
     if ((flag_pic == 1 || flag_pic == 2) && !TARGET_PCREL)		\
-      error ("%'-fpic%', %'-fPIC%' and %'-fpie%' are not supported on " \
+      warning (0, "%'-fpic%', %'-fPIC%' and %'-fpie%' are not supported on " \
 	     "this target, use %'-fbaserel%' instead");			\
     if (flag_sanitize)							\
       error ("%<-fsanitize%> is not supported on this target");		\
