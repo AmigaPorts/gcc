@@ -70,19 +70,24 @@
 (define_insn "*m68k_doloop_si32"
   [(set (pc)
         (if_then_else
-          (ne (match_operand:SI 0 "register_operand" "+d")
+          (ne (match_operand:SI 0 "register_operand" "+r")
               (const_int 0))
           (label_ref (match_operand 1 "" ""))
           (pc)))
    (set (match_dup 0)
         (plus:SI (match_dup 0)
                  (const_int -1)))
-   (clobber (match_scratch:SI 2 "=&d"))]
+   (clobber (match_scratch:SI 2 "=&r"))]
   ""
-  "dbra %0,%l1\;clr%.w %0\;subq%.l #1,%0\;jcc %l1"
+  "*
+  {
+    if (ADDRESS_REG_P (operands[0]))
+      return \"subq%.l #1,%0\;cmpa.w #-1,%0\;jne %l1\";
+    else
+      return \"dbra %0,%l1\;clr%.w %0\;subq%.l #1,%0\;jcc %l1\";
+  }"
   [(set_attr "type" "bcc")])
 
-  
 ;; =========================================================================
 ;; MOVMEMSI / SETMEMSI - SUPPORT use_by_pieces_infrastructure 
 ;; =========================================================================
