@@ -783,10 +783,13 @@ m68k_option_override (void)
   if (optimize >= 1)
     {
       /* Stefan "Bebbo" Franke:
-         M68K is CISC not RISC, do not disrupt the code to preserve auto inc!
+         attempt to select the optimal flags, based on zlib and libpng.
        */
-      SET_OPTION_IF_UNSET (&global_options, &global_options_set, flag_tree_dom, 0);
+//      SET_OPTION_IF_UNSET (&global_options, &global_options_set, flag_tree_dom, 0);
+      /* tree-sink is an auto-inc killer */
       SET_OPTION_IF_UNSET (&global_options, &global_options_set, flag_tree_sink, 0);
+      /* this helps if lra is on. */
+      SET_OPTION_IF_UNSET (&global_options, &global_options_set, flag_tree_coalesce_vars, !m68k_lra_p);
     }
 
   SUBTARGET_OVERRIDE_OPTIONS;
