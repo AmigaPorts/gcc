@@ -1,4 +1,5 @@
 /* { dg-do compile } */
+/* { dg-skip-if "no sanitizers" { m68k-*-amigaos* } } */
 /* { dg-options "-std=c++20 -O3 -fsanitize=undefined" } */
 
 long v;

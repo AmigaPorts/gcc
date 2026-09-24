@@ -2,6 +2,7 @@
    variant.  Either keeping virtual call or optimizing to cxa_pure_virtual
    is fine.  */
 /* { dg-do compile } */
+/* { dg-skip-if "no sanitizers" { m68k-*-amigaos* } } */
 /* { dg-options "-O2 -fsanitize=unreachable -fdump-tree-optimized"  } */
 namespace {
   struct B {

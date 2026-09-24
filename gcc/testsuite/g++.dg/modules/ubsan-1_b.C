@@ -1,4 +1,5 @@
 // PR c++/98735
+// { dg-skip-if "no sanitizers" { m68k-*-amigaos* } }
 // { dg-additional-options "-fmodules -fsanitize=undefined -Wno-return-type" }
 // Note: can't work out how to do a link test here.
 

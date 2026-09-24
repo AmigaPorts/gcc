@@ -1,4 +1,5 @@
 // PR c++/98735
+// { dg-skip-if "no sanitizers" { m68k-*-amigaos* } }
 // { dg-additional-options "-fmodules -fsanitize=undefined -Wno-return-type" }
 // { dg-module-cmi X }
 
