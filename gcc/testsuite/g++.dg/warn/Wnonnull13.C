@@ -1,5 +1,6 @@
 /* PR middle-end/100684 - spurious -Wnonnull with -O1 on a C++ lambda
    { dg-do compile { target c++11 } }
+   { dg-skip-if "no sanitizers" { m68k-*-amigaos* } }
    { dg-options "-O0 -Wall -fsanitize=undefined" } */
 
 #define NONNULL  __attribute__ ((nonnull))
