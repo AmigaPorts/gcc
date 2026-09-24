@@ -87,15 +87,19 @@ bool m68k_is_ok_for_sibcall(tree decl, tree exp);
  * a1 is used for the sibcall
  * others might be trashed due to stack pop.
  */
-bool m68k_is_ok_for_sibcall(tree decl ATTRIBUTE_UNUSED, tree exp)
+bool m68k_is_ok_for_sibcall(tree decl, tree exp)
 {
   /* othercum describes the call expand_call just set up with the function
      type of the call expression.  Compare with that type, not with the
      decl's: after a prototype/definition spelling mismatch the decl's
      composited type is a different node and the sibcall was refused.  */
   tree fntype = TREE_TYPE (TREE_TYPE (CALL_EXPR_FN (exp)));
-  if (othercum.fntype == fntype)
-    return (othercum.regs_already_used & ~0x010103) == 0;
+  /* A call to the current function is set up in mycum, not othercum
+     (see m68k_init_cumulative_args), so a self tail call was always
+     refused and [[gnu::musttail]] on a recursive call errored out.  */
+  struct m68k_args *cum = decl == current_function_decl ? &mycum : &othercum;
+  if (cum->fntype == fntype)
+    return (cum->regs_already_used & ~0x010103) == 0;
   return false;
 }
 
