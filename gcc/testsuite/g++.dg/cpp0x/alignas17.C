@@ -1,5 +1,6 @@
 // PR c++/89357
 // { dg-do compile { target c++11 } }
+// { dg-skip-if "small alignment" { m68k-*-amigaos* } }
 
 void g(int &);
 
