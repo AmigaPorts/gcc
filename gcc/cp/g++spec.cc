@@ -428,7 +428,7 @@ lang_specific_driver (struct cl_decoded_option **in_decoded_options,
 #endif
 
 #if defined(TARGET_AMIGAOS)
-      /* SBF: force linking __init_eh and replace new operator. */
+      /* SBF: force linking __init_eh. */
       	{
       	  bool addglue = true;
       	  /* do not add glue if exceptions are disabled. */
@@ -437,23 +437,12 @@ lang_specific_driver (struct cl_decoded_option **in_decoded_options,
       	      if (decoded_options[ii].opt_index == OPT_fexceptions)
       		addglue = decoded_options[ii].value;
       	    }
-      	  {
-      	    extern const char *
-      	    amiga_m68k_prefix_func (int argc, const char ** argv);
-      	    if (addglue)
-      	      {
-      		generate_option (OPT_Wl_, "-u,___init_eh", 1, CL_DRIVER,
-      					   &new_decoded_options[j]);
-      	      }
-      	    else
-      	      {
-      		char const * add =
-      		    "../lib/gcc/m68k-amigaos/" DEFAULT_TARGET_VERSION "/new_op.o";
-      		char const * p = amiga_m68k_prefix_func (1, &add);
-      		generate_option_input_file (p, &new_decoded_options[j]);
-      	      }
-      	    ++j;
-      	  }
+      	  if (addglue)
+      	    {
+      	      generate_option (OPT_Wl_, "-u,___init_eh", 1, CL_DRIVER,
+      			       &new_decoded_options[j]);
+      	      ++j;
+      	    }
       	}
 #endif
 

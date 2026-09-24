@@ -1,9 +1,4 @@
-LIB2ADD += $(srcdir)/config/m68k/gmon.c 
-
-new_op.o: $(srcdir)/config/m68k/new_op.c
-	$(CC) $(CFLAGS) -c $< 
-
-EXTRA_PARTS=new_op.o 
+LIB2ADD += $(srcdir)/config/m68k/gmon.c
 
 # On Amiga, specifying -fnon-call-exceptions will needlessly pull in
 # the unwinder in simple programs which use 64-bit division.
