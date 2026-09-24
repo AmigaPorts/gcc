@@ -7379,7 +7379,11 @@ m68k_callee_save_cost (spill_cost_type, unsigned int hard_regno,
    moves.  The generic speed threshold rejects even a 60-byte aligned copy.
    Keep size optimization, byte-aligned copies and other operations on their
    existing policy.  The generic piece expander still chooses access widths
-   using the actual alignment; this hook does not relax alignment constraints. */
+   using the actual alignment; this hook does not relax alignment constraints.
+
+   Note the mixed units: SIZE is in bytes, ALIGNMENT is in bits, so the
+   test below accepts copies of up to 128 bytes at word (16-bit) or better
+   alignment.  */
 static bool
 m68k_amiga_use_by_pieces (unsigned HOST_WIDE_INT size, unsigned int alignment,
 			 enum by_pieces_operation op, bool speed_p)
