@@ -1,4 +1,4 @@
-// { dg-do assemble }
+// { dg-do assemble { target fpic } }
 // { dg-options "-fpic -pedantic-errors -S" }
 // prms-id: 4750
 

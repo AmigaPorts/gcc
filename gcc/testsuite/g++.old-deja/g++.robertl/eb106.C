@@ -1,4 +1,4 @@
-// { dg-do assemble }
+// { dg-do assemble { target fpic } }
 // { dg-options "-O2 -fPIC " }
 struct T
 {
