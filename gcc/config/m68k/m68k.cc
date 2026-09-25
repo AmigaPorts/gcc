@@ -3273,8 +3273,10 @@ valid_mov3q_const (HOST_WIDE_INT i)
 }
 
 /* Return true if OPERANDS[] are valid for output_move_simode.
-   In particular, if SRC is a MEM with auto-inc/dec adressing and
-   its REG is mentioned in DST, it's invalid.  See PR123853.  */
+   In particular, if SRC is a MEM with auto-inc/dec addressing and
+   its REG is mentioned in DST, it's invalid.  See PR123853.
+   The check does not depend on the mode: the HI, QI and SF move insns
+   use it too, since late-combine produces the same shape for them.  */
 
 bool
 check_move_simode (const rtx *operands)
