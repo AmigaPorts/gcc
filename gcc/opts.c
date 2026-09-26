@@ -2430,7 +2430,7 @@ setup_core_dumping (diagnostic_context *dc)
 #ifdef SIGABRT
   signal (SIGABRT, SIG_DFL);
 #endif
-#if defined(HAVE_SETRLIMIT)
+#if defined(HAVE_SETRLIMIT) && !defined(__amigaos__)
   {
     struct rlimit rlim;
     if (getrlimit (RLIMIT_CORE, &rlim) != 0)

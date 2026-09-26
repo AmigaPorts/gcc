@@ -113,6 +113,7 @@ struct plugin_symtab
 struct plugin_objfile
 {
   int found;
+  int has_lto;
   int offload;
   simple_object_read *objfile;
   struct plugin_symtab *out;
@@ -902,6 +903,13 @@ process_symtab (void *data, const char *name, off_t offset, off_t length)
   char *s;
   char *secdatastart, *secdata;
 
+  /* Empty LTO translation units have options but no symbol table.  */
+  if (strcmp (name, ".gnu.lto_.opts") == 0)
+    {
+      obj->has_lto = 1;
+      return 1;
+    }
+
   if (strncmp (name, LTO_SECTION_PREFIX, LTO_SECTION_PREFIX_LEN) != 0)
     return 1;
 
@@ -995,6 +1003,7 @@ claim_file_handler (const struct ld_plugin_input_file *file, int *claimed)
   *claimed = 0;
   obj.file = file;
   obj.found = 0;
+  obj.has_lto = 0;
   obj.offload = 0;
   obj.out = &lto_file.symtab;
   errmsg = NULL;
@@ -1021,13 +1030,13 @@ claim_file_handler (const struct ld_plugin_input_file *file, int *claimed)
     simple_object_find_sections (obj.objfile, process_offload_section,
 				 &obj, &err);
 
-  if (obj.found == 0 && obj.offload == 0)
+  if (obj.found == 0 && !obj.has_lto && obj.offload == 0)
     goto err;
 
   if (obj.found > 1)
     resolve_conflicts (&lto_file.symtab, &lto_file.conflicts);
 
-  if (obj.found > 0)
+  if (obj.found > 0 || obj.has_lto)
     {
       status = add_symbols (file->handle, lto_file.symtab.nsyms,
 			    lto_file.symtab.syms);

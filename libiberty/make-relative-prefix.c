@@ -67,6 +67,10 @@ relative prefix can be found, return @code{NULL}.
 #ifdef __MACH__
 #include <mach-o/dyld.h>
 #endif
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#endif
 
 #include "ansidecl.h"
 #include "libiberty.h"
@@ -283,7 +287,7 @@ make_relative_prefix_1 (const char *progname, const char *bin_prefix,
 #if defined(__amiga__)
   strcpy(buf, "GCC:");
   n = strlen("GCC:");
-#elif defined(__MSYS__)
+#elif defined(_WIN32)
   n = GetModuleFileNameA(0, buf, 1023);
 #elif defined(__MACH__)
   n = 1022;
@@ -397,4 +401,3 @@ make_relative_prefix_ignore_links (const char *progname,
 {
   return make_relative_prefix_1 (progname, bin_prefix, prefix, 0);
 }
-

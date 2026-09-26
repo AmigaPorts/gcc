@@ -221,7 +221,7 @@ DEBUG_FUNCTION void
 dot_rdg (struct graph *rdg)
 {
   /* When debugging, you may want to enable the following code.  */
-#ifdef HAVE_POPEN
+#if defined(HAVE_POPEN) && !defined(__amigaos__)
   FILE *file = popen ("dot -Tx11", "w");
   if (!file)
     return;
