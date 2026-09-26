@@ -179,6 +179,13 @@ static bool m68k_tls_symbol_p (rtx);
 static rtx m68k_legitimize_address (rtx, rtx, machine_mode);
 static bool m68k_rtx_costs (rtx, machine_mode, int, int, int *, bool);
 static int m68k_address_cost(rtx x, machine_mode mode, addr_space_t t, bool speed);
+static int m68k_callee_save_cost (spill_cost_type, unsigned int, machine_mode,
+				  unsigned int, int, const HARD_REG_SET &,
+				  bool);
+#ifdef TARGET_AMIGAOS
+static bool m68k_amiga_use_by_pieces (unsigned HOST_WIDE_INT, unsigned int,
+				    enum by_pieces_operation, bool);
+#endif
 #if M68K_HONOR_TARGET_STRICT_ALIGNMENT
 static bool m68k_return_in_memory (const_tree, const_tree);
 #endif
@@ -286,6 +293,14 @@ static bool m68k_use_lra_p (void);
 
 #undef TARGET_ADDRESS_COST
 #define TARGET_ADDRESS_COST m68k_address_cost
+
+#undef TARGET_CALLEE_SAVE_COST
+#define TARGET_CALLEE_SAVE_COST m68k_callee_save_cost
+
+#ifdef TARGET_AMIGAOS
+#undef TARGET_USE_BY_PIECES_INFRASTRUCTURE_P
+#define TARGET_USE_BY_PIECES_INFRASTRUCTURE_P m68k_amiga_use_by_pieces
+#endif
 
 #undef TARGET_ATTRIBUTE_TABLE
 #define TARGET_ATTRIBUTE_TABLE m68k_attribute_table
@@ -2216,14 +2231,17 @@ static bool
 m68k_decompose_address (machine_mode mode, rtx x,
 			bool strict_p, struct m68k_address *address)
 {
-  unsigned int reach;
+  /* Displacements are accepted up to LIMIT - REACH.  */
+  unsigned int reach = GET_MODE_SIZE (mode);
 
   memset (address, 0, sizeof (*address));
 
-  if (mode == BLKmode)
+  /* A mode without a size (BLKmode, or VOIDmode when LRA checks a bare
+     address operand such as the "p" of *lea) accesses nothing, but the
+     displacement itself must still be encodable: a reach of 0 would
+     let 128 and 0x8000 through.  */
+  if (reach == 0)
     reach = 1;
-  else
-    reach = GET_MODE_SIZE (mode);
 
   /* Check for (An) (mode 2).  */
   if (m68k_legitimate_base_reg_p (x, strict_p))
@@ -7333,6 +7351,48 @@ m68k_68040_costs (rtx x, machine_mode mode, int outer_code,
 extern bool
 m68k_68080_costs (rtx x, machine_mode mode, int outer_code,
 		int opno, int *total, bool speed );
+
+/* Implement TARGET_CALLEE_SAVE_COST.
+
+   The default charges a callee-saved register a full memory move to save
+   and another to restore, which the allocator then scales by the entry
+   block frequency, so a value with only a few uses is left in memory
+   rather than given a register that needs saving.  On m68k the prologue
+   and epilogue save integer registers with move.l dN,-(sp) and
+   move.l (sp)+,dN, and from three registers on with a single movem, so an
+   extra saved register costs no code and a few cycles, while a value kept
+   in memory costs a displacement word and a memory access on every use.
+   Charge nothing for integer registers; FPU registers keep the default
+   since fmovem is expensive.  */
+
+static int
+m68k_callee_save_cost (spill_cost_type, unsigned int hard_regno,
+		       machine_mode, unsigned int, int mem_cost,
+		       const HARD_REG_SET &, bool)
+{
+  return INT_REGNO_P (hard_regno) ? 0 : mem_cost;
+}
+
+#ifdef TARGET_AMIGAOS
+/* Amiga libnix memcpy can dispatch through exec.library CopyMem.  For small,
+   constant block copies this call overhead outweighs a bounded sequence of
+   moves.  The generic speed threshold rejects even a 60-byte aligned copy.
+   Keep size optimization, byte-aligned copies and other operations on their
+   existing policy.  The generic piece expander still chooses access widths
+   using the actual alignment; this hook does not relax alignment constraints.
+
+   Note the mixed units: SIZE is in bytes, ALIGNMENT is in bits, so the
+   test below accepts copies of up to 128 bytes at word (16-bit) or better
+   alignment.  */
+static bool
+m68k_amiga_use_by_pieces (unsigned HOST_WIDE_INT size, unsigned int alignment,
+			 enum by_pieces_operation op, bool speed_p)
+{
+  if (speed_p && op == MOVE_BY_PIECES && alignment >= 16 && size <= 128)
+    return true;
+  return default_use_by_pieces_infrastructure_p (size, alignment, op, speed_p);
+}
+#endif
 
 static bool
 m68k_rtx_costs (rtx x, machine_mode mode, int outer_code,
