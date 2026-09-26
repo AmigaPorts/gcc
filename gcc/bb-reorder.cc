@@ -117,6 +117,7 @@
 #include "stringpool.h"
 #include "attribs.h"
 #include "common/common-target.h"
+#include "insn-attr.h"
 
 /* The number of rounds.  In most cases there will only be 4 rounds, but
    when partitioning hot and cold basic blocks into separate sections of
@@ -1377,7 +1378,7 @@ copy_bb_p (const_basic_block bb, int code_may_grow)
     {
       if (INSN_P (insn))
 	{
-	  size += get_attr_min_length (insn);
+	  size += insn_size_estimate (insn);
 	  if (size > max_size)
 	    break;
 	}
@@ -1403,6 +1404,12 @@ get_uncond_jump_length (void)
 {
   unsigned int length;
 
+  /* Without a length attribute every insn measures 0 and the size
+     budgets derived from this value would allow unbounded duplication;
+     count insns instead (see insn_size_estimate).  */
+  if (!HAVE_ATTR_length)
+    return 1;
+
   start_sequence ();
   rtx_code_label *label = emit_label (gen_label_rtx ());
   rtx_insn *jump = emit_jump_insn (targetm.gen_jump (label));
@@ -1411,6 +1418,17 @@ get_uncond_jump_length (void)
 
   gcc_assert (length < INT_MAX);
   return length;
+}
+
+/* Size of INSN in the same unit as get_uncond_jump_length: bytes when
+   the target has a length attribute, otherwise one per insn.  */
+
+int
+insn_size_estimate (rtx_insn *insn)
+{
+  if (!HAVE_ATTR_length)
+    return 1;
+  return get_attr_min_length (insn);
 }
 
 /* Create a forwarder block to OLD_BB starting with NEW_LABEL and in the
@@ -2716,7 +2734,7 @@ maybe_duplicate_computed_goto (basic_block bb, int max_size)
   FOR_BB_INSNS (bb, insn)
     if (INSN_P (insn))
       {
-	max_size -= get_attr_min_length (insn);
+	max_size -= insn_size_estimate (insn);
 	if (max_size < 0)
 	   return false;
       }
