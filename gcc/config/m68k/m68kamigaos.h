@@ -257,33 +257,28 @@ if (target_flags & (MASK_RESTORE_A4|MASK_ALWAYS_RESTORE_A4)) \
 #endif
 
 #ifdef __amiga__
+/* An AmigaOS-hosted compiler keeps the cross layout, with the target
+   headers and libraries under <prefix>/m68k-amigaos/.  The directories
+   are found relative to the executable like on any other host.  */
 #undef CROSS_DIRECTORY_STRUCTURE
 #define CROSS_DIRECTORY_STRUCTURE
-
-#undef CROSS_INCLUDE_DIR
-#define CROSS_INCLUDE_DIR "GCC:m68k-amigaos/sys-include"
-
-#undef FIXED_INCLUDE_DIR
-#define FIXED_INCLUDE_DIR "GCC:m68k-amigaos/ndk-include"
-
-#else
+#endif
 
 #undef FIXED_INCLUDE_DIR
 #define FIXED_INCLUDE_DIR CROSS_INCLUDE_DIR "/../ndk-include"
-#endif
 
 /* When creating shared libraries, use different 'errno'. */
 #define CPP_IXEMUL_SPEC \
-  "-isystem %:sdk_root(ixemul/include) " \
+  "-isystem %:find-file(../ixemul/include) " \
   "%{!ansi:-Dixemul} -D__ixemul__ -D__ixemul " \
   "%{malways-restore-a4:-Derrno=(*ixemul_errno)} " \
   "%{mrestore-a4:-Derrno=(*ixemul_errno)}"
 #define CPP_LIBNIX_SPEC \
-  "-isystem %:sdk_root(libnix/include) " \
+  "-isystem %:find-file(../libnix/include) " \
   "%{!ansi:-Dlibnix} -D__libnix__ -D__libnix " \
   "%{mcrt=nix13:-D__KICK13__}"
 #define CPP_CLIB2_SPEC \
-  "-isystem %:sdk_root(clib2/include) " \
+  "-isystem %:find-file(../clib2/include) " \
   "%{!ansi:-DCLIB2} -D__CLIB2__ -D__CLIB2"
 
 /* Define __HAVE_68881__ in preprocessor according to the -m flags.
@@ -310,8 +305,7 @@ if (target_flags & (MASK_RESTORE_A4|MASK_ALWAYS_RESTORE_A4)) \
   "%{m68030:-D__mc68030__ -D__mc68030} " \
   "%{m68040:-D__mc68040__ -D__mc68040} " \
   "%{m68060:-D__mc68060__ -D__mc68060} " \
-  "-isystem %:sdk_root(../include) " \
-  "%{mcrt=nix13:-isystem %:sdk_root(ndk13-include)} " \
+  "%{mcrt=nix13:-isystem %:find-file(../ndk13-include)} " \
   "%{noixemul:%(cpp_libnix)} " \
   "%{mcrt=nix*:%(cpp_libnix)} " \
   "%{mcrt=ixemul:%(cpp_ixemul)} " \
@@ -391,11 +385,11 @@ if (target_flags & (MASK_RESTORE_A4|MASK_ALWAYS_RESTORE_A4)) \
     "crt0.o%s "
 
 #define SELF_SPEC \
- "%{noixemul:-B %:sdk_root(libnix/lib/)} " \
- "%{mcrt=nix*:-B %:sdk_root(libnix/lib/)} " \
- "%{mcrt=library:-B %:sdk_root(libnix/lib/)} " \
- "%{mcrt=ixemul:-B %:sdk_root(ixemul/lib/)} " \
- "%{mcrt=clib2:-B %:sdk_root(clib2/lib/)} "
+ "%{noixemul:-B %:find-file(../libnix/lib/)} " \
+ "%{mcrt=nix*:-B %:find-file(../libnix/lib/)} " \
+ "%{mcrt=library:-B %:find-file(../libnix/lib/)} " \
+ "%{mcrt=ixemul:-B %:find-file(../ixemul/lib/)} " \
+ "%{mcrt=clib2:-B %:find-file(../clib2/lib/)} "
 
 #undef    STARTFILE_SPEC
 #ifdef TARGET_AMIGAOS_VASM
@@ -476,9 +470,9 @@ if (target_flags & (MASK_RESTORE_A4|MASK_ALWAYS_RESTORE_A4)) \
    Also, pass appropriate linker flavours depending on user-supplied
    commandline options.  */
 
-#define LINK_IXEMUL_SPEC "-L%:sdk_root(ixemul/lib)"
-#define LINK_LIBNIX_SPEC "-L%:sdk_root(libnix/lib)"
-#define LINK_CLIB2_SPEC "-L%:sdk_root(clib2/lib)"
+#define LINK_IXEMUL_SPEC "-L%:find-file(../ixemul/lib)"
+#define LINK_LIBNIX_SPEC "-L%:find-file(../libnix/lib)"
+#define LINK_CLIB2_SPEC "-L%:find-file(../clib2/lib)"
 
 /* If debugging, tell the linker to output amiga-hunk symbols *and* a BSD
    compatible debug hunk.
@@ -498,7 +492,6 @@ if (target_flags & (MASK_RESTORE_A4|MASK_ALWAYS_RESTORE_A4)) \
   "%(link_cpu) "
 #else
 #define LINK_SPEC \
-  "-L%:sdk_root(../lib) " \
   "%{fexceptions:-u___init_eh } "\
   "%{noixemul:%(link_libnix)} " \
   "%{mcrt=nix*:%(link_libnix)} " \
@@ -553,18 +546,13 @@ if (target_flags & (MASK_RESTORE_A4|MASK_ALWAYS_RESTORE_A4)) \
 	  "%(linker) " LINK_PLUGIN_SPEC "%l %X %{o*} %{A} %{d} %{e*} %{m} " \
           "%{N} %{n} %{r} %{s} %{t} %{u*} %{x} %{z} %{Z} " \
           "%{!A:%{!nostdlib:%{!nostartfiles:%S}}} " \
-          "%{static:} %{L*} %F -L%:sdk_root(lib/) -L%:sdk_root(../lib/) %o " \
+          "%{static:} %{L*} %F %o " \
           "%{!nostdlib:%{!nodefaultlibs:%L}} " \
           "%{!A:%{!nostdlib:%{!nostartfiles:%E}}} " \
           "%{!nostdlib:%{!nodefaultlibs:%G}} " \
               "%{flto} " \
           "%{T*} }}}}}} "
 #endif
-
-extern const char * amiga_m68k_prefix_func(int, const char **);
-
-#define EXTRA_SPEC_FUNCTIONS \
-  { "sdk_root", amiga_m68k_prefix_func },
 
 /* This macro defines names of additional specifications to put in the specs
    that can be used in various specifications like CC1_SPEC.  Its definition

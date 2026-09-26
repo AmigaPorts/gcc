@@ -427,26 +427,6 @@ lang_specific_driver (struct cl_decoded_option **in_decoded_options,
 	}
 #endif
 
-#if defined(TARGET_AMIGAOS)
-      /* SBF: force linking __init_eh. */
-      	{
-      	  bool addglue = true;
-      	  /* do not add glue if exceptions are disabled. */
-      	  for (int ii = 0; ii < argc; ++ii)
-      	    {
-      	      if (decoded_options[ii].opt_index == OPT_fexceptions)
-      		addglue = decoded_options[ii].value;
-      	    }
-      	  if (addglue)
-      	    {
-      	      generate_option (OPT_Wl_, "-u,___init_eh", 1, CL_DRIVER,
-      			       &new_decoded_options[j]);
-      	      ++j;
-      	    }
-      	}
-#endif
-
-
       if (which_library == USE_LIBCXX)
 	{
 	  generate_option (OPT_l,
