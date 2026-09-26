@@ -532,7 +532,7 @@ can_dup_for_shrink_wrapping (basic_block bb, basic_block pro, unsigned max_size)
   FOR_BB_INSNS (bb, insn)
     if (NONDEBUG_INSN_P (insn))
       {
-	size += get_attr_min_length (insn);
+	size += insn_size_estimate (insn);
 	if (size > max_size)
 	  return false;
       }

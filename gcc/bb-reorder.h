@@ -34,6 +34,7 @@ extern struct target_bb_reorder *this_target_bb_reorder;
 #endif
 
 extern int get_uncond_jump_length (void);
+extern int insn_size_estimate (rtx_insn *);
 
 extern void insert_section_boundary_note (void);
 
