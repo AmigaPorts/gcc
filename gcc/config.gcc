@@ -2496,6 +2496,7 @@ m68k*-*-amigaosvasm*)
 	tmake_file="m68k/t-floatlib m68k/t-m68kbare m68k/t-amigaos"
 	tm_p_file="${tm_p_file} m68k/amigaos-protos.h"
 	extra_options="${extra_options} m68k/amigaos.opt"
+	extra_gcc_objs="driver-amigaos.o"
 	gnu_ld=yes
 	;;
 m68k*-*-amigaos*)
@@ -2505,6 +2506,7 @@ m68k*-*-amigaos*)
 	tmake_file="m68k/t-floatlib m68k/t-m68kbare m68k/t-amigaos"
 	tm_p_file="${tm_p_file} m68k/amigaos-protos.h"
 	extra_options="${extra_options} m68k/amigaos.opt"
+	extra_gcc_objs="driver-amigaos.o"
 	gnu_ld=yes
 	CFLAGS="-Os"
   	case ${enable_threads} in

@@ -281,6 +281,25 @@ if (target_flags & (MASK_RESTORE_A4|MASK_ALWAYS_RESTORE_A4)) \
   "-isystem %:find-file(../clib2/include) " \
   "%{!ansi:-DCLIB2} -D__CLIB2__ -D__CLIB2"
 
+/* A program gets one C runtime, so the driver rejects two selectors rather
+   than picking one: the choice decides the header path, the startup file and
+   the libraries.  The vasm configuration has one fixed startup file and
+   library set, so there is nothing to check there.  */
+
+#ifdef TARGET_AMIGAOS_VASM
+#define CRT_CHECK_SPEC ""
+#else
+#define CRT_CHECK_SPEC \
+  "%{mcrt=*:%:amigaos-crt-check(-mcrt=%*)} " \
+  "%{noixemul:%:amigaos-crt-check(-noixemul)} "
+#endif
+
+extern const char *amigaos_crt_check (int argc, const char **argv);
+
+#undef EXTRA_SPEC_FUNCTIONS
+#define EXTRA_SPEC_FUNCTIONS \
+  { "amigaos-crt-check", amigaos_crt_check },
+
 /* Define __HAVE_68881__ in preprocessor according to the -m flags.
    This will control the use of inline 68881 insns in certain macros.
    Note: it should be set in TARGET_CPU_CPP_BUILTINS but TARGET_68881
@@ -309,7 +328,8 @@ if (target_flags & (MASK_RESTORE_A4|MASK_ALWAYS_RESTORE_A4)) \
   "%{noixemul:%(cpp_libnix)} " \
   "%{mcrt=nix*:%(cpp_libnix)} " \
   "%{mcrt=ixemul:%(cpp_ixemul)} " \
-  "%{mcrt=clib2:%(cpp_clib2)}"
+  "%{mcrt=clib2:%(cpp_clib2)} " \
+  CRT_CHECK_SPEC
 
 /* Various -m flags require special flags to the assembler.  */
 
@@ -402,6 +422,7 @@ if (target_flags & (MASK_RESTORE_A4|MASK_ALWAYS_RESTORE_A4)) \
   "%{mcrt=library:%(startfile_libnix)} " \
   "%{mcrt=ixemul:%(startfile_ixemul)} " \
   "%{mcrt=clib2:%(startfile_clib2)} " \
+  "%{mcrt=newlib:%(startfile_newlib)} " \
   "%{!mcrt=*:%{!noixemul:%(startfile_newlib)}} "
 #endif
 
@@ -455,6 +476,7 @@ if (target_flags & (MASK_RESTORE_A4|MASK_ALWAYS_RESTORE_A4)) \
   "%{mcrt=nix*:%(lib_libnix)} " \
   "%{mcrt=ixemul:%(lib_ixemul)} " \
   "%{mcrt=clib2:%(lib_clib2)} " \
+  "%{mcrt=newlib:%(lib_newlib)} " \
   "%{!mcrt=*:%{!noixemul:%(lib_newlib)}} " \
   "%{fprofile-arcs|fprofile-generate*|coverage:-lgcov} " \
   "-lamiga -lgcc "\
@@ -503,6 +525,7 @@ if (target_flags & (MASK_RESTORE_A4|MASK_ALWAYS_RESTORE_A4)) \
   "%{fbaserel32:%{!resident32:-m amiga_bss -fl libb32}} " \
   "%{resident32:-m amiga_bss -amiga-datadata-reloc -fl libb32} " \
   "%{g:-amiga-debug-hunk} " \
+  CRT_CHECK_SPEC \
   "%(link_cpu) "
 #endif
 

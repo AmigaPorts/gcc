@@ -5,7 +5,9 @@
    memcpy.o reference was emitted as a reloc against hunk 0: the program
    then loaded its first instruction word as the exec base and crashed.
    -nostartfiles keeps libnix's own SysBase definition out so this file
-   is the one defining it, as in a library or module build.
+   is the one defining it, as in a library or module build.  The runtime
+   is the board's to choose: naming one here would collide with the
+   board's own -mcrt=/-noixemul, which a test cannot remove.
 
    The second source only makes this a two-file LTO link: with a single
    input ld places the compiled LTO object after the library members
@@ -14,7 +16,7 @@
 
 /* { dg-do run } */
 /* { dg-skip-if "libnix base variables" { ! { m68k-*-amigaos* } } } */
-/* { dg-additional-options "-flto -flto-partition=one -noixemul -nostartfiles" } */
+/* { dg-additional-options "-flto -flto-partition=one -nostartfiles" } */
 /* { dg-additional-sources "lto-late-libref-run-lib.c" } */
 
 void *SysBase;
