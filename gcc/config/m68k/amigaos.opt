@@ -14,7 +14,7 @@ Target Common Mask(ALWAYS_RESTORE_A4)
 
 mcrt=
 Target RejectNegative Var(amigaos_crt) Joined
-Specify startup binary
+Specify the C runtime: newlib, nix20, nix13, ixemul, clib2 or library
 
 mrestore-a4
 Restore a4 in public functions
