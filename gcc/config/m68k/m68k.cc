@@ -306,7 +306,12 @@ m68k_use_by_pieces_infrastructure_p (unsigned HOST_WIDE_INT size,
 #undef TARGET_CALLEE_SAVE_COST
 #define TARGET_CALLEE_SAVE_COST m68k_callee_save_cost
 
-#ifdef TARGET_AMIGAOS
+/* Measuring bebbo's block-move work against ours: his
+   m68k_use_by_pieces_infrastructure_p above keeps only copies of under
+   eight bytes in the by-pieces expander and sends the rest to movmemsi,
+   where ours expands up to 128 bytes.  Both cannot be installed at once,
+   so the AmigaOS override is off for this variant.  */
+#if 0
 #undef TARGET_USE_BY_PIECES_INFRASTRUCTURE_P
 #define TARGET_USE_BY_PIECES_INFRASTRUCTURE_P m68k_amiga_use_by_pieces
 #endif
