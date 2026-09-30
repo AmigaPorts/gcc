@@ -1,6 +1,8 @@
 // Test that -fipa-icf combines the backing arrays for a and b.
 // { dg-do run { target c++11 } }
 // { dg-options -fipa-icf }
+// ICF merges variables by making one an alias of the other.
+// { dg-require-alias "" }
 
 #include <initializer_list>
 

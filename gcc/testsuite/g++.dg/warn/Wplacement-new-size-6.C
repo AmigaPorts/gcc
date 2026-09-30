@@ -1,5 +1,8 @@
 // { dg-do compile }
 // { dg-options "-Wno-pedantic -Wplacement-new=1" }
+// Struct tail padding is 1 byte with the 2-byte int alignment of m68k, not
+// 3, so the flexible array member warnings come out differently.
+// { dg-skip-if "int alignment is 2" { m68k*-*-* } { "*" } { "-malign-int" } }
 
 typedef __typeof__ (sizeof 0) size_t;
 

@@ -2,6 +2,8 @@
 // Test whether A is put into .rodata section on platforms
 // that have it.
 // { dg-do compile }
+// The hunk format has no read-only data section; constants go to .text.
+// { dg-skip-if "no rodata section" { m68k-*-amigaos* } }
 
 // { dg-final { scan-assembler-symbol-section {constant_variable} {^\.(const|rodata)|\[RO\]} } }
 const int constant_variable[] __attribute__ ((__used__)) = { 0, 1, 2, 3 };
