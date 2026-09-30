@@ -210,6 +210,44 @@ amigaos_insert_attribute (tree decl, tree * attr)
     }
 }
 
+/* Constructors and destructors with a priority.  The startup code walks
+   __CTOR_LIST__ backwards and __DTOR_LIST__ forwards, as crtstuff does
+   with .ctors and .dtors, and the linker script sorts the .list_*
+   sections by name.  Naming the section after MAX_INIT_PRIORITY minus
+   the priority, zero padded, therefore orders the entries the way ELF
+   gets them from .ctors.NNNNN: the default-priority list first, then
+   decreasing priority numbers, so the backward walk runs the lowest
+   numbers first and the default ones last, and the forward walk of the
+   destructors reverses that.  */
+
+static section *
+amigaos_cdtor_section (int priority, bool constructor_p)
+{
+  char buf[40];
+
+  sprintf (buf, ".list___%s_LIST__.%.5u", constructor_p ? "CTOR" : "DTOR",
+	   MAX_INIT_PRIORITY - priority);
+  return get_section (buf, SECTION_WRITE, NULL);
+}
+
+void
+amigaos_asm_out_constructor (rtx symbol, int priority)
+{
+  if (priority == DEFAULT_INIT_PRIORITY)
+    assemble_addr_to_section (symbol, ctors_section);
+  else
+    assemble_addr_to_section (symbol, amigaos_cdtor_section (priority, true));
+}
+
+void
+amigaos_asm_out_destructor (rtx symbol, int priority)
+{
+  if (priority == DEFAULT_INIT_PRIORITY)
+    assemble_addr_to_section (symbol, dtors_section);
+  else
+    assemble_addr_to_section (symbol, amigaos_cdtor_section (priority, false));
+}
+
 /* Output assembly to switch to section NAME with attribute FLAGS.  */
 #ifndef TARGET_AMIGAOS_VASM
 extern void
