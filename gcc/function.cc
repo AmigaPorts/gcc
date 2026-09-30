@@ -2258,7 +2258,7 @@ use_register_for_decl (const_tree decl)
     return true;
 
   if (!DECL_REGISTER (decl)
-#ifdef TARGET_M68K
+#if defined(TARGET_M68K)
 		&& (!DECL_INCOMING_RTL (decl) || !REG_P (DECL_INCOMING_RTL (decl)))
 #endif
   )

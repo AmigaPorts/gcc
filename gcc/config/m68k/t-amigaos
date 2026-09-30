@@ -1,6 +1,6 @@
 # Makefile fragment for AmigaOS target.
 
-EXTRA_OBJS += amigaos.o m68k2.o m68k_68000_10_costs.o m68k_68020_costs.o m68k_68030_costs.o m68k_68040_costs.o m68k_68080_costs.o
+EXTRA_OBJS += amigaos.o m68k2.o m68k_costs.o
 
 # Extra object file linked to the driver, for the -mcrt= consistency check.
 driver-amigaos.o: $(srcdir)/config/m68k/driver-amigaos.cc
@@ -19,23 +19,7 @@ m68k2.o: $(srcdir)/config/m68k/m68k2.cc
 	$(COMPILE) $<
 	$(POSTCOMPILE)
 
-m68k_68000_10_costs.o: $(srcdir)/config/m68k/m68k_68000_10_costs.cc
-	$(COMPILE) $<
-	$(POSTCOMPILE)
-
-m68k_68020_costs.o: $(srcdir)/config/m68k/m68k_68020_costs.cc
-	$(COMPILE) $<
-	$(POSTCOMPILE)
-
-m68k_68030_costs.o: $(srcdir)/config/m68k/m68k_68030_costs.cc
-	$(COMPILE) $<
-	$(POSTCOMPILE)
-
-m68k_68040_costs.o: $(srcdir)/config/m68k/m68k_68040_costs.cc
-	$(COMPILE) $<
-	$(POSTCOMPILE)
-
-m68k_68080_costs.o: $(srcdir)/config/m68k/m68k_68080_costs.cc
+m68k_costs.o: $(srcdir)/config/m68k/m68k_costs.cc
 	$(COMPILE) $<
 	$(POSTCOMPILE)
 

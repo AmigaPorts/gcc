@@ -19,6 +19,31 @@ along with GCC; see the file COPYING3.  If not see
 
 #define TARGET_M68K 1
 
+#ifndef M68K_SWITCHES_MODE
+#define M68K_SWITCHES_MODE 0
+#endif
+
+/* Compile-time defaults. One per switch. Current best. */
+#define M68K_SW_DEFAULT_m68k_cse_1        1
+#define M68K_SW_DEFAULT_m68k_gcse_1       0
+#define M68K_SW_DEFAULT_m68k_ira_color_1  1
+#define M68K_SW_DEFAULT_m68k_ira_color_2  1
+#define M68K_SW_DEFAULT_m68k_ira_color_3  0
+#define M68K_SW_DEFAULT_m68k_ira_costs_1  0
+#define M68K_SW_DEFAULT_m68k_ivopts_1     0
+#define M68K_SW_DEFAULT_m68k_ivopts_2     1
+#define M68K_SW_DEFAULT_m68k_ivopts_3     0
+
+/* Generic: explicit default */
+#if M68K_SWITCHES_MODE == 0
+#  define M68K_SW(name, dflt)   (dflt)
+#else
+#  define M68K_SW(name, dflt)   (getenv(name) != NULL ? 1 : (dflt))
+#endif
+
+/* Convenience: default derived from the switch name */
+#define M68K_SW_ON(name)        M68K_SW(#name, M68K_SW_DEFAULT_##name)
+
 #ifdef TARGET_AMIGAOS
 #define TARGET_AMIGA 1
 #else

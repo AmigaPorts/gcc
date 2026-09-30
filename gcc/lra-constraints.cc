@@ -5007,6 +5007,23 @@ curr_insn_transform (bool check_only_p)
 	      && type != OP_OUT)
 	    {
 	      push_to_sequence (before);
+
+	      if (lra_dump_file != NULL)
+		{
+		  fprintf (lra_dump_file,
+			   "      *** IN-RELOAD insn #%u op %d type %d: old=",
+			   INSN_UID (curr_insn), i, (int) type);
+		  dump_value_slim (lra_dump_file, old, 1);
+		  fprintf (lra_dump_file, " new=");
+		  dump_value_slim (lra_dump_file, new_reg, 1);
+		  if (REG_P (old))
+		    fprintf (lra_dump_file,
+			     " oldregno=%d hardreg=%d",
+			     REGNO (old),
+			     lra_get_regno_hard_regno (REGNO (old)));
+		  fprintf (lra_dump_file, "\n");
+		}
+
 	      lra_emit_move (new_reg, old);
 	      before = end_sequence ();
 	    }
@@ -5020,6 +5037,21 @@ curr_insn_transform (bool check_only_p)
 	      && (!REG_P(old) || !ira_former_scratch_p (REGNO (old))))
 	    {
 	      start_sequence ();
+
+	      if (lra_dump_file != NULL)
+		{
+		  fprintf (lra_dump_file,
+			   "      *** OUT-RELOAD insn #%u op %d type %d: old=",
+			   INSN_UID (curr_insn), i, (int) type);
+		  dump_value_slim (lra_dump_file, old, 1);
+		  fprintf (lra_dump_file, " new=");
+		  dump_value_slim (lra_dump_file, new_reg, 1);
+		  if (REG_P (old))
+		    fprintf (lra_dump_file, " oldregno=%d hardreg=%d",
+			     REGNO (old), lra_get_regno_hard_regno (REGNO (old)));
+		  fprintf (lra_dump_file, "\n");
+		}
+
 	      lra_emit_move (type == OP_INOUT ? copy_rtx (old) : old, new_reg);
 	      emit_insn (after);
 	      after = end_sequence ();

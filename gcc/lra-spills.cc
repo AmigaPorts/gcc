@@ -71,7 +71,7 @@ along with GCC; see the file COPYING3.	If not see
 #include "cfgrtl.h"
 #include "lra.h"
 #include "lra-int.h"
-
+#include "print-rtl.h"
 
 /* Max regno at the start of the pass.	*/
 static int regs_num;
@@ -497,6 +497,19 @@ remove_pseudos (rtx *loc, rtx_insn *insn)
       if (lra_reg_info[i].nrefs == 0
 	  && pseudo_slots[i].mem == NULL && spill_hard_reg[i] == NULL)
 	return true;
+
+      if (lra_dump_file != NULL)
+	{
+	  fprintf (lra_dump_file,
+		   "      *** SPILL-REWRITE insn #%u regno %d slotmem=",
+		   INSN_UID (insn), i);
+	  if (pseudo_slots[i].mem != NULL_RTX)
+	    dump_value_slim (lra_dump_file, pseudo_slots[i].mem, 1);
+	  else
+	    fprintf (lra_dump_file, "<none>");
+	  fprintf (lra_dump_file, "\n");
+	}
+
       if ((hard_reg = spill_hard_reg[i]) != NULL_RTX)
 	*loc = copy_rtx (hard_reg);
       else if (pseudo_slots[i].mem != NULL_RTX)
