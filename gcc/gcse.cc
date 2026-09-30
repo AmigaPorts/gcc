@@ -4417,9 +4417,10 @@ bool
 pass_rtl_hoist::gate (function *)
 {
 #if defined(TARGET_M68K)
-/* SBF: hoist is not good on m68k */
-  return false;
-#else
+  if (M68K_SW_ON (m68k_gcse_1))
+    /* SBF: hoist is not good on m68k */
+    return false;
+#endif
   return optimize > 0 && flag_gcse
     && !cfun->calls_setjmp
     /* It does not make sense to run code hoisting unless we are optimizing
@@ -4427,7 +4428,6 @@ pass_rtl_hoist::gate (function *)
        bigger if we did PRE (when optimizing for space, we don't run PRE).  */
     && optimize_function_for_size_p (cfun)
     && dbg_cnt (hoist);
-#endif
 }
 
 } // anon namespace

@@ -951,10 +951,11 @@ setup_left_conflict_sizes_p (ira_allocno_t a)
 	      subnodes[0].left_conflict_size));
   conflict_size += ira_reg_class_max_nregs[ALLOCNO_CLASS (a)][ALLOCNO_MODE (a)];
 
-#ifdef TARGET_M68K
-  /* Stefan "Bebbo" Franke (SBFF)
-     avoid marking multi word pseudos as not colorable. */
-  if (ALLOCNO_NUM_OBJECTS (a) > 1 && data->available_regs_num > 0)
+#if defined(TARGET_M68K)
+  /* SBF: avoid marking multi word pseudos as not colorable. */
+  if (M68K_SW_ON (m68k_ira_color_1)
+      && ALLOCNO_NUM_OBJECTS (a) > 1
+      && data->available_regs_num > 0)
     conflict_size = MIN (conflict_size, data->available_regs_num);
 #endif
 
@@ -1993,14 +1994,15 @@ assign_hard_reg (ira_allocno_t a, bool retry_p)
 #endif
   auto_bitmap allocnos_to_spill;
   HARD_REG_SET soft_conflict_regs = {};
-#ifdef TARGET_M68K
-  /* Stefan "Bebbo" Franke (SBFF):
-     movem is once per function. */
-  int entry_freq = 1;
-  int exit_freq = 1;
-#else
   int entry_freq = REG_FREQ_FROM_BB (ENTRY_BLOCK_PTR_FOR_FN (cfun));
   int exit_freq = REG_FREQ_FROM_BB (EXIT_BLOCK_PTR_FOR_FN (cfun));
+#if defined(TARGET_M68K)
+  /* SBF: movem is once per function. */
+  if (M68K_SW_ON (m68k_ira_color_2))
+    {
+      entry_freq = 1;
+      exit_freq = 1;
+    }
 #endif
   int spill_cost = 0;
   /* Whether we have spilled pseudos or used caller-saved registers for values
@@ -2164,11 +2166,11 @@ assign_hard_reg (ira_allocno_t a, bool retry_p)
 	    {
 	      int k, *conflict_costs;
 
-#ifdef TARGET_M68K
-	      /* Stefan "Bebbo" Franke (SBFF):
-	         minimize costs if already 'may_be_spilled_p'. */
-	      if (ALLOCNO_NUM_OBJECTS (a) > 1 &&
-		  ALLOCNO_COLOR_DATA (conflict_a)->may_be_spilled_p)
+#if defined(TARGET_M68K)
+	      /* SBF: minimize costs if already 'may_be_spilled_p'. */
+	      if (M68K_SW_ON (m68k_ira_color_3)
+		  && ALLOCNO_NUM_OBJECTS (a) > 1
+		  && ALLOCNO_COLOR_DATA (conflict_a)->may_be_spilled_p)
 		continue;
 #endif
 

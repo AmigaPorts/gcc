@@ -1094,7 +1094,7 @@ insert_regs (rtx x, struct table_elt *classp, bool modified)
       unsigned int regno = REGNO (x);
       int qty_valid;
 
-#ifdef TARGET_M68K
+#if defined(TARGET_M68K)
       /* SBF: Never add auto inc regs! */
       if (this_insn && find_reg_note (this_insn, REG_INC, x))
 	{
@@ -2904,7 +2904,7 @@ canon_reg (rtx x, rtx_insn *insn)
 	  return x;
 
 #if defined(TARGET_M68K)
-	/* DBF: If this pseudo-register is actively involved in an auto-increment
+	/* SBF: If this pseudo-register is actively involved in an auto-increment
 	   or auto-decrement side effect chain in this EBB, do NOT canonicalize or replace it.
 	   Replacing it here corrupts it and triggers the auto_inc crash. */
 	if (this_insn && find_reg_note (this_insn, REG_INC, x))
@@ -3699,9 +3699,13 @@ fold_rtx (rtx x, rtx_insn *insn)
 		      || (HAVE_POST_DECREMENT
 			  && pow2p_hwi (- INTVAL (const_arg1)))))
 		{
-#ifdef TARGET_M68K
+#if defined(TARGET_M68K)
 		  /* SBF: fold if defined once and multiple uses. */
-		  if (DF_REG_USE_COUNT(REGNO(folded_arg0)) <= 2 || DF_REG_DEF_COUNT(REGNO(folded_arg0)) > 1)
+		  if (M68K_SW_ON (m68k_cse_1)
+		      && (DF_REG_USE_COUNT (REGNO (folded_arg0)) <= 2
+			  || DF_REG_DEF_COUNT (REGNO (folded_arg0)) > 1))
+		    break;
+#else
 		    break;
 #endif
 		}
@@ -6052,7 +6056,7 @@ cse_insn (rtx_insn *insn)
 	if (paradoxical_subreg_p (dest))
 	  continue;
 
-#ifdef TARGET_M68K
+#if defined(TARGET_M68K)
 	/* SBF: ignore regs marked as REG_INC to prevent invalid graph building. */
 	if (find_reg_note (insn, REG_INC, dest))
 	  continue;
