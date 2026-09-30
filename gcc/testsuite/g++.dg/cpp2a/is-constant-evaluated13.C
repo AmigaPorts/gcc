@@ -1,5 +1,8 @@
 // PR c++/105233
 // { dg-do compile { target c++14 } }
+// With 2-byte int alignment 4 * alignof (int) is 8 and sizeof (A<int>) is
+// 12, so foo picks 12 and alignas rejects it as not a power of two.
+// { dg-skip-if "int alignment is 2" { m68k*-*-* } { "*" } { "-malign-int" } }
 
 template <typename T>
 constexpr T

@@ -2,6 +2,7 @@
 // { dg-do run }
 // { dg-options "-O2 -mcpu=v8 -fPIC" { target { { sparc*-*-* } && { ilp32 && fpic } } } }
 // { dg-skip-if "requires hosted libstdc++ for cstdlib abort" { ! hostedlib } }
+// { dg-skip-if "uint32_t is unsigned long in newlib" { m68k-*-amigaos* } }
 
 #include <cstdlib>
 

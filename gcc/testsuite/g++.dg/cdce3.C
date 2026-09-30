@@ -4,7 +4,8 @@
 /* { dg-additional-options "-DLARGE_LONG_DOUBLE" { target large_long_double } } */
 /* { dg-additional-options "-DGNU_EXTENSION" { target pow10 } } */
 /* { dg-add-options ieee } */
-/* { dg-skip-if "requires hosted libstdc++ for cmath" { ! hostedlib } } */
+/* { dg-skip-if "requires hosted libstdc++ for cmath" { ! hostedlib } }
+/* { dg-skip-if "newlib has no long double math functions" { m68k-*-amigaos* } } */
 /* { dg-final { scan-tree-dump  "cdce3.C:92: .* function call is shrink-wrapped into error conditions\." "cdce" { target pow10 } } } */
 /* { dg-final { scan-tree-dump  "cdce3.C:93: .* function call is shrink-wrapped into error conditions\." "cdce" { target pow10 } } } */
 /* { dg-final { scan-tree-dump  "cdce3.C:95: .* function call is shrink-wrapped into error conditions\." "cdce" } } */
