@@ -1,6 +1,9 @@
 // PR c++/102071
 // { dg-do run  { target { { c++17 } && { ! default_packed } } } }
 // { dg-additional-options -faligned-new=2 }
+// alignof (X) is 2 on m68k, not above the -faligned-new=2 threshold, so the
+// plain operator new is the right one and nalign stays 0.
+// { dg-skip-if "alignof (X) is 2" { m68k*-*-* } { "*" } { "-malign-int" } }
 // { dg-xfail-run-if "AIX operator new" { powerpc-ibm-aix* } }
 
 #include <new>

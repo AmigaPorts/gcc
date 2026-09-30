@@ -1,4 +1,5 @@
 /* { dg-do compile } */
+// { dg-skip-if "no sanitizers" { m68k-*-amigaos* } }
 // { dg-timeout-factor 2.0 }
 // { dg-additional-options "-std=c++11 -fsanitize=undefined -O2 -Wno-return-type" }
 class ECoordinate { };

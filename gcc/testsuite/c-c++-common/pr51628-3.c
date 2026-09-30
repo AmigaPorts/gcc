@@ -1,6 +1,9 @@
 /* PR c/51628.  */
 /* { dg-do compile } */
 /* { dg-options "-O" } */
+/* int is 2-byte aligned on m68k, so a member of a packed struct aligned to
+   2 is not misaligned and there is nothing to warn about.  */
+/* { dg-skip-if "int alignment is 2" { m68k*-*-* } { "*" } { "-malign-int" } } */
 
 struct pair_t
 {

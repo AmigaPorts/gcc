@@ -321,6 +321,14 @@ proc check_weak_available { } {
 	return 1
     }
 
+    # The AmigaOS hunk format has weak symbols, but gcc_target_object_format
+    # does not know it and the "unknown" answer below would leave every
+    # dg-require-weak test unresolved.
+
+    if { [istarget m68k-*-amigaos*] } {
+	return 1
+    }
+
     # nvptx (nearly) supports it
 
     if { [istarget nvptx-*-*] } {
