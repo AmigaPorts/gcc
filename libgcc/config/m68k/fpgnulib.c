@@ -909,7 +909,10 @@ __addxf3 (long double a, long double b)
   if (exp_b == EXP_SENTINEL_INF_NAN)
     return b;
 
-  /* Zero handling.  */
+  /* Zero handling.  Two zeros add to -0 only when both are negative;
+     +0 + -0 is +0 in round-to-nearest, and so is x - x below.  */
+  if (mant_a == 0 && mant_b == 0)
+    return __xf_pack (sign_a & sign_b, 0, 0);
   if (mant_a == 0)
     return b;
   if (mant_b == 0)
