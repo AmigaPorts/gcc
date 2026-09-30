@@ -427,6 +427,26 @@ lang_specific_driver (struct cl_decoded_option **in_decoded_options,
 	}
 #endif
 
+#ifdef TARGET_AMIGAOS
+      /* AmigaOS has no crtbegin.o to register the .eh_frame sections with
+	 the unwinder; the C library's __init_eh does that from the init
+	 list, and only if something references it.  Force it in whenever
+	 exceptions are on, which for C++ is the default, so it cannot be
+	 left to a %{fexceptions:...} in LINK_SPEC.  */
+      {
+	bool exceptions = true;
+	for (i = 0; i < argc; i++)
+	  if (decoded_options[i].opt_index == OPT_fexceptions)
+	    exceptions = decoded_options[i].value;
+	if (exceptions)
+	  {
+	    generate_option (OPT_Wl_, "-u,___init_eh", 1, CL_DRIVER,
+			     &new_decoded_options[j]);
+	    j++;
+	  }
+      }
+#endif
+
       if (which_library == USE_LIBCXX)
 	{
 	  generate_option (OPT_l,
