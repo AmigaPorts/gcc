@@ -86,6 +86,18 @@ amiga_select_section (tree decl, int reloc ATTRIBUTE_UNUSED,
 #undef  TARGET_ASM_SELECT_SECTION
 #define TARGET_ASM_SELECT_SECTION	amiga_select_section
 
+/* Constructor and destructor priorities go to .list___CTOR_LIST__.NNNNN
+   and .list___DTOR_LIST__.NNNNN, which the linker script sorts by name.  */
+extern void
+amigaos_asm_out_constructor (rtx symbol, int priority);
+extern void
+amigaos_asm_out_destructor (rtx symbol, int priority);
+
+#undef  TARGET_ASM_CONSTRUCTOR
+#define TARGET_ASM_CONSTRUCTOR	amigaos_asm_out_constructor
+#undef  TARGET_ASM_DESTRUCTOR
+#define TARGET_ASM_DESTRUCTOR	amigaos_asm_out_destructor
+
 
 /* Various ABI issues.  */
 
