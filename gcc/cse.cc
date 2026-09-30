@@ -3667,7 +3667,17 @@ fold_rtx (rtx x, rtx_insn *insn)
 			  && pow2p_hwi (- INTVAL (const_arg1)))
 		      || (HAVE_POST_DECREMENT
 			  && pow2p_hwi (- INTVAL (const_arg1)))))
-		break;
+		{
+#if defined(TARGET_M68K)
+		  /* SBF: fold if defined once and multiple uses. */
+		  if (M68K_SW_ON (m68k_cse_1)
+		      && (DF_REG_USE_COUNT (REGNO (folded_arg0)) <= 2
+			  || DF_REG_DEF_COUNT (REGNO (folded_arg0)) > 1))
+		    break;
+#else
+		    break;
+#endif
+		}
 
 	      /* ??? Vector mode shifts by scalar
 		 shift operand are not supported yet.  */

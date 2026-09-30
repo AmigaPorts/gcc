@@ -3103,6 +3103,14 @@ add_candidate_1 (struct ivopts_data *data, tree base, tree step, bool important,
     {
       orig_type = TREE_TYPE (base);
       type = generic_type_for (orig_type);
+#if defined(TARGET_M68K)
+      /* SBF: if orig_type is a pointer, do not flatten it to unsigned int.
+	 Keeping it as ptr_type_node preserves the pointer nature through
+	 GIMPLE, avoids temporary VIEW_CONVERT_EXPR vars, and enables
+	 native (ax)+ post-increment generation in RTL. */
+      if (M68K_SW_ON (m68k_ivopts_1) && POINTER_TYPE_P (orig_type))
+	type = ptr_type_node;
+#endif
       if (type != orig_type)
 	{
 	  base = fold_convert (type, base);
@@ -4804,6 +4812,19 @@ get_address_cost (struct ivopts_data *data, struct iv_use *use,
     cost.complexity += 1;
   if (parts.offset != NULL_TREE && !integer_zerop (parts.offset))
     cost.complexity += 1;
+
+#if defined(TARGET_M68K)
+  /* SBF: penalize indexed addressing (base+index) when IVOpts wants to
+     merge independent pointer IVs. On 68040/060, (a0,d0.l) is much slower
+     than dense (a0)+ chains; inflating this cost forces the GIMPLE loop
+     optimizer to keep separate pointer variables, letting RTL emit post-inc. */
+  if (M68K_SW_ON (m68k_ivopts_2)
+      && parts.index != NULL_TREE
+      && (mem_mode == QImode || mem_mode == HImode || mem_mode == SImode))
+    {
+      cost.cost += 42;
+    }
+#endif
 
   return cost;
 }
@@ -7638,6 +7659,37 @@ rewrite_use_address (struct ivopts_data *data,
 	  ref = build2 (MEM_REF, type, ref, build_zero_cst (alias_ptr_type));
 	}
       copy_ref_info (ref, *use->op_p);
+
+#if defined(TARGET_M68K)
+    /* SBF: eliminate the temporary pointer var created by create_mem_ref.
+       If a TARGET_MEM_REF / MEM_REF base was forced through a NOP/CONVERT
+       clone of a pointer IV, bypass the clone and bind the IV directly.
+       Restores a single dataflow chain so auto_inc_dec can form (ax)+. */
+      if (M68K_SW_ON (m68k_ivopts_3)
+	  && (TREE_CODE (ref) == TARGET_MEM_REF || TREE_CODE (ref) == MEM_REF))
+	{
+	  tree *base_ptr = (TREE_CODE (ref) == TARGET_MEM_REF)
+			   ? &TMR_BASE (ref)
+			   : &TREE_OPERAND (ref, 0);
+	  if (*base_ptr && TREE_CODE (*base_ptr) == SSA_NAME)
+	    {
+	      gimple *def_stmt = SSA_NAME_DEF_STMT (*base_ptr);
+	      if (def_stmt
+		  && is_gimple_assign (def_stmt)
+		  && (gimple_assign_rhs_code (def_stmt) == NOP_EXPR
+		      || gimple_assign_rhs_code (def_stmt) == CONVERT_EXPR))
+		{
+		  tree orig_iv = gimple_assign_rhs1 (def_stmt);
+		  if (TREE_CODE (orig_iv) == SSA_NAME
+		      && POINTER_TYPE_P (TREE_TYPE (orig_iv)))
+		    {
+		      /* Bypass the temporary and bind directly to the running IV. */
+		      *base_ptr = orig_iv;
+		    }
+		}
+	    }
+	}
+#endif
     }
 
   *use->op_p = ref;

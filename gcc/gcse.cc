@@ -4409,6 +4409,11 @@ public:
 bool
 pass_rtl_hoist::gate (function *)
 {
+#if defined(TARGET_M68K)
+  if (M68K_SW_ON (m68k_gcse_1))
+    /* SBF: hoist is not good on m68k */
+    return false;
+#endif
   return optimize > 0 && flag_gcse
     && !cfun->calls_setjmp
     /* It does not make sense to run code hoisting unless we are optimizing
