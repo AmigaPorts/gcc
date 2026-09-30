@@ -2,11 +2,10 @@
 // { dg-do run }
 // { dg-options "-O2 -mcpu=v8 -fPIC" { target { { sparc*-*-* } && { ilp32 && fpic } } } }
 // { dg-skip-if "requires hosted libstdc++ for cstdlib abort" { ! hostedlib } }
-// { dg-skip-if "uint32_t is unsigned long in newlib" { m68k-*-amigaos* } }
 
 #include <cstdlib>
 
-typedef unsigned uint32_t __attribute__((mode (__SI__)));
+typedef unsigned u32 __attribute__((mode (__SI__)));
 
 class QTime
 {
@@ -19,7 +18,7 @@ private:
     unsigned ds;
 };
 
-static const uint32_t MSECS_PER_DAY = 86400000;
+static const u32 MSECS_PER_DAY = 86400000;
 
 QTime QTime::addMSecs(int ms) const
 {

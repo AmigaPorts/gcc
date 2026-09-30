@@ -4,6 +4,10 @@
 // the comments below.
 // { dg-do compile }
 // { dg-options "-Wno-pedantic -Wplacement-new=1" }
+// The flexible array members here sit in the tail padding of a struct
+// aligned to int, which is 3 bytes with a 4-byte int alignment and 1 byte
+// with the 2-byte one of m68k, so the warnings come out differently.
+// { dg-skip-if "int alignment is 2" { m68k*-*-* } { "*" } { "-malign-int" } }
 
 typedef __typeof__ (sizeof 0) size_t;
 
