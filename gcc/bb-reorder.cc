@@ -1431,6 +1431,11 @@ get_uncond_jump_length (void)
 int
 insn_size_estimate (rtx_insn *insn)
 {
+  /* Debug insns produce no code.  The callers walk every INSN_P, which
+     includes them, and counting them would make the duplication decision
+     depend on -g, which -fcompare-debug rightly rejects.  */
+  if (DEBUG_INSN_P (insn))
+    return 0;
   if (!HAVE_ATTR_length)
     return optimize >= 3 ? 0 : 1;
   return get_attr_min_length (insn);
