@@ -105,6 +105,57 @@ bool m68k_is_ok_for_sibcall(tree decl, tree exp)
 
 /* Argument-passing support functions.  */
 
+/* Set CUM up for the arguments of a call through FNTYPE, null for a
+   libcall: how many registers they may take, and the structure-return
+   register as already used.  */
+
+static void
+m68k_init_arg_regs (struct m68k_args *cum, const_tree fntype)
+{
+  int regparm = sas_regparm ? 2 : m68k_regparm;
+
+  cum->num_of_regs = 0;
+  cum->last_arg_reg = -1;
+  cum->regs_already_used = 0;
+  if (!fntype)
+    return;
+
+  cum->num_of_regs = regparm > 0 ? regparm : 0;
+  tree attrs = TYPE_ATTRIBUTES (fntype);
+  if (attrs)
+    {
+      if (lookup_attribute ("stkparm", attrs)
+	  || lookup_attribute ("fn spec", attrs))
+	cum->num_of_regs = 0;
+      else
+	{
+	  tree ratree = lookup_attribute ("regparm", attrs);
+	  cum->num_of_regs = regparm != 0 ? regparm : M68K_DEFAULT_REGPARM;
+	  if (ratree)
+	    {
+	      int no = TREE_INT_CST_LOW (TREE_VALUE (TREE_VALUE (ratree)));
+	      if (no > 0)
+		cum->num_of_regs = no < M68K_MAX_REGPARM ? no : M68K_MAX_REGPARM;
+	    }
+	}
+    }
+
+  /* If this is a vararg call, put all arguments on stack.  */
+  if (cum->num_of_regs)
+    for (const_tree param = TYPE_ARG_TYPES (fntype); param;
+	 param = TREE_CHAIN (param))
+      if (!TREE_CHAIN (param) && TREE_VALUE (param) != void_type_node)
+	cum->num_of_regs = 0;
+
+#if ! defined (PCC_STATIC_STRUCT_RETURN) && defined (M68K_STRUCT_VALUE_REGNUM)
+  /* If return value is a structure, and we pass the buffer address in a
+   register, we cannot use this register for our own purposes.
+   FIXME: Something similar would be useful for static chain.  */
+  if (aggregate_value_p (TREE_TYPE (fntype), fntype))
+    cum->regs_already_used |= (1 << M68K_STRUCT_VALUE_REGNUM);
+#endif
+}
+
 /* Initialize a variable CUM of type CUMULATIVE_ARGS
  for a call to a function whose data type is FNTYPE.
  For a library call, FNTYPE is 0.  */
@@ -116,15 +167,6 @@ m68k_init_cumulative_args (CUMULATIVE_ARGS *cump, tree fntype, tree decl)
   *cump = decl == current_function_decl;
   if (sas_regparm)
     m68k_regparm = 2;
-  cum->num_of_regs = m68k_regparm > 0 ? m68k_regparm : 0;
-  DPRINTF((stderr, "0m68k_init_cumulative_args %s %d -> %d\r\n", decl ? lang_hooks.decl_printable_name (decl, 2) : "?", *cump, cum->num_of_regs));
-
-  /* Initialize a variable CUM of type CUMULATIVE_ARGS
-   for a call to a function whose data type is FNTYPE.
-   For a library call, FNTYPE is 0.  */
-
-  cum->last_arg_reg = -1;
-  cum->regs_already_used = 0;
 
   if (!fntype && decl)
     fntype = TREE_TYPE(decl);
@@ -142,55 +184,8 @@ m68k_init_cumulative_args (CUMULATIVE_ARGS *cump, tree fntype, tree decl)
   if (decl && fndecl_built_in_p(decl))
     fntype = NULL;
 
-  tree attrs = NULL;
-  if (fntype)
-    {
-      attrs = TYPE_ATTRIBUTES(fntype);
-      DPRINTF((stderr, "1m68k_init_cumulative_args %s %d attrs: %p\r\n", decl ? lang_hooks.decl_printable_name (decl, 2) : "?", *cump, attrs));
-      if (attrs)
-	{
-	  tree stkp = lookup_attribute ("stkparm", attrs);
-	  tree fnspec = lookup_attribute ("fn spec", attrs);
-	  DPRINTF((stderr, "2m68k_init_cumulative_args %s %d stkp: %p %s\r\n", decl ? lang_hooks.decl_printable_name (decl, 2) : "?", *cump, stkp ? stkp : fnspec, IDENTIFIER_POINTER(TREE_PURPOSE(attrs))));
-	  if (stkp || fnspec)
-	    cum->num_of_regs = 0;
-	  else
-	    {
-	      tree ratree = lookup_attribute ("regparm", attrs);
-	      cum->num_of_regs = m68k_regparm != 0 ? m68k_regparm :
-							M68K_DEFAULT_REGPARM;
-	      if (ratree)
-		{
-		  int no = TREE_INT_CST_LOW(TREE_VALUE(TREE_VALUE(ratree)));
-		  if (no > 0)
-		    cum->num_of_regs = no < M68K_MAX_REGPARM ? no : M68K_MAX_REGPARM;
-		}
-	    }
-	}
-    }
-  else
-    /* Libcall.  */
-    cum->num_of_regs = 0;
-
-  if (cum->num_of_regs)
-    {
-      /* If this is a vararg call, put all arguments on stack.  */
-      tree param, next_param;
-      for (param = TYPE_ARG_TYPES(fntype); param; param = next_param)
-	{
-	  next_param = TREE_CHAIN(param);
-	  if (!next_param && TREE_VALUE (param) != void_type_node)
-	  cum->num_of_regs = 0;
-	}
-    }
-
-#if ! defined (PCC_STATIC_STRUCT_RETURN) && defined (M68K_STRUCT_VALUE_REGNUM)
-  /* If return value is a structure, and we pass the buffer address in a
-   register, we cannot use this register for our own purposes.
-   FIXME: Something similar would be useful for static chain.  */
-  if (fntype && aggregate_value_p (TREE_TYPE(fntype), fntype))
-    cum->regs_already_used |= (1 << M68K_STRUCT_VALUE_REGNUM);
-#endif
+  m68k_init_arg_regs (cum, fntype);
+  DPRINTF((stderr, "m68k_init_cumulative_args %s %d -> %d\r\n", decl ? lang_hooks.decl_printable_name (decl, 2) : "?", *cump, cum->num_of_regs));
 
   if (fntype && fntype->base.code == FUNCTION_DECL && DECL_STATIC_CHAIN(fntype))
     {
@@ -275,11 +270,13 @@ void m68k_function_arg_advance (cumulative_args_t cum_v,
  CUM is a variable of type CUMULATIVE_ARGS which gives info about
  the preceding args and about the function being called.  */
 
-static struct rtx_def *
-_m68k_function_arg (struct m68k_args * cum, machine_mode mode, const_tree type)
-{
-  DPRINTF((stderr, "m68k_function_arg numOfRegs=%d\r\n", cum ? cum->num_of_regs : 0));
+/* The register _m68k_function_arg picks for an argument of MODE and TYPE,
+   or -1 for the stack.  Writes only CUM's last_arg_reg and last_arg_len, so
+   it can run on a local m68k_args as well (m68k_place_next_arg).  */
 
+static int
+m68k_arg_regno (struct m68k_args * cum, machine_mode mode, const_tree type)
+{
   if (cum->num_of_regs)
     {
       int regbegin = -1, altregbegin = -1, len;
@@ -335,10 +332,21 @@ _m68k_function_arg (struct m68k_args * cum, machine_mode mode, const_tree type)
 	}
 
       if (cum->last_arg_reg != -1)
-	{
-	  DPRINTF((stderr, "-> gen_rtx_REG %d\r\n", cum->last_arg_reg));
-	  return gen_rtx_REG (mode, cum->last_arg_reg);
-	}
+	return cum->last_arg_reg;
+    }
+  return -1;
+}
+
+static struct rtx_def *
+_m68k_function_arg (struct m68k_args * cum, machine_mode mode, const_tree type)
+{
+  DPRINTF((stderr, "m68k_function_arg numOfRegs=%d\r\n", cum ? cum->num_of_regs : 0));
+
+  int regno = m68k_arg_regno (cum, mode, type);
+  if (regno != -1)
+    {
+      DPRINTF((stderr, "-> gen_rtx_REG %d\r\n", regno));
+      return gen_rtx_REG (mode, regno);
     }
   return 0;
 }
@@ -377,6 +385,54 @@ rtx m68k_function_arg (cumulative_args_t cum_v, const function_arg_info & ai)
   return _m68k_function_arg (cum, ai.mode, ai.type);
 }
 
+/* Where the next argument, of type TYPE, goes in the call CUM describes:
+   its register, or -1 for the stack.  Advances CUM past it.  */
+
+static int
+m68k_place_next_arg (struct m68k_args *cum, const_tree type)
+{
+  tree asmtree = lookup_attribute ("asmreg", TYPE_ATTRIBUTES (type));
+  int regno, len;
+
+  if (asmtree)
+    {
+      regno = TREE_INT_CST_LOW (TREE_VALUE (TREE_VALUE (asmtree)));
+      len = TYPE_MODE (type) == DImode ? 2 : 1;
+    }
+  else
+    {
+      regno = m68k_arg_regno (cum, TYPE_MODE (type), type);
+      len = cum->last_arg_len;
+    }
+  if (regno != -1)
+    for (int i = 0; i < len; i++)
+      cum->regs_already_used |= (1 << (regno + i));
+  cum->last_arg_reg = -1;
+  return regno;
+}
+
+/* Whether calls through FNTYPE1 with arguments ARGS1 and through FNTYPE2
+   with ARGS2 pass each argument in the same place.  Per-declaration
+   choices (builtins, memset) and the static chain are not seen here.  */
+
+bool
+m68k_fntypes_place_args_alike (const_tree fntype1, const_tree args1,
+			       const_tree fntype2, const_tree args2)
+{
+  struct m68k_args cum1, cum2;
+
+  m68k_init_arg_regs (&cum1, fntype1);
+  m68k_init_arg_regs (&cum2, fntype2);
+  for (; args1 && args2
+	 && TREE_VALUE (args1) != void_type_node
+	 && TREE_VALUE (args2) != void_type_node;
+       args1 = TREE_CHAIN (args1), args2 = TREE_CHAIN (args2))
+    if (m68k_place_next_arg (&cum1, TREE_VALUE (args1))
+	!= m68k_place_next_arg (&cum2, TREE_VALUE (args2)))
+      return false;
+  return true;
+}
+
 void
 m68k_emit_regparm_clobbers (void)
 {
@@ -392,6 +448,9 @@ m68k_emit_regparm_clobbers (void)
  one if they are compatible, and two if they are nearly compatible
  (which causes a warning to be generated). */
 
+/* Not registered as TARGET_COMP_TYPE_ATTRIBUTES, and not to be: it returns
+   0, which C makes an incompatible-pointer-types error.  AmigaOS uses
+   amigaos_callconv_comp_type_attributes.  */
 int
 m68k_comp_type_attributes (const_tree type1, const_tree type2)
 {
