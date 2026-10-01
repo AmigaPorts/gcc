@@ -616,17 +616,34 @@ m68k_static_chain_rtx (const_tree decl, bool incoming ATTRIBUTE_UNUSED)
   return 0;
 }
 
+static unsigned HOST_WIDE_INT
+get_env_uint (char const * name, unsigned HOST_WIDE_INT dflt)
+{
+#if M68K_SWITCHES_MODE
+  unsigned HOST_WIDE_INT r;
+  const char *env = getenv (name);
+  if (env && *env)
+    r = strtoul (env, NULL, 10);
+  else
+    r = dflt;   /* default */
+//fprintf(stderr, "%s = %d\n", name, r);
+  return r;
+#else
+  return dflt;
+#endif
+}
+
 /* Implement TARGET_USE_MOVE_BY_PIECES_INFRASTRUCTURE_P.
  */
 bool
 m68k_use_by_pieces_infrastructure_p (unsigned HOST_WIDE_INT size,
-				     unsigned int align ATTRIBUTE_UNUSED,
-				     enum by_pieces_operation op ATTRIBUTE_UNUSED,
-				     bool speed_p ATTRIBUTE_UNUSED)
+                                     unsigned int align ATTRIBUTE_UNUSED,
+                                     enum by_pieces_operation op ATTRIBUTE_UNUSED,
+                                     bool speed_p ATTRIBUTE_UNUSED)
 {
-  /* no need for small items. */
   if (align == 16) align = 32;
-  return size * 8 / align < 2;
+  unsigned HOST_WIDE_INT max = get_env_uint ("M68K_BY_PIECES_MAX", 48);
+  return size * 32 <= max * align;
 }
 
 int
@@ -684,7 +701,7 @@ m68k_emit_setmemsi(rtx blkdest, rtx val, rtx length, rtx alignment)
   int nloops = size / n - 1;
 
   /* Above this size, the generic implementation using MOVEM is faster. */
-  if (nloops > 160)
+  if (nloops > get_env_uint ("M68K_SETMEMSI_MAX_NLOOPS", 63))
     return false;
 
   int single = size % n;
@@ -827,7 +844,7 @@ m68k_emit_movmemsi(rtx blkdest, rtx blksrc, rtx length, rtx alignment)
   /* 4. The entire loop unrolling infrastructure remains unchanged! */
   int nloops = size / n - 1;
 
-  if (nloops > 160)
+  if (nloops > get_env_uint ("M68K_MOVMEMSI_MAX_NLOOPS", 63))
     return false;
 
   int single = size % n;

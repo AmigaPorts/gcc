@@ -124,38 +124,40 @@ static int cost_size_68000_10[IDX_COUNT] = {
 
 /* ============================================
    68020 - SPEED / SIZE
-   Speed values from CMA run.
+   Speed values from CMA run, then shrunk to the equivalence-class
+   edges with `driver.py shrink`. Parameters that shrank to 0 stay at 0;
+   exception: cost_mulu_w, which is a plausible codegen choice for other
+   programs and would otherwise be treated as free.
    ============================================ */
 static int cost_speed_68020[IDX_COUNT] = {
-    [IDX_REG]                   = 14,
-    [IDX_MEM_PLUS_REG_DISP]     = 14,
-    [IDX_MEM_PLUS_REG_REG]      = 13,
-    [IDX_MEM_OTHER]             = 2,
-    [IDX_CONST_INT_Q]           = 9,
-    [IDX_CONST_INT_W]           = 23,
-    [IDX_CONST_INT_L]           = 22,
-    [IDX_CONST_DOUBLE]          = 2,
-    [IDX_SYMBOL]                = 19,
-    [IDX_PLUS_REG_REG]          = 9,
-    [IDX_PLUS_REG_CONSTQ]       = 2,
-    [IDX_PLUS_REG_CONSTW]       = 0,
-    [IDX_PLUS_REG_CONSTL]       = 30,
-    [IDX_PLUS_OTHER]            = 9,
-    [IDX_LOGIC_REG_CONST]       = 6,
-    [IDX_SHIFT_CONST]           = 7,
-    [IDX_SHIFT_CONST_W]         = 29,
-    [IDX_BRANCH]                = 11,
-    [IDX_SET_REG_REG]           = 1,
-    [IDX_CALL_OTHER]            = 13,
-    [IDX_MULU_L]                = 25,
-    [IDX_MULU_W]                = 26,
-    [IDX_ADD_L]                 = 3,
-    [IDX_SUB_L]                 = 11,
-    [IDX_MOVE_L]                = 13,
-    [IDX_MOVEQ]                 = 2,
-    [IDX_LSL_SHIFT]             = 16,
+    [IDX_REG]                   =  6,
+    [IDX_MEM_PLUS_REG_DISP]     =  1,
+    [IDX_MEM_PLUS_REG_REG]      =  1,
+    [IDX_MEM_OTHER]             =  0,
+    [IDX_CONST_INT_Q]           =  0,
+    [IDX_CONST_INT_W]           = 14,
+    [IDX_CONST_INT_L]           =  0,
+    [IDX_CONST_DOUBLE]          =  0,
+    [IDX_SYMBOL]                =  7,
+    [IDX_PLUS_REG_REG]          =  4,
+    [IDX_PLUS_REG_CONSTQ]       =  9,
+    [IDX_PLUS_REG_CONSTW]       =  0,
+    [IDX_PLUS_REG_CONSTL]       =  1,
+    [IDX_PLUS_OTHER]            = 16,
+    [IDX_LOGIC_REG_CONST]       =  0,
+    [IDX_SHIFT_CONST]           =  5,
+    [IDX_SHIFT_CONST_W]         = 11,
+    [IDX_BRANCH]                =  0,
+    [IDX_SET_REG_REG]           =  1,
+    [IDX_CALL_OTHER]            =  0,
+    [IDX_MULU_L]                = 43,
+    [IDX_MULU_W]                = 27,
+    [IDX_ADD_L]                 =  0,
+    [IDX_SUB_L]                 =  0,
+    [IDX_MOVE_L]                =  0,
+    [IDX_MOVEQ]                 =  0,
+    [IDX_LSL_SHIFT]             =  5,
 };
-
 
 static int cost_size_68020[IDX_COUNT] = {
     [IDX_REG]                   = 5,
