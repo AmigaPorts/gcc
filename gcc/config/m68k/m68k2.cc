@@ -170,8 +170,11 @@ m68k_init_arg_regs (struct m68k_args *cum, const_tree fntype)
 	cum->num_of_regs = 0;
       else
 	{
+	  /* Only regparm (N) with N > 0 overrides the -mregparm count set
+	     above.  regparm (0) and attributes unrelated to argument
+	     passing (saveds, nonnull, ...) keep it, so with -mregparm=0
+	     they use the stack like a plain prototype.  */
 	  tree ratree = lookup_attribute ("regparm", attrs);
-	  cum->num_of_regs = regparm != 0 ? regparm : M68K_DEFAULT_REGPARM;
 	  if (ratree)
 	    {
 	      int no = TREE_INT_CST_LOW (TREE_VALUE (TREE_VALUE (ratree)));
