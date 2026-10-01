@@ -9485,7 +9485,7 @@ suppress such a warning.
 
 @opindex Wno-callconv-mismatch
 @opindex Wcallconv-mismatch
-@item -Wno-callconv-mismatch @r{(C and Objective-C only)}
+@item -Wno-callconv-mismatch
 Do not warn when a pointer to a function is converted to a pointer to a
 function with a different calling convention, by assignment,
 initialization, argument passing, return or a conditional expression.  The

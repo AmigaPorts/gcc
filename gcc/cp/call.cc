@@ -6587,6 +6587,9 @@ build_conditional_expr (const op_location_t &loc,
     return error_mark_node;
 
  valid_operands:
+  if (complain & tf_warning)
+    maybe_warn_callconv_mismatch (loc, arg2_type, arg3_type, true);
+
   if (processing_template_decl && is_glvalue)
     {
       /* Let lvalue_kind know this was a glvalue.  */
@@ -10642,7 +10645,11 @@ build_over_call (struct z_candidate *cand, int flags, tsubst_flags_t complain)
 	conv->user_conv_p = true;
 
       if (arg_complain & tf_warning)
-	maybe_warn_pessimizing_move (arg, type, /*return_p=*/false);
+	{
+	  maybe_warn_pessimizing_move (arg, type, /*return_p=*/false);
+	  maybe_warn_callconv_mismatch (cp_expr_loc_or_input_loc (arg), type,
+						TREE_TYPE (arg), false);
+	}
 
       tree val = convert_like_with_context (conv, arg, fn,
 					    param_index, arg_complain);

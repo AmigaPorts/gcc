@@ -8574,11 +8574,79 @@ check_for_casting_away_constness (location_t loc, tree src_type,
     }
 }
 
+/* The function type a function, pointer, reference or pointer-to-member
+   type T designates, or NULL_TREE.  */
+
+static tree
+callconv_fn_type (tree t)
+{
+  if (!t)
+    return NULL_TREE;
+  if (TYPE_PTRMEMFUNC_P (t))
+    t = TYPE_PTRMEMFUNC_FN_TYPE (t);
+  if (INDIRECT_TYPE_P (t))
+    t = TREE_TYPE (t);
+  return FUNC_OR_METHOD_TYPE_P (t) ? t : NULL_TREE;
+}
+
+/* True if -Wcallconv-mismatch applies to TYPE1 and TYPE2: they designate
+   function types the target reports as nearly compatible
+   (TARGET_COMP_TYPE_ATTRIBUTES returns 2), which C++ takes as the same
+   type, so a call through one can pass arguments where a function of the
+   other type does not read them.  */
+
+static bool
+callconv_mismatch_p (tree type1, tree type2)
+{
+  if (!warn_callconv_mismatch)
+    return false;
+  type1 = callconv_fn_type (type1);
+  type2 = callconv_fn_type (type2);
+  return (type1 && type2
+	  && !dependent_type_p (type1) && !dependent_type_p (type2)
+	  && targetm.comp_type_attributes (type1, type2) == 2);
+}
+
+/* Warn at LOC, once, if TYPE2 converted to TYPE1 changes the calling
+   convention (COND_P false), or if TYPE1 and TYPE2 are the operand types
+   of a conditional expression (COND_P true).  An explicit cast at LOC
+   (maybe_warn_about_useless_cast) has already turned the warning off.  */
+
+void
+maybe_warn_callconv_mismatch (location_t loc, tree type1, tree type2,
+			      bool cond_p)
+{
+  /* Keyed on the caret: a conditional between two functions is built
+     again, between pointers, when it decays, at the same caret.  */
+  location_t key = get_pure_location (loc);
+  bool known = !RESERVED_LOCATION_P (key);
+  if ((known && warning_suppressed_at (key, OPT_Wcallconv_mismatch))
+      || !callconv_mismatch_p (type1, type2))
+    return;
+  if (cond_p)
+    warning_at (loc, OPT_Wcallconv_mismatch,
+		"conditional expression between pointers to functions "
+		"with different calling conventions");
+  else
+    warning_at (loc, OPT_Wcallconv_mismatch,
+		"conversion between pointers to functions with "
+		"different calling conventions");
+  if (known)
+    suppress_warning_at (key, OPT_Wcallconv_mismatch);
+}
+
 /* Warns if the cast from expression EXPR to type TYPE is useless.  */
 void
 maybe_warn_about_useless_cast (location_t loc, tree type, tree expr,
 			       tsubst_flags_t complain)
 {
+  /* The cast is useless to C++ even between function types that differ in
+     calling convention, so its result keeps EXPR's type; the cast still
+     tells -Wcallconv-mismatch not to diagnose the result's conversion.  */
+  if (!RESERVED_LOCATION_P (loc)
+      && callconv_mismatch_p (type, TREE_TYPE (expr)))
+    suppress_warning_at (get_pure_location (loc), OPT_Wcallconv_mismatch);
+
   if (warn_useless_cast
       && complain & tf_warning)
     {
@@ -10858,7 +10926,10 @@ convert_for_assignment (tree type, tree rhs,
     maybe_warn_unparenthesized_assignment (rhs, /*nested_p=*/true, complain);
 
   if (complain & tf_warning)
-    warn_for_address_of_packed_member (type, rhs);
+    {
+      warn_for_address_of_packed_member (type, rhs);
+      maybe_warn_callconv_mismatch (rhs_loc, type, rhstype, false);
+    }
 
   return perform_implicit_conversion_flags (strip_top_quals (type), rhs,
 					    complain, flags);

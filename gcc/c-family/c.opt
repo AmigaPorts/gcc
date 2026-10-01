@@ -915,7 +915,7 @@ C ObjC Var(warn_incompatible_pointer_types) Init(1) Warning
 Warn when there is a conversion between pointers that have incompatible types.
 
 Wcallconv-mismatch
-C ObjC Var(warn_callconv_mismatch) Init(1) Warning
+C ObjC C++ ObjC++ Var(warn_callconv_mismatch) Init(1) Warning
 Warn when a pointer to a function is converted to a pointer to a function with a different calling convention.
 
 Winfinite-recursion
