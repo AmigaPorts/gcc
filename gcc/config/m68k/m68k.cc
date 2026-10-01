@@ -183,10 +183,6 @@ static int m68k_address_cost(rtx x, machine_mode mode, addr_space_t t, bool spee
 static int m68k_callee_save_cost (spill_cost_type, unsigned int, machine_mode,
 				  unsigned int, int, const HARD_REG_SET &,
 				  bool);
-#ifdef TARGET_AMIGAOS
-static bool m68k_amiga_use_by_pieces (unsigned HOST_WIDE_INT, unsigned int,
-				    enum by_pieces_operation, bool);
-#endif
 #if M68K_HONOR_TARGET_STRICT_ALIGNMENT
 static bool m68k_return_in_memory (const_tree, const_tree);
 #endif
@@ -316,11 +312,6 @@ m68k_use_by_pieces_infrastructure_p (unsigned HOST_WIDE_INT size,
 
 #undef TARGET_CALLEE_SAVE_COST
 #define TARGET_CALLEE_SAVE_COST m68k_callee_save_cost
-
-#ifdef TARGET_AMIGAOS
-#undef TARGET_USE_BY_PIECES_INFRASTRUCTURE_P
-#define TARGET_USE_BY_PIECES_INFRASTRUCTURE_P m68k_amiga_use_by_pieces
-#endif
 
 #undef TARGET_ATTRIBUTE_TABLE
 #define TARGET_ATTRIBUTE_TABLE m68k_attribute_table
@@ -7433,27 +7424,6 @@ m68k_callee_save_cost (spill_cost_type, unsigned int hard_regno,
 #endif
   return 0;
 }
-
-#ifdef TARGET_AMIGAOS
-/* Amiga libnix memcpy can dispatch through exec.library CopyMem.  For small,
-   constant block copies this call overhead outweighs a bounded sequence of
-   moves.  The generic speed threshold rejects even a 60-byte aligned copy.
-   Keep size optimization, byte-aligned copies and other operations on their
-   existing policy.  The generic piece expander still chooses access widths
-   using the actual alignment; this hook does not relax alignment constraints.
-
-   Note the mixed units: SIZE is in bytes, ALIGNMENT is in bits, so the
-   test below accepts copies of up to 128 bytes at word (16-bit) or better
-   alignment.  */
-static bool
-m68k_amiga_use_by_pieces (unsigned HOST_WIDE_INT size, unsigned int alignment,
-			 enum by_pieces_operation op, bool speed_p)
-{
-  if (speed_p && op == MOVE_BY_PIECES && alignment >= 16 && size <= 128)
-    return true;
-  return default_use_by_pieces_infrastructure_p (size, alignment, op, speed_p);
-}
-#endif
 
 bool
 m68k_costs (rtx x,

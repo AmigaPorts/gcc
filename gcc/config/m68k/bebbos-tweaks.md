@@ -109,6 +109,20 @@
 	  FAIL;
 })
 
+(define_expand "cpymemsi"
+  [(parallel [(set (match_operand:BLK 0 "general_operand")
+		   (match_operand:BLK 1 "general_operand"))
+	      (use (match_operand:SI 2 "const_int_operand"))
+	      (use (match_operand:SI 3 "const_int_operand"))])]
+  ""
+{
+	if (m68k_emit_movmemsi(operands[0], operands[1], operands[2], operands[3]))
+	  DONE;
+	else
+	  FAIL;
+})
+
+
 (define_expand "setmemsi"
   [(parallel [(set (match_operand:BLK 0 "" "")
 		   (match_operand:SI 1 "const_int_operand" ""))
