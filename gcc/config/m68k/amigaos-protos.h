@@ -33,6 +33,9 @@ amigaos_handle_type_attribute (tree *node, tree name, tree args, int flags ATTRI
 extern bool
 amigaos_legitimate_src (rtx src);
 
+extern int
+amigaos_callconv_comp_type_attributes (const_tree type1, const_tree type2);
+
 extern void
 amigaos_restore_a4 (void);
 

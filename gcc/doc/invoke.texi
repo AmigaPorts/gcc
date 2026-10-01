@@ -9483,6 +9483,17 @@ are being discarded.  Typically, the compiler warns if a
 takes a @code{int (*)[]} parameter.  This option can be used to
 suppress such a warning.
 
+@opindex Wno-callconv-mismatch
+@opindex Wcallconv-mismatch
+@item -Wno-callconv-mismatch
+Do not warn when a pointer to a function is converted to a pointer to a
+function with a different calling convention, by assignment,
+initialization, argument passing, return or a conditional expression.  The
+conversion is still accepted; comparisons and explicit casts are not
+diagnosed.  On m68k AmigaOS the calling conventions differ when an argument
+is passed in a different register or on the stack instead.  This warning
+is enabled by default.
+
 @opindex Wno-incompatible-pointer-types
 @opindex Wincompatible-pointer-types
 @item -Wno-incompatible-pointer-types @r{(C and Objective-C only)}
