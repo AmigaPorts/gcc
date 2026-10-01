@@ -52,10 +52,31 @@
 #define DPRINTF(x)
 #endif
 
+/* TARGET_COMP_TYPE_ATTRIBUTES.  2 (nearly compatible, which the C front end
+   reports as -Wcallconv-mismatch) when two function types pass an argument
+   in different places, else 1.  Never 0, which would make the conversion
+   an error.  An unprototyped type is called with the other type's
+   arguments, as declared rather than as promoted.  */
+
+int
+amigaos_callconv_comp_type_attributes (const_tree type1, const_tree type2)
+{
+  if (!FUNC_OR_METHOD_TYPE_P (type1) || !FUNC_OR_METHOD_TYPE_P (type2))
+    return 1;
+
+  const_tree args1 = TYPE_ARG_TYPES (type1);
+  const_tree args2 = TYPE_ARG_TYPES (type2);
+  return m68k_fntypes_place_args_alike (type1, args1 ? args1 : args2,
+					type2, args2 ? args2 : args1) ? 1 : 2;
+}
+
 /* Return zero if the attributes on TYPE1 and TYPE2 are incompatible,
  one if they are compatible, and two if they are nearly compatible
  (which causes a warning to be generated). */
 
+/* Not registered as TARGET_COMP_TYPE_ATTRIBUTES, and not to be: it returns
+   0, which C makes an incompatible-pointer-types error.  AmigaOS uses
+   amigaos_callconv_comp_type_attributes.  */
 int
 amigaos_comp_type_attributes (const_tree type1, const_tree type2)
 {

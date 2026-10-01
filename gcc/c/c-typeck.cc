@@ -6919,6 +6919,17 @@ build_conditional_expr (location_t colon_loc, tree ifexp, bool ifexp_bcp,
 
       if (comp_target_types (colon_loc, type1, type2))
 	{
+	  /* A conditional forms one function-pointer type from both operands.
+	     Calling its result can use the wrong argument convention for one
+	     branch, even without a later assignment.  */
+	  tree target1 = TREE_TYPE (type1);
+	  tree target2 = TREE_TYPE (type2);
+	  if (FUNC_OR_METHOD_TYPE_P (target1)
+	      && FUNC_OR_METHOD_TYPE_P (target2)
+	      && targetm.comp_type_attributes (target1, target2) == 2)
+	    warning_at (colon_loc, OPT_Wcallconv_mismatch,
+			"conditional expression between pointers to functions "
+			"with different calling conventions");
 	  ifexp = save_expr (ifexp);
 	  result_type = common_pointer_type (type1, type2, ifexp);
 	}
@@ -9073,6 +9084,16 @@ convert_for_assignment (location_t location, location_t expr_loc, tree type,
 		  == c_common_signed_type (mvr))
 	      && TYPE_ATOMIC (mvl) == TYPE_ATOMIC (mvr)))
 	{
+	  /* A call through the converted pointer would pass its arguments
+	     where the callee does not read them.  The target reports such
+	     function types as nearly compatible (TARGET_COMP_TYPE_ATTRIBUTES
+	     returns 2).  */
+	  if (FUNC_OR_METHOD_TYPE_P (ttl) && FUNC_OR_METHOD_TYPE_P (ttr)
+	      && targetm.comp_type_attributes (ttl, ttr) == 2)
+	    warning_at (location, OPT_Wcallconv_mismatch,
+			"conversion between pointers to functions with "
+			"different calling conventions");
+
 	  /* Warn about loss of qualifers from pointers to arrays with
 	     qualifiers on the element type. */
 	  if (TREE_CODE (ttr) == ARRAY_TYPE)

@@ -232,3 +232,6 @@ while (0)
 #undef TARGET_INSERT_ATTRIBUTES
 #define TARGET_INSERT_ATTRIBUTES amigaos_insert_attribute
 
+#undef TARGET_COMP_TYPE_ATTRIBUTES
+#define TARGET_COMP_TYPE_ATTRIBUTES amigaos_callconv_comp_type_attributes
+
