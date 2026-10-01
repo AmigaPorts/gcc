@@ -83,9 +83,13 @@ static struct m68k_args mycum, othercum;
 
 bool m68k_is_ok_for_sibcall(tree decl, tree exp);
 /**
- * Sibcall is only ok, if max regs d0/d1/a0 are used.
- * a1 is used for the sibcall
+ * Sibcall is only ok, if max regs d0/d1/a0 are used;
  * others might be trashed due to stack pop.
+ * A target that is not a direct call m68k_symbolic_jump can branch to (an
+ * indirect call, or a direct one with -m68000 -fbaserel, -resident or
+ * -mpcrel) is loaded into STATIC_CHAIN_REGNUM (a0 on AmigaOS) by
+ * m68k_legitimize_sibcall_address, so then that register must not carry
+ * an argument.
  */
 bool m68k_is_ok_for_sibcall(tree decl, tree exp)
 {
@@ -99,7 +103,12 @@ bool m68k_is_ok_for_sibcall(tree decl, tree exp)
      refused and [[gnu::musttail]] on a recursive call errored out.  */
   struct m68k_args *cum = decl == current_function_decl ? &mycum : &othercum;
   if (cum->fntype == fntype)
-    return (cum->regs_already_used & ~0x010103) == 0;
+    {
+      long allowed = 0x010103;
+      if (!decl || m68k_symbolic_jump == NULL)
+	allowed &= ~(1L << STATIC_CHAIN_REGNUM);
+      return (cum->regs_already_used & ~allowed) == 0;
+    }
   return false;
 }
 
