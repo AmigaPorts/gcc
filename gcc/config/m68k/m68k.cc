@@ -5900,6 +5900,9 @@ m68k_secondary_reload_class (enum reg_class rclass,
 {
   int regno;
 
+  if (rclass == ADDR_REGS)
+	  return NO_REGS;
+
   regno = true_regnum (x);
 
   /* If one operand of a movqi is an address register, the other
@@ -7359,26 +7362,6 @@ m68k_use_lra_p ()
 #include "gt-m68k.h"
 
 
-extern bool
-m68k_68000_10_costs (rtx x, machine_mode mode, int outer_code,
-		int opno, int *total, bool speed );
-
-extern bool
-m68k_68020_costs (rtx x, machine_mode mode, int outer_code,
-		int opno, int *total, bool speed );
-
-extern bool
-m68k_68030_costs (rtx x, machine_mode mode, int outer_code,
-		int opno, int *total, bool speed );
-
-extern bool
-m68k_68040_costs (rtx x, machine_mode mode, int outer_code,
-		int opno, int *total, bool speed );
-
-extern bool
-m68k_68080_costs (rtx x, machine_mode mode, int outer_code,
-		int opno, int *total, bool speed );
-
 /* Implement TARGET_CALLEE_SAVE_COST.
 
    The default charges a callee-saved register a full memory move to save
@@ -7395,9 +7378,18 @@ m68k_68080_costs (rtx x, machine_mode mode, int outer_code,
 static int
 m68k_callee_save_cost (spill_cost_type, unsigned int hard_regno,
 		       machine_mode, unsigned int, int mem_cost,
-		       const HARD_REG_SET &, bool)
+		       const HARD_REG_SET &allocated_callee_save_regs, bool)
 {
-  return INT_REGNO_P (hard_regno) ? 0 : mem_cost;
+  if (call_used_regs[hard_regno])
+    return 0;                      /* d0,d1,a0,a1: caller-saved, free */
+
+#ifdef TARGET_AMIGA
+  /* Callee-saved integer reg: charge full mem_cost for a lone save;
+     nearly free if it joins an existing movem group.  */
+  if (hard_reg_set_empty_p (allocated_callee_save_regs))
+    return mem_cost;
+#endif
+  return 0;
 }
 
 #ifdef TARGET_AMIGAOS
@@ -7421,27 +7413,20 @@ m68k_amiga_use_by_pieces (unsigned HOST_WIDE_INT size, unsigned int alignment,
 }
 #endif
 
+bool
+m68k_costs (rtx x,
+	    machine_mode mode,
+	    int outer_code ATTRIBUTE_UNUSED,
+	    int opno ATTRIBUTE_UNUSED,
+	    int *total,
+	    bool speed);
+
 static bool
 m68k_rtx_costs (rtx x, machine_mode mode, int outer_code,
 		int opno,
 		int *total, bool speed )
 {
-  bool r;
-  if (TUNE_68000_10)
-    r =  m68k_68000_10_costs(x, mode, outer_code, opno, total, speed);
-  else
-  if (m68k_tune == u68020)
-    r = m68k_68020_costs(x, mode, outer_code, opno, total, speed);
-  else
-  if (m68k_tune == u68030)
-    r = m68k_68030_costs(x, mode, outer_code, opno, total, speed);
-  else
-  if (m68k_tune == u68040 || m68k_tune == u68020_40)
-    r = m68k_68040_costs(x, mode, outer_code, opno, total, speed);
-  else
-    r = m68k_68080_costs(x, mode, outer_code, opno, total, speed);
-
-  return r;
+  return m68k_costs(x, mode, outer_code, opno, total, speed);
 }
 
 int m68k_address_cost(rtx x, machine_mode mode, addr_space_t t ATTRIBUTE_UNUSED, bool speed)

@@ -950,6 +950,15 @@ setup_left_conflict_sizes_p (ira_allocno_t a)
        + MIN (subnodes[0].max_node_impact - left_conflict_subnodes_size,
 	      subnodes[0].left_conflict_size));
   conflict_size += ira_reg_class_max_nregs[ALLOCNO_CLASS (a)][ALLOCNO_MODE (a)];
+
+#if defined(TARGET_M68K)
+  /* SBF: avoid marking multi word pseudos as not colorable. */
+  if (M68K_SW_ON (m68k_ira_color_1)
+      && ALLOCNO_NUM_OBJECTS (a) > 1
+      && data->available_regs_num > 0)
+    conflict_size = MIN (conflict_size, data->available_regs_num);
+#endif
+
   data->colorable_p = conflict_size <= data->available_regs_num;
   return data->colorable_p;
 }
@@ -1987,6 +1996,14 @@ assign_hard_reg (ira_allocno_t a, bool retry_p)
   HARD_REG_SET soft_conflict_regs = {};
   int entry_freq = REG_FREQ_FROM_BB (ENTRY_BLOCK_PTR_FOR_FN (cfun));
   int exit_freq = REG_FREQ_FROM_BB (EXIT_BLOCK_PTR_FOR_FN (cfun));
+#if defined(TARGET_M68K)
+  /* SBF: movem is once per function. */
+  if (M68K_SW_ON (m68k_ira_color_2))
+    {
+      entry_freq = 1;
+      exit_freq = 1;
+    }
+#endif
   int spill_cost = 0;
   /* Whether we have spilled pseudos or used caller-saved registers for values
      that are live across a call.  */
@@ -2148,6 +2165,14 @@ assign_hard_reg (ira_allocno_t a, bool retry_p)
 		       != curr_allocno_process))
 	    {
 	      int k, *conflict_costs;
+
+#if defined(TARGET_M68K)
+	      /* SBF: minimize costs if already 'may_be_spilled_p'. */
+	      if (M68K_SW_ON (m68k_ira_color_3)
+		  && ALLOCNO_NUM_OBJECTS (a) > 1
+		  && ALLOCNO_COLOR_DATA (conflict_a)->may_be_spilled_p)
+		continue;
+#endif
 
 	      ALLOCNO_COLOR_DATA (conflict_a)->last_process
 		= curr_allocno_process;
