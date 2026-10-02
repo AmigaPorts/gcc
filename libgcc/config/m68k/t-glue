@@ -1,5 +1,13 @@
 LIB2ADD += $(srcdir)/config/m68k/gmon.c
 
+# operator new that aborts instead of throwing; g++ links it ahead of
+# libstdc++ under -fno-exceptions.
+new_op.o: $(srcdir)/config/m68k/new_op.c
+	$(gcc_compile) $< -c
+
+libnew_op.a: new_op.o
+	$(AR_CREATE_FOR_TARGET) $@ $<
+
 # On Amiga, specifying -fnon-call-exceptions will needlessly pull in
 # the unwinder in simple programs which use 64-bit division.
 LIB2_DIVMOD_EXCEPTION_FLAGS := -fno-exceptions
