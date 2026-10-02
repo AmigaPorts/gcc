@@ -444,6 +444,16 @@ lang_specific_driver (struct cl_decoded_option **in_decoded_options,
 			     &new_decoded_options[j]);
 	    j++;
 	  }
+	else
+	  {
+	    /* libsupc++'s operator new throws, which pulls in the unwinder
+	       even here.  libnew_noexc.a ahead of libstdc++ has one that
+	       aborts instead.  */
+	    generate_option (OPT_l, "new_noexc", 1, CL_DRIVER,
+			     &new_decoded_options[j]);
+	    j++;
+	    added_libraries++;
+	  }
       }
 #endif
 

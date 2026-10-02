@@ -1,0 +1,51 @@
+# src/.libs/libnew_noexc.a (next to libstdc++.a, where the testsuite and an
+# in-tree g++ look): operator new for -fno-exceptions programs.  g++ links it
+# ahead of libstdc++ (see g++spec.cc) so an allocation failure aborts
+# instead of throwing, which keeps the unwinder out of the program.
+# The throwing forms are libsupc++'s own sources built with
+# -fno-exceptions; the nothrow forms need their own source, since
+# upstream writes them as a try/catch around operator new.  One object
+# per operator, like libsupc++, so a program can still replace any one
+# of them.
+
+new_noexc_objects = new_op-noexc.o new_opv-noexc.o \
+	new_opa-noexc.o new_opva-noexc.o \
+	new_opnt-noexc.o new_opvnt-noexc.o \
+	new_opant-noexc.o new_opvant-noexc.o
+
+NEW_NOEXC_COMPILE = $(CXX) $(AM_CPPFLAGS) $(WARN_CXXFLAGS) \
+	$(OPTIMIZE_CXXFLAGS) $(CONFIG_CXXFLAGS) $(CXXFLAGS) $(EXTRA_CXX_FLAGS) \
+	-fno-exceptions -c
+
+new_op-noexc.o: $(glibcxx_srcdir)/libsupc++/new_op.cc
+	$(NEW_NOEXC_COMPILE) $< -o $@
+new_opv-noexc.o: $(glibcxx_srcdir)/libsupc++/new_opv.cc
+	$(NEW_NOEXC_COMPILE) $< -o $@
+new_opa-noexc.o: $(glibcxx_srcdir)/libsupc++/new_opa.cc
+	$(NEW_NOEXC_COMPILE) $< -o $@
+new_opva-noexc.o: $(glibcxx_srcdir)/libsupc++/new_opva.cc
+	$(NEW_NOEXC_COMPILE) $< -o $@
+new_opnt-noexc.o: $(glibcxx_srcdir)/libsupc++/new_op_noexc.cc
+	$(NEW_NOEXC_COMPILE) $< -o $@
+new_opvnt-noexc.o: $(glibcxx_srcdir)/libsupc++/new_op_noexc.cc
+	$(NEW_NOEXC_COMPILE) -DNEW_OP_ARRAY $< -o $@
+new_opant-noexc.o: $(glibcxx_srcdir)/libsupc++/new_op_noexc.cc
+	$(NEW_NOEXC_COMPILE) -DNEW_OP_ALIGNED $< -o $@
+new_opvant-noexc.o: $(glibcxx_srcdir)/libsupc++/new_op_noexc.cc
+	$(NEW_NOEXC_COMPILE) -DNEW_OP_ARRAY -DNEW_OP_ALIGNED $< -o $@
+
+src/.libs/libnew_noexc.a: $(new_noexc_objects)
+	$(mkinstalldirs) src/.libs && rm -f $@
+	$(AR) cr $@ $(new_noexc_objects)
+	$(RANLIB) $@
+
+all-local: src/.libs/libnew_noexc.a
+
+install-exec-local: install-new-noexc
+install-new-noexc: src/.libs/libnew_noexc.a
+	$(mkinstalldirs) $(DESTDIR)$(toolexeclibdir)
+	$(INSTALL_DATA) src/.libs/libnew_noexc.a $(DESTDIR)$(toolexeclibdir)/libnew_noexc.a
+
+clean-local: clean-new-noexc
+clean-new-noexc:
+	rm -f src/.libs/libnew_noexc.a $(new_noexc_objects)
