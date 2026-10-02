@@ -1020,6 +1020,7 @@ m32rle-*-elf*)
 	;;
 m68k-*-amiga*)
 	tmake_file="$tmake_file m68k/t-glue m68k/t-floatlib-amiga soft-fp"
+	extra_parts="$extra_parts libnew_op.a"
 	CFLAGS="-Os"
 	;;
 m68k-*-elf* | fido-*-elf)
