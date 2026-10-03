@@ -2198,6 +2198,19 @@ m68k_illegitimate_symbolic_constant_p (rtx x)
 	  && !offset_within_block_p (base, INTVAL (offset)))
 	return true;
     }
+
+  /* No relocation subtracts a symbol: (const (minus N (symbol_ref)))
+     has no immediate form, and under -fbaserel the subtrahend is the
+     RELOC16 unspec, whose "sym:W" spelling is not even an assembler
+     expression.  Only a constant or a label difference may be
+     subtracted; the movsi expander splits anything else.  */
+  if (GET_CODE (x) == CONST
+      && GET_CODE (XEXP (x, 0)) == MINUS
+      && !CONST_INT_P (XEXP (XEXP (x, 0), 1))
+      && !(GET_CODE (XEXP (XEXP (x, 0), 0)) == LABEL_REF
+	   && GET_CODE (XEXP (XEXP (x, 0), 1)) == LABEL_REF))
+    return true;
+
   return m68k_tls_reference_p (x, false);
 }
 
