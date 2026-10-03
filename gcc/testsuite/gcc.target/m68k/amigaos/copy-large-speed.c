@@ -1,8 +1,9 @@
 /* { dg-do compile } */
 /* { dg-options "-O2 -m68060" } */
 
-struct block256 { unsigned short v[128]; };
-void copy256 (struct block256 *d, const struct block256 *s) { *d = *s; }
+struct block8k { unsigned int v[2048]; };
+void copy8k (struct block8k *d, const struct block8k *s) { *d = *s; }
 
-/* Larger copies retain the original policy. */
+/* Beyond the expander's loop limit (63 iterations of 16 moves at -O2,
+   4 KB) the copy goes to memcpy. */
 /* { dg-final { scan-assembler "memcpy" } } */

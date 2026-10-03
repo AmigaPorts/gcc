@@ -700,8 +700,9 @@ m68k_emit_setmemsi(rtx blkdest, rtx val, rtx length, rtx alignment)
 
   int nloops = size / n - 1;
 
-  /* Above this size, the generic implementation using MOVEM is faster. */
-  if (nloops > get_env_uint ("M68K_SETMEMSI_MAX_NLOOPS", 63))
+  /* Above this size, the generic implementation using MOVEM is faster.
+     nloops is -1 below one unrolled iteration; keep the comparison signed.  */
+  if (nloops > (HOST_WIDE_INT) get_env_uint ("M68K_SETMEMSI_MAX_NLOOPS", 63))
     return false;
 
   int single = size % n;
@@ -844,7 +845,8 @@ m68k_emit_movmemsi(rtx blkdest, rtx blksrc, rtx length, rtx alignment)
   /* 4. The entire loop unrolling infrastructure remains unchanged! */
   int nloops = size / n - 1;
 
-  if (nloops > get_env_uint ("M68K_MOVMEMSI_MAX_NLOOPS", 63))
+  /* nloops is -1 below one unrolled iteration; keep the comparison signed.  */
+  if (nloops > (HOST_WIDE_INT) get_env_uint ("M68K_MOVMEMSI_MAX_NLOOPS", 63))
     return false;
 
   int single = size % n;
