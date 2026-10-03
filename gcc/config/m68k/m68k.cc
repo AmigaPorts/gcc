@@ -68,6 +68,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "rtl-iter.h"
 #include "toplev.h"
 #include "df.h"
+#include "cfgloop.h"
 
 
 /* This file should be included last.  */
@@ -182,10 +183,6 @@ static int m68k_address_cost(rtx x, machine_mode mode, addr_space_t t, bool spee
 static int m68k_callee_save_cost (spill_cost_type, unsigned int, machine_mode,
 				  unsigned int, int, const HARD_REG_SET &,
 				  bool);
-#ifdef TARGET_AMIGAOS
-static bool m68k_amiga_use_by_pieces (unsigned HOST_WIDE_INT, unsigned int,
-				    enum by_pieces_operation, bool);
-#endif
 #if M68K_HONOR_TARGET_STRICT_ALIGNMENT
 static bool m68k_return_in_memory (const_tree, const_tree);
 #endif
@@ -212,6 +209,17 @@ static void m68k_asm_final_postscan_insn (FILE *, rtx_insn *insn, rtx [], int);
 static HARD_REG_SET m68k_zero_call_used_regs (HARD_REG_SET);
 static machine_mode m68k_c_mode_for_floating_type (enum tree_index);
 static bool m68k_use_lra_p (void);
+
+
+/* Modern GCC 16 Doloop Optimization Hooks for m68k (dbra/dbcc) */
+
+static bool
+m68k_can_use_doloop_p (const widest_int &, const widest_int &,
+		       unsigned int loop_depth, bool entered_at_top);
+static bool
+m68k_predict_doloop_p (class loop *loop);
+static machine_mode
+m68k_preferred_doloop_mode (machine_mode mode);
 
 /* Initialize the GCC target structure.  */
 
@@ -250,6 +258,14 @@ static bool m68k_use_lra_p (void);
 
 #undef TARGET_ASM_FILE_START_APP_OFF
 #define TARGET_ASM_FILE_START_APP_OFF true
+
+extern bool
+m68k_use_by_pieces_infrastructure_p (unsigned HOST_WIDE_INT size,
+				     unsigned int align,
+				     enum by_pieces_operation op,
+				     bool speed_p);
+#undef TARGET_USE_BY_PIECES_INFRASTRUCTURE_P
+#define TARGET_USE_BY_PIECES_INFRASTRUCTURE_P m68k_use_by_pieces_infrastructure_p
 
 #undef TARGET_LEGITIMIZE_ADDRESS
 #define TARGET_LEGITIMIZE_ADDRESS m68k_legitimize_address
@@ -296,11 +312,6 @@ static bool m68k_use_lra_p (void);
 
 #undef TARGET_CALLEE_SAVE_COST
 #define TARGET_CALLEE_SAVE_COST m68k_callee_save_cost
-
-#ifdef TARGET_AMIGAOS
-#undef TARGET_USE_BY_PIECES_INFRASTRUCTURE_P
-#define TARGET_USE_BY_PIECES_INFRASTRUCTURE_P m68k_amiga_use_by_pieces
-#endif
 
 #undef TARGET_ATTRIBUTE_TABLE
 #define TARGET_ATTRIBUTE_TABLE m68k_attribute_table
@@ -362,6 +373,26 @@ static bool m68k_use_lra_p (void);
 
 #undef TARGET_ASM_OUTPUT_ADDR_CONST_EXTRA
 #define TARGET_ASM_OUTPUT_ADDR_CONST_EXTRA m68k_output_addr_const_extra
+
+#undef TARGET_CAN_USE_DOLOOP_P
+#define TARGET_CAN_USE_DOLOOP_P can_use_doloop_if_innermost
+
+#undef TARGET_PREDICT_DOLOOP_P
+#define TARGET_PREDICT_DOLOOP_P m68k_predict_doloop_p
+
+#undef TARGET_HAVE_COUNT_REG_DECR_P
+#define TARGET_HAVE_COUNT_REG_DECR_P true
+
+/* 1000000000 is infinite cost in IVOPTs.  */
+/* #undef TARGET_DOLOOP_COST_FOR_GENERIC
+#define TARGET_DOLOOP_COST_FOR_GENERIC 1000000000 */
+
+#undef TARGET_DOLOOP_COST_FOR_ADDRESS
+#define TARGET_DOLOOP_COST_FOR_ADDRESS 1
+
+#undef TARGET_PREFERRED_DOLOOP_MODE
+#define TARGET_PREFERRED_DOLOOP_MODE m68k_preferred_doloop_mode
+
 
 #undef TARGET_C_EXCESS_PRECISION
 #define TARGET_C_EXCESS_PRECISION m68k_excess_precision
@@ -2167,6 +2198,19 @@ m68k_illegitimate_symbolic_constant_p (rtx x)
 	  && !offset_within_block_p (base, INTVAL (offset)))
 	return true;
     }
+
+  /* No relocation subtracts a symbol: (const (minus N (symbol_ref)))
+     has no immediate form, and under -fbaserel the subtrahend is the
+     RELOC16 unspec, whose "sym:W" spelling is not even an assembler
+     expression.  Only a constant or a label difference may be
+     subtracted; the movsi expander splits anything else.  */
+  if (GET_CODE (x) == CONST
+      && GET_CODE (XEXP (x, 0)) == MINUS
+      && !CONST_INT_P (XEXP (XEXP (x, 0), 1))
+      && !(GET_CODE (XEXP (XEXP (x, 0), 0)) == LABEL_REF
+	   && GET_CODE (XEXP (XEXP (x, 0), 1)) == LABEL_REF))
+    return true;
+
   return m68k_tls_reference_p (x, false);
 }
 
@@ -5187,15 +5231,15 @@ m68k_get_reloc_decoration (enum m68k_reloc reloc)
 	}
       else
 	{
-	  if (TARGET_68020)
+	if (TARGET_68020)
 	    {
-	      switch (flag_pic)
-		{
-		case 1:
-		  return ":w";
-		case 2:
-		  return ":l";
-		default:
+	  switch (flag_pic)
+	    {
+	    case 1:
+	      return ":w";
+	    case 2:
+	      return ":l";
+	    default:
 		  return "";
 		}
 	    }
@@ -5899,6 +5943,9 @@ m68k_secondary_reload_class (enum reg_class rclass,
 			     machine_mode mode, rtx x)
 {
   int regno;
+
+  if (rclass == ADDR_REGS)
+	  return NO_REGS;
 
   regno = true_regnum (x);
 
@@ -7356,28 +7403,10 @@ m68k_use_lra_p ()
   return m68k_lra_p;
 }
 
+
+
 #include "gt-m68k.h"
 
-
-extern bool
-m68k_68000_10_costs (rtx x, machine_mode mode, int outer_code,
-		int opno, int *total, bool speed );
-
-extern bool
-m68k_68020_costs (rtx x, machine_mode mode, int outer_code,
-		int opno, int *total, bool speed );
-
-extern bool
-m68k_68030_costs (rtx x, machine_mode mode, int outer_code,
-		int opno, int *total, bool speed );
-
-extern bool
-m68k_68040_costs (rtx x, machine_mode mode, int outer_code,
-		int opno, int *total, bool speed );
-
-extern bool
-m68k_68080_costs (rtx x, machine_mode mode, int outer_code,
-		int opno, int *total, bool speed );
 
 /* Implement TARGET_CALLEE_SAVE_COST.
 
@@ -7395,53 +7424,34 @@ m68k_68080_costs (rtx x, machine_mode mode, int outer_code,
 static int
 m68k_callee_save_cost (spill_cost_type, unsigned int hard_regno,
 		       machine_mode, unsigned int, int mem_cost,
-		       const HARD_REG_SET &, bool)
+		       const HARD_REG_SET &allocated_callee_save_regs, bool)
 {
-  return INT_REGNO_P (hard_regno) ? 0 : mem_cost;
-}
+  if (call_used_regs[hard_regno])
+    return 0;                      /* d0,d1,a0,a1: caller-saved, free */
 
-#ifdef TARGET_AMIGAOS
-/* Amiga libnix memcpy can dispatch through exec.library CopyMem.  For small,
-   constant block copies this call overhead outweighs a bounded sequence of
-   moves.  The generic speed threshold rejects even a 60-byte aligned copy.
-   Keep size optimization, byte-aligned copies and other operations on their
-   existing policy.  The generic piece expander still chooses access widths
-   using the actual alignment; this hook does not relax alignment constraints.
-
-   Note the mixed units: SIZE is in bytes, ALIGNMENT is in bits, so the
-   test below accepts copies of up to 128 bytes at word (16-bit) or better
-   alignment.  */
-static bool
-m68k_amiga_use_by_pieces (unsigned HOST_WIDE_INT size, unsigned int alignment,
-			 enum by_pieces_operation op, bool speed_p)
-{
-  if (speed_p && op == MOVE_BY_PIECES && alignment >= 16 && size <= 128)
-    return true;
-  return default_use_by_pieces_infrastructure_p (size, alignment, op, speed_p);
-}
+#ifdef TARGET_AMIGA
+  /* Callee-saved integer reg: charge full mem_cost for a lone save;
+     nearly free if it joins an existing movem group.  */
+  if (hard_reg_set_empty_p (allocated_callee_save_regs))
+    return mem_cost;
 #endif
+  return 0;
+}
+
+bool
+m68k_costs (rtx x,
+	    machine_mode mode,
+	    int outer_code ATTRIBUTE_UNUSED,
+	    int opno ATTRIBUTE_UNUSED,
+	    int *total,
+	    bool speed);
 
 static bool
 m68k_rtx_costs (rtx x, machine_mode mode, int outer_code,
 		int opno,
 		int *total, bool speed )
 {
-  bool r;
-  if (TUNE_68000_10)
-    r =  m68k_68000_10_costs(x, mode, outer_code, opno, total, speed);
-  else
-  if (m68k_tune == u68020)
-    r = m68k_68020_costs(x, mode, outer_code, opno, total, speed);
-  else
-  if (m68k_tune == u68030)
-    r = m68k_68030_costs(x, mode, outer_code, opno, total, speed);
-  else
-  if (m68k_tune == u68040 || m68k_tune == u68020_40)
-    r = m68k_68040_costs(x, mode, outer_code, opno, total, speed);
-  else
-    r = m68k_68080_costs(x, mode, outer_code, opno, total, speed);
-
-  return r;
+  return m68k_costs(x, mode, outer_code, opno, total, speed);
 }
 
 int m68k_address_cost(rtx x, machine_mode mode, addr_space_t t ATTRIBUTE_UNUSED, bool speed)
@@ -7452,4 +7462,40 @@ int m68k_address_cost(rtx x, machine_mode mode, addr_space_t t ATTRIBUTE_UNUSED,
   int total = 0;
   m68k_rtx_costs(&mem, mode, SET, 0, &total, speed);
   return total;
+}
+
+/* Modern GCC 16 Doloop Optimization Hooks for m68k (dbra/dbcc) */
+
+static bool
+m68k_can_use_doloop_p (const widest_int &, const widest_int &,
+		       unsigned int loop_depth, bool entered_at_top)
+{
+  /* dbra/dbcc loops on m68k are most efficient in the innermost loops.
+     We also require the loop to be entered at the top to avoid complex branch layout. */
+  if (loop_depth > 1 || !entered_at_top)
+    return false;
+
+  return true;
+}
+
+static bool
+m68k_predict_doloop_p (class loop *loop)
+{
+  /* Predict success for simple, predictable innermost loops so that IVOpts
+     preserves the scalar loop counter instead of turning it into a pointer comparison. */
+  if (loop->inner == NULL)
+    return true;
+
+  return false;
+}
+
+static machine_mode
+m68k_preferred_doloop_mode (machine_mode mode)
+{
+  /* dbra works on 16-bit (HImode) decrements natively, but if the loop count
+     is larger or already in SImode, SImode is fully supported by long-branch targets. */
+  if (mode == HImode || mode == QImode)
+    return HImode;
+
+  return SImode;
 }

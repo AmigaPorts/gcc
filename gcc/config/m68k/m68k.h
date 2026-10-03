@@ -19,6 +19,31 @@ along with GCC; see the file COPYING3.  If not see
 
 #define TARGET_M68K 1
 
+#ifndef M68K_SWITCHES_MODE
+#define M68K_SWITCHES_MODE 0
+#endif
+
+/* Compile-time defaults. One per switch. Current best. */
+#define M68K_SW_DEFAULT_m68k_cse_1        1
+#define M68K_SW_DEFAULT_m68k_gcse_1       0
+#define M68K_SW_DEFAULT_m68k_ira_color_1  1
+#define M68K_SW_DEFAULT_m68k_ira_color_2  1
+#define M68K_SW_DEFAULT_m68k_ira_color_3  0
+#define M68K_SW_DEFAULT_m68k_ira_costs_1  0
+#define M68K_SW_DEFAULT_m68k_ivopts_1     0
+#define M68K_SW_DEFAULT_m68k_ivopts_2     1
+#define M68K_SW_DEFAULT_m68k_ivopts_3     0
+
+/* Generic: explicit default */
+#if M68K_SWITCHES_MODE == 0
+#  define M68K_SW(name, dflt)   (dflt)
+#else
+#  define M68K_SW(name, dflt)   (getenv(name) != NULL ? 1 : (dflt))
+#endif
+
+/* Convenience: default derived from the switch name */
+#define M68K_SW_ON(name)        M68K_SW(#name, M68K_SW_DEFAULT_##name)
+
 #ifdef TARGET_AMIGAOS
 #define TARGET_AMIGA 1
 #else
@@ -261,14 +286,21 @@ along with GCC; see the file COPYING3.  If not see
 #define TUNE_68000	(m68k_tune == u68000)
 #define TUNE_68010	(m68k_tune == u68010)
 #define TUNE_68000_10	(TUNE_68000 || TUNE_68010)
+#define TUNE_68020	(m68k_tune == u68020 \
+			 || m68k_tune == u68020_40 \
+			 || m68k_tune == u68020_60)
 #define TUNE_68030	(m68k_tune == u68030 \
 			 || m68k_tune == u68020_40 \
 			 || m68k_tune == u68020_60)
 #define TUNE_68040	(m68k_tune == u68040 \
 			 || m68k_tune == u68020_40 \
 			 || m68k_tune == u68020_60)
-#define TUNE_68060	(m68k_tune == u68060 || m68k_tune == u68020_60)
 #define TUNE_68040_60	(TUNE_68040 || TUNE_68060)
+#define TUNE_68060	(m68k_tune == u68060 || m68k_tune == u68020_60)
+#define TUNE_68080	(m68k_tune == u68080)
+#define TUNE_68020_80	(TUNE_68020 || TUNE_68030 || TUNE_68040 || TUNE_68060 || TUNE_68080)
+#define TUNE_68040_80	(TUNE_68040 || TUNE_68060 || TUNE_68080)
+#define TUNE_68060_80	(TUNE_68060 || TUNE_68080)
 #define TUNE_CPU32	(m68k_tune == ucpu32)
 #define TUNE_CFV1       (m68k_tune == ucfv1)
 #define TUNE_CFV2	(m68k_tune == ucfv2)
@@ -970,3 +1002,11 @@ extern int m68k_sched_address_bypass_p (rtx_insn *, rtx_insn *);
 extern int m68k_sched_indexed_address_bypass_p (rtx_insn *, rtx_insn *);
 
 #define CPU_UNITS_QUERY 1
+
+int
+m68k_emit_movmemsi(rtx dest, rtx src, rtx length, rtx alignment,
+		   bool may_overlap);
+
+int
+m68k_emit_setmemsi(rtx dest, rtx val, rtx length, rtx alignment);
+

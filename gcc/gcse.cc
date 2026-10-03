@@ -2451,6 +2451,13 @@ pre_insert_copy_insn (struct gcse_expr *expr, rtx_insn *insn)
         new_insn = emit_insn_after (new_insn, insn);
     }
 
+  /* SBF: move REG_INC note. */
+  if (NEXT_INSN(insn) == new_insn && find_reg_note(insn, REG_INC, old_reg))
+    {
+      remove_note(insn, find_reg_note(insn, REG_INC, old_reg));
+      add_reg_note (new_insn, REG_INC, old_reg);
+    }
+
   gcse_create_count++;
 
   if (dump_file)
@@ -4409,6 +4416,11 @@ public:
 bool
 pass_rtl_hoist::gate (function *)
 {
+#if defined(TARGET_M68K)
+  if (M68K_SW_ON (m68k_gcse_1))
+    /* SBF: hoist is not good on m68k */
+    return false;
+#endif
   return optimize > 0 && flag_gcse
     && !cfun->calls_setjmp
     /* It does not make sense to run code hoisting unless we are optimizing

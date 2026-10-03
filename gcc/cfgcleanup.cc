@@ -2032,6 +2032,14 @@ try_crossjump_to_edge (int mode, edge e1, edge e2,
 	{
 	  rtx_insn *insn;
 
+#ifdef TARGET_M68K
+	  /* SBF: we need replicated labels, if the labels are too far away,
+	   * since on 68000 there are only 8 bits for the offset.
+	   */
+	  if (TUNE_68000_10)
+	    return false;
+#endif
+
 	  /* Replace references to LABEL1 with LABEL2.  */
 	  for (insn = get_insns (); insn; insn = NEXT_INSN (insn))
 	    {

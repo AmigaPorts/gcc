@@ -1586,6 +1586,18 @@ scan_one_insn (rtx_insn *insn)
 
       COSTS (costs, num)->mem_cost
 	-= ira_memory_move_cost[GET_MODE (reg)][cl][1] * frequency;
+
+
+#if defined(TARGET_M68K)
+      /* SBF: clamp mem_cost to the base reg-to-mem cost. */
+      if (M68K_SW_ON (m68k_ira_costs_1))
+	{
+	  int base = ira_memory_move_cost[GET_MODE (reg)][cl][1];
+	  if (COSTS (costs, num)->mem_cost < base)
+	    COSTS (costs, num)->mem_cost = base;
+	}
+#endif
+
       record_address_regs (GET_MODE (SET_SRC (set)),
 			   MEM_ADDR_SPACE (SET_SRC (set)),
 			   XEXP (SET_SRC (set), 0), 0, MEM, SCRATCH,
