@@ -990,6 +990,11 @@ mention_regs (rtx x)
 
       for (i = regno; i < endregno; i++)
 	{
+#if defined(TARGET_M68K)
+	  /* If the register is modified via auto-increment, force invalidation of old refs */
+	  if (this_insn && find_reg_note (this_insn, REG_INC, x))
+	    REG_TICK (i)++;
+#endif
 	  if (REG_IN_TABLE (i) >= 0 && REG_IN_TABLE (i) != REG_TICK (i))
 	    remove_invalid_refs (i);
 
@@ -1088,6 +1093,15 @@ insert_regs (rtx x, struct table_elt *classp, bool modified)
     {
       unsigned int regno = REGNO (x);
       int qty_valid;
+
+#ifdef TARGET_M68K
+      /* SBF: Never add auto inc regs! */
+      if (this_insn && find_reg_note (this_insn, REG_INC, x))
+	{
+	  make_new_qty (regno, GET_MODE (x));
+	  return true;
+	}
+#endif
 
       /* If REGNO is in the equivalence table already but is of the
 	 wrong mode for that equivalence, don't do anything here.  */
@@ -1830,6 +1844,15 @@ invalidate_reg (rtx x)
      overlap these registers.  */
 
   delete_reg_equiv (regno);
+  
+
+#if defined(TARGET_M68K)
+  /* Force a double tick if the register is modified by an active REG_INC note
+     to guarantee that cse doesn't reuse the stale pre-incremented value. */
+  if (this_insn && find_reg_note (this_insn, REG_INC, x))
+    REG_TICK (regno)++;
+#endif
+  
   REG_TICK (regno)++;
   SUBREG_TICKED (regno) = -1;
 
@@ -2880,6 +2903,14 @@ canon_reg (rtx x, rtx_insn *insn)
 	    || ! REGNO_QTY_VALID_P (REGNO (x)))
 	  return x;
 
+#if defined(TARGET_M68K)
+	/* DBF: If this pseudo-register is actively involved in an auto-increment
+	   or auto-decrement side effect chain in this EBB, do NOT canonicalize or replace it.
+	   Replacing it here corrupts it and triggers the auto_inc crash. */
+	if (this_insn && find_reg_note (this_insn, REG_INC, x))
+	  return x;
+#endif
+
 	q = REG_QTY (REGNO (x));
 	ent = &qty_table[q];
 	first = ent->first_reg;
@@ -3667,7 +3698,13 @@ fold_rtx (rtx x, rtx_insn *insn)
 			  && pow2p_hwi (- INTVAL (const_arg1)))
 		      || (HAVE_POST_DECREMENT
 			  && pow2p_hwi (- INTVAL (const_arg1)))))
-		break;
+		{
+#ifdef TARGET_M68K
+		  /* SBF: fold if defined once and multiple uses. */
+		  if (DF_REG_USE_COUNT(REGNO(folded_arg0)) <= 2 || DF_REG_DEF_COUNT(REGNO(folded_arg0)) > 1)
+		    break;
+#endif
+		}
 
 	      /* ??? Vector mode shifts by scalar
 		 shift operand are not supported yet.  */
@@ -5543,10 +5580,19 @@ cse_insn (rtx_insn *insn)
 	  /* Make sure that the rtx is not shared.  */
 	  src_const = copy_rtx (src_const);
 
+#if defined(TARGET_M68K)
+	  /* SBF: ignore regs marked as REG_INC to avoid stale compile-time values. */
+	  if (!find_reg_note (insn, REG_INC, dest))
+	    {
+#endif
+
 	  /* Record the actual constant value in a REG_EQUAL note,
 	     making a new one if one does not already exist.  */
 	  set_unique_reg_note (insn, REG_EQUAL, src_const);
 	  df_notes_rescan (insn);
+#if defined(TARGET_M68K)
+	}
+#endif
 	}
 
       /* Now deal with the destination.  */
@@ -6005,6 +6051,12 @@ cse_insn (rtx_insn *insn)
 	   outside the mode of GET_MODE (SUBREG_REG (dest)) are undefined.  */
 	if (paradoxical_subreg_p (dest))
 	  continue;
+
+#ifdef TARGET_M68K
+	/* SBF: ignore regs marked as REG_INC to prevent invalid graph building. */
+	if (find_reg_note (insn, REG_INC, dest))
+	  continue;
+#endif
 
 	elt = insert (dest, sets[i].src_elt,
 		      sets[i].dest_hash, GET_MODE (dest));
