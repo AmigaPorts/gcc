@@ -5886,6 +5886,16 @@ cse_insn (rtx_insn *insn)
 
   invalidate_from_clobbers (insn);
 
+#if defined(TARGET_M68K)
+  /* The m68k block move and set expanders emit auto-increment addresses
+     long before the auto_inc_dec pass, so a register named in a REG_INC
+     note no longer holds the value it was last set to.  Drop all its
+     equivalences, or a later use is rewritten to the incremented copy.  */
+  for (tem = REG_NOTES (insn); tem; tem = XEXP (tem, 1))
+    if (REG_NOTE_KIND (tem) == REG_INC)
+      invalidate (XEXP (tem, 0), VOIDmode);
+#endif
+
   /* Some registers are invalidated by subroutine calls.  Memory is
      invalidated by non-constant calls.  */
 
