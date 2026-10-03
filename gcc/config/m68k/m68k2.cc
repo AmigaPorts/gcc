@@ -751,8 +751,12 @@ m68k_emit_setmemsi(rtx blkdest, rtx val, rtx length, rtx alignment)
   return true;
 }
 
+/* MAY_OVERLAP is set by movmemsi (memmove): the blocks may overlap, so
+   the copy direction must be provable from the operands, otherwise the
+   libcall is the only safe choice.  cpymemsi passes false.  */
 int
-m68k_emit_movmemsi(rtx blkdest, rtx blksrc, rtx length, rtx alignment)
+m68k_emit_movmemsi(rtx blkdest, rtx blksrc, rtx length, rtx alignment,
+		   bool may_overlap)
 {
   int align = INTVAL(alignment);
   int size = INTVAL(length);
@@ -765,8 +769,10 @@ m68k_emit_movmemsi(rtx blkdest, rtx blksrc, rtx length, rtx alignment)
 
   /* Default direction is forward (POST_INC) starting at the beginning. */
   bool backward = false;
+  bool direction_known = false;
 
-  /* 1. Dynamic Overlap & Direction Check using get_inner_reference. */
+  /* 1. Overlap & Direction Check using get_inner_reference.  Only a
+     common base with constant offsets on both sides proves anything. */
   tree dest_expr = MEM_EXPR (blkdest);
   tree src_expr = MEM_EXPR (blksrc);
 
@@ -783,14 +789,17 @@ m68k_emit_movmemsi(rtx blkdest, rtx blksrc, rtx length, rtx alignment)
       tree src_base = get_inner_reference (src_expr, &s_bitsize, &s_bitpos, &s_offset_tree,
 					   &s_mode, &s_unsignedp, &s_reversep, &s_volatilep);
 
-      if (dest_base && src_base && dest_base == src_base)
+      if (dest_base && src_base && dest_base == src_base
+	  && (!d_offset_tree || TREE_CODE (d_offset_tree) == INTEGER_CST)
+	  && (!s_offset_tree || TREE_CODE (s_offset_tree) == INTEGER_CST)
+	  && d_bitpos.is_constant () && s_bitpos.is_constant ())
 	{
 	  HOST_WIDE_INT d_off = d_bitpos.to_constant() / BITS_PER_UNIT;
 	  HOST_WIDE_INT s_off = s_bitpos.to_constant() / BITS_PER_UNIT;
 
-	  if (d_offset_tree && TREE_CODE (d_offset_tree) == INTEGER_CST)
+	  if (d_offset_tree)
 	    d_off += TREE_INT_CST_LOW (d_offset_tree);
-	  if (s_offset_tree && TREE_CODE (s_offset_tree) == INTEGER_CST)
+	  if (s_offset_tree)
 	    s_off += TREE_INT_CST_LOW (s_offset_tree);
 
 	  if (MEM_OFFSET_KNOWN_P (blkdest))
@@ -798,11 +807,15 @@ m68k_emit_movmemsi(rtx blkdest, rtx blksrc, rtx length, rtx alignment)
 	  if (MEM_OFFSET_KNOWN_P (blksrc))
 	    s_off += MEM_OFFSET (blksrc).to_constant();
 
+	  direction_known = true;
 	  /* If destination is ahead of source and they overlap, switch to backward. */
 	  if (d_off > s_off && d_off < s_off + size)
 	    backward = true;
 	}
     }
+
+  if (may_overlap && !direction_known)
+    return false;
 
   /* 2. Adjust starting pointers if copying backward.
      Two additional instructions are emitted here to calculate the end of the blocks. */
