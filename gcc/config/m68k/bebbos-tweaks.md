@@ -103,7 +103,8 @@
 	      (use (match_operand:SI 3 "const_int_operand"))])]
   ""
 {
-	if (m68k_emit_movmemsi(operands[0], operands[1], operands[2], operands[3]))
+	if (m68k_emit_movmemsi(operands[0], operands[1], operands[2], operands[3],
+			       true))
 	  DONE;
 	else
 	  FAIL;
@@ -116,7 +117,8 @@
 	      (use (match_operand:SI 3 "const_int_operand"))])]
   ""
 {
-	if (m68k_emit_movmemsi(operands[0], operands[1], operands[2], operands[3]))
+	if (m68k_emit_movmemsi(operands[0], operands[1], operands[2], operands[3],
+			       false))
 	  DONE;
 	else
 	  FAIL;
