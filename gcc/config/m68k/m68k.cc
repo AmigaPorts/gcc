@@ -771,6 +771,12 @@ m68k_option_override (void)
       opt_fstack_limit_register_no = -1;
     }
 
+  /* Default to LRA: the old reload pass ICEs on some DImode code
+     (PR 127300, -O1 -fext-dce) and LRA is what upstream is
+     moving to.  -mno-lra still selects reload. */
+  if (!OPTION_SET_P (m68k_lra_p))
+    m68k_lra_p = 1;
+
   /* On m68k, the default IRA region handling produces worse code for
      functions with nested loops.  Default to mixed region unless the user
      explicitly asked for something else.  */
