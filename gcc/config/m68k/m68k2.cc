@@ -700,7 +700,11 @@ m68k_use_by_pieces_infrastructure_p (unsigned HOST_WIDE_INT size,
                                      enum by_pieces_operation op ATTRIBUTE_UNUSED,
                                      bool speed_p ATTRIBUTE_UNUSED)
 {
-  if (align == 16) align = 32;
+  /* ALIGN is in bits.  Word alignment is as good as long alignment for
+     the pieces, and nothing beyond a long helps: a 16384-byte aligned
+     struct must not turn a 48 KB memset into thousands of stores
+     (c-c++-common/torture/builtin-clear-padding-2.c at -Os).  */
+  if (align >= 16) align = 32;
   unsigned HOST_WIDE_INT max = get_env_uint ("M68K_BY_PIECES_MAX", 48);
   return size * 32 <= max * align;
 }
