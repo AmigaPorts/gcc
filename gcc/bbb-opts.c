@@ -3416,7 +3416,10 @@ opt_strcpy ()
 		{
 		  /* now check via NOTICE_UPDATE_CC*/
 		  NOTICE_UPDATE_CC(PATTERN (reg2x), reg2x);
-		  if (cc_status.flags == 0 && rtx_equal_p (dst, cc_status.value2))
+		  /* and never into an address register: a move to An sets no
+		     flags, so it can never stand in for the tst (eriQue) */
+		  if (cc_status.flags == 0 && rtx_equal_p (dst, cc_status.value2)
+		      && !ADDRESS_REG_P (SET_DEST (single_set (reg2x))))
 		    {
 		      rtx pattern = gen_rtx_SET(SET_DEST(single_set (reg2x)), SET_SRC(single_set (x2reg)));
 		      rtx_insn * newinsn = make_insn_raw (pattern);
