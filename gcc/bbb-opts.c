@@ -3414,7 +3414,11 @@ opt_strcpy ()
 //	      if (CONST_INT_P(src) && INTVAL(src) == 0 && find_reg_note (insn, REG_DEAD, dst))
 	      if (REG_P(dst) && REGNO(dst) == REGNO(theReg) && CONST_INT_P(src) && INTVAL(src) == 0 && is_reg_dead (REGNO(dst), index))
 		{
-		  /* now check via NOTICE_UPDATE_CC*/
+		  /* now check via NOTICE_UPDATE_CC, from a clean state: a move
+		     to an address register leaves cc_status untouched, and a
+		     stale value2 == dst from an earlier insn made this merge
+		     `move x,aN` -- which sets no flags -- and drop the tst.  */
+		  CC_STATUS_INIT;
 		  NOTICE_UPDATE_CC(PATTERN (reg2x), reg2x);
 		  /* and never into an address register: a move to An sets no
 		     flags, so it can never stand in for the tst (eriQue) */
