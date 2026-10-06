@@ -18,6 +18,15 @@ __attribute__((noinline,noclone)) void up_longs(long *p)
 __attribute__((noinline,noclone)) void up_in_struct(struct s *s)
 { __builtin_memmove(s->b + 1, s->b, 16); }
 
+/* Same base and constant offsets: here the expander does know the
+   direction.  Odd length, word-aligned start: the backward copy must
+   not fault on a 68000.  */
+static char g[64] __attribute__((aligned(2)));
+__attribute__((noinline,noclone)) void up_global(void)
+{ __builtin_memmove(g + 2, g, 53); }
+__attribute__((noinline,noclone)) void down_global(void)
+{ __builtin_memmove(g, g + 2, 53); }
+
 int main(void)
 {
   char a[20];
@@ -40,6 +49,16 @@ int main(void)
   for (i = 0; i < 40; i++) st.b[i] = 'a' + i;
   up_in_struct(&st);
   for (i = 1; i < 17; i++) if (st.b[i] != 'a' + i - 1) abort();
+
+  for (i = 0; i < 64; i++) g[i] = i;
+  up_global();
+  for (i = 2; i < 55; i++) if (g[i] != i - 2) abort();
+  if (g[55] != 55) abort();
+
+  for (i = 0; i < 64; i++) g[i] = i;
+  down_global();
+  for (i = 0; i < 53; i++) if (g[i] != i + 2) abort();
+  if (g[53] != 53) abort();
 
   return 0;
 }
