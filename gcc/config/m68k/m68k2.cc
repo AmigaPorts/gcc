@@ -661,9 +661,14 @@ m68k_emit_setmemsi(rtx blkdest, rtx val, rtx length, rtx alignment)
   int rest = 0;
 
   int value = INTVAL(val) & 0xff;
+  /* Below the 68020 an odd word or long access faults, so byte-aligned
+     blocks go byte by byte there.  This depends on the CPU selected, not
+     on -mtune: -m68000 -mtune=68020-60 still runs on a 68000.  */
+  const bool bytewise = align == 1 && !TARGET_68020;
+
   if (value != 0)
     {
-      if (align == 1 && TUNE_68000_10)
+      if (bytewise)
         {
 	  src = gen_reg_rtx(QImode);
 	  emit_move_insn (src, GEN_INT((signed char )value));
@@ -691,7 +696,7 @@ m68k_emit_setmemsi(rtx blkdest, rtx val, rtx length, rtx alignment)
   regdst = dst;
 
   /* move bytes. */
-  if (align == 1 && TUNE_68000_10)
+  if (bytewise)
     {
       dst = gen_rtx_MEM(QImode, gen_rtx_POST_INC(SImode, regdst));
     }
@@ -793,10 +798,14 @@ m68k_emit_movmemsi(rtx blkdest, rtx blksrc, rtx length, rtx alignment,
       tree src_base = get_inner_reference (src_expr, &s_bitsize, &s_bitpos, &s_offset_tree,
 					   &s_mode, &s_unsignedp, &s_reversep, &s_volatilep);
 
+      /* get_memory_rtx keeps the base object but clears MEM_OFFSET when
+	 it strips an address expression, so an unknown offset proves
+	 nothing.  */
       if (dest_base && src_base && dest_base == src_base
 	  && (!d_offset_tree || TREE_CODE (d_offset_tree) == INTEGER_CST)
 	  && (!s_offset_tree || TREE_CODE (s_offset_tree) == INTEGER_CST)
-	  && d_bitpos.is_constant () && s_bitpos.is_constant ())
+	  && d_bitpos.is_constant () && s_bitpos.is_constant ()
+	  && MEM_OFFSET_KNOWN_P (blkdest) && MEM_OFFSET_KNOWN_P (blksrc))
 	{
 	  HOST_WIDE_INT d_off = d_bitpos.to_constant() / BITS_PER_UNIT;
 	  HOST_WIDE_INT s_off = s_bitpos.to_constant() / BITS_PER_UNIT;
@@ -806,10 +815,8 @@ m68k_emit_movmemsi(rtx blkdest, rtx blksrc, rtx length, rtx alignment,
 	  if (s_offset_tree)
 	    s_off += TREE_INT_CST_LOW (s_offset_tree);
 
-	  if (MEM_OFFSET_KNOWN_P (blkdest))
-	    d_off += MEM_OFFSET (blkdest).to_constant();
-	  if (MEM_OFFSET_KNOWN_P (blksrc))
-	    s_off += MEM_OFFSET (blksrc).to_constant();
+	  d_off += MEM_OFFSET (blkdest).to_constant();
+	  s_off += MEM_OFFSET (blksrc).to_constant();
 
 	  direction_known = true;
 	  /* If destination is ahead of source and they overlap, switch to backward. */
@@ -819,6 +826,13 @@ m68k_emit_movmemsi(rtx blkdest, rtx blksrc, rtx length, rtx alignment,
     }
 
   if (may_overlap && !direction_known)
+    return false;
+
+  /* See m68k_emit_setmemsi: byte by byte below the 68020 when the
+     block is byte aligned.  A backward copy of odd length starts its
+     wide accesses at an odd address, which faults there too.  */
+  const bool bytewise = align == 1 && !TARGET_68020;
+  if (backward && (size & 1) && !bytewise && !TARGET_68020)
     return false;
 
   /* 2. Adjust starting pointers if copying backward.
@@ -841,7 +855,7 @@ m68k_emit_movmemsi(rtx blkdest, rtx blksrc, rtx length, rtx alignment,
   regdst = dst;
 
   /* 3. Dynamically generate either POST_INC or PRE_DEC MEM expressions. */
-  if (align == 1 && TUNE_68000_10)
+  if (bytewise)
     {
       src = gen_rtx_MEM(QImode, backward ? gen_rtx_PRE_DEC(SImode, regsrc)
                                          : gen_rtx_POST_INC(SImode, regsrc));
