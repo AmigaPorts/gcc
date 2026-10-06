@@ -28,7 +28,6 @@ along with GCC; see the file COPYING3.  If not see
 #define M68K_SW_DEFAULT_m68k_gcse_1       0
 #define M68K_SW_DEFAULT_m68k_ira_color_1  1
 #define M68K_SW_DEFAULT_m68k_ira_color_2  1
-#define M68K_SW_DEFAULT_m68k_ira_color_3  0
 #define M68K_SW_DEFAULT_m68k_ira_costs_1  0
 #define M68K_SW_DEFAULT_m68k_ivopts_1     0
 #define M68K_SW_DEFAULT_m68k_ivopts_2     1
