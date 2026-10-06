@@ -2166,14 +2166,6 @@ assign_hard_reg (ira_allocno_t a, bool retry_p)
 	    {
 	      int k, *conflict_costs;
 
-#if defined(TARGET_M68K)
-	      /* SBF: minimize costs if already 'may_be_spilled_p'. */
-	      if (M68K_SW_ON (m68k_ira_color_3)
-		  && ALLOCNO_NUM_OBJECTS (a) > 1
-		  && ALLOCNO_COLOR_DATA (conflict_a)->may_be_spilled_p)
-		continue;
-#endif
-
 	      ALLOCNO_COLOR_DATA (conflict_a)->last_process
 		= curr_allocno_process;
 	      ira_allocate_and_copy_costs
