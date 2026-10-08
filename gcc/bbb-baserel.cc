@@ -92,53 +92,63 @@ namespace
   static rtx cur_symbol[8];
   static rtx cur_tmp_reg[8];
 
+  /* Is DECL addressed through a4?  Only a writable variable in the data
+     segment is; everything else keeps its absolute address.  A bare
+     symbol and a symbol plus offset must agree on this: the hunk linker
+     resolves a4-relative relocs as data-hunk offsets, so a text or
+     far-section target would get a wrong, in-range displacement.  */
+  static bool baserel_symbol_p (tree decl)
+  {
+    if (!decl)
+      return false;
+    // only handle VAR non CONST
+    if (decl->base.code != VAR_DECL)
+      return false;
+
+    // a section means: a4 unless the section is ".datachip" ".datafast" ".datafar"
+    char const * secname = DECL_SECTION_NAME(decl);
+    if (secname && (
+	   0 == strcmp(secname, ".datachip")
+	|| 0 == strcmp(secname, ".datafast")
+	|| 0 == strcmp(secname, ".datafar")))
+      return false;
+
+    if (secname == 0)
+      {
+	/* Standardized hook call: Query the official target section selector.
+	   If it decides that this variable belongs into the text_section,
+	   it resides in the read-only segment and must bypass the baserel a4 tracking. */
+	if (targetm.asm_out.select_section (decl, 0, 0) == text_section)
+	  return false; /* Keep it as an absolute text-segment reference, skip a4. */
+
+	/* Fallback for safety if explicitly written section flags exist */
+	if (decl->base.constant_flag || decl->base.readonly_flag || TREE_READONLY (decl))
+	  return false;
+      }
+    else
+      {
+	if (0 == strcmp(".text", secname))
+	  return false;
+      }
+
+    if (secname == 0 || strcmp(".data", secname))
+      {
+	section * sec = get_variable_section(decl, false);
+	if ( (sec->common.flags & SECTION_WRITE) == 0)
+	  return false;
+      }
+
+    return true;
+  }
+
   int make_pic_ref(rtx_insn * insn, rtx * x, bool * use_tmp)
   {
     int r = 0;
     enum rtx_code code = GET_CODE(*x);
     if (code == SYMBOL_REF)
       {
-	tree decl = SYMBOL_REF_DECL (*x);
-	if (!decl)
+	if (!baserel_symbol_p (SYMBOL_REF_DECL (*x)))
 	  return 0;
-	// only handle VAR non CONST
-	if (decl->base.code != VAR_DECL)
-	  return 0;
-
-	// a section means: a4 unless the section is ".datachip" ".datafast" ".datafar"
-	char const * secname = DECL_SECTION_NAME(decl);
-	if (secname && (
-	       0 == strcmp(secname, ".datachip")
-	    || 0 == strcmp(secname, ".datafast")
-	    || 0 == strcmp(secname, ".datafar")))
-	  return 0;
-
-	if (secname == 0)
-	  {
-	    /* Standardized hook call: Query the official target section selector.
-	       If it decides that this variable belongs into the text_section,
-	       it resides in the read-only segment and must bypass the baserel a4 tracking. */
-	    if (targetm.asm_out.select_section (decl, 0, 0) == text_section)
-	      {
-		return 0; /* Keep it as an absolute text-segment reference, skip a4. */
-	      }
-
-	    /* Fallback for safety if explicitly written section flags exist */
-	    if (decl->base.constant_flag || decl->base.readonly_flag || TREE_READONLY (decl))
-	      return 0;
-	  }
-	else
-	  {
-	    if (0 == strcmp(".text", secname))
-	      return 0;
-	  }
-
-	if (secname == 0 || strcmp(".data", secname))
-	  {
-	    section * sec = get_variable_section(decl, false);
-	    if ( (sec->common.flags & SECTION_WRITE) == 0)
-	      return 0;
-	  }
 
 //	  if (decl)
 //	    printf("%s: %8x %d\n", decl->decl_minimal.name->identifier.id.str, sec ? sec->common.flags : 0, ispic);
@@ -229,22 +239,14 @@ namespace
           {
             rtx symbol = XEXP(XEXP(*x, 0), 0);
             rtx offset = XEXP(XEXP(*x, 0), 1);
-            tree decl = SYMBOL_REF_DECL (symbol);
 
-            if (decl)
-              {
-                /* Fix for Amiga -mbaserel (PR36038):
-                   Check if this constant expression points to a read-only symbol
-                   inside the text segment. If targetm says it's text_section,
-                   we MUST return 0 here and leave the absolute address untouched! */
-                if (targetm.asm_out.select_section (decl, 0, 0) == text_section)
-                  return 0;
+            /* Same verdict as for the bare symbol: a read-only object, a
+               function, or a chip/fast/far variable keeps its absolute
+               address, offset or not.  */
+            if (!baserel_symbol_p (SYMBOL_REF_DECL (symbol)))
+              return 0;
 
-                if (decl->base.constant_flag || decl->base.readonly_flag || TREE_READONLY (decl))
-                  return 0;
-              }
-
-            /* If it's a real mutable data symbol, proceed with baserel conversion using a tmp reg */
+            /* A mutable data symbol: proceed with baserel conversion using a tmp reg */
             rtx pic_ref = gen_rtx_PLUS(Pmode, picreg,
   					gen_rtx_CONST(Pmode,
   					gen_rtx_UNSPEC(Pmode,
