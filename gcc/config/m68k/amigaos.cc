@@ -387,7 +387,9 @@ amiga_select_section (tree decl, int reloc ATTRIBUTE_UNUSED,
 	  if (type && type->base.code == ARRAY_TYPE)
 	    {
 	      tree elem = type->typed.type;
-	      if (elem && (type->base.readonly_flag || TYPE_READONLY(elem) || TREE_READONLY(elem)))
+	      /* TYPE_READONLY is the type-node form of the same flag; TREE_READONLY
+		 asserts a non-type node and aborts under --enable-checking.  */
+	      if (elem && (type->base.readonly_flag || TYPE_READONLY (elem)))
 		return text_section;
 	    }
 
