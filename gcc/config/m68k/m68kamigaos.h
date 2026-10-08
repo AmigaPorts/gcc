@@ -41,6 +41,13 @@ along with GCC; see the file COPYING3.  If not see
    ignored instead of emitting directives.  */
 #undef HAVE_GAS_HIDDEN
 
+/* With HAVE_GAS_HIDDEN undefined the default hook warns for every decl
+   whose visibility is not default, including the cross-partition statics
+   LTO partitioning promotes to hidden.  Warn only for a visibility the
+   user wrote.  */
+#undef TARGET_ASM_ASSEMBLE_VISIBILITY
+#define TARGET_ASM_ASSEMBLE_VISIBILITY amigaos_assemble_visibility
+
 #define HAS_INIT_SECTION
 
 /* A hunk is placed by LoadSeg with AllocMem, which returns MEM_BLOCKSIZE

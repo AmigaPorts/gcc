@@ -44,3 +44,6 @@ amigaos_alternate_frame_setup_f (int fsize);
 
 extern void
 amigaos_alternate_frame_setup (int fsize);
+
+extern void
+amigaos_assemble_visibility (tree decl, int vis);

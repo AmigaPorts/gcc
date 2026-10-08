@@ -181,6 +181,27 @@ amigaos_handle_type_attribute (tree *node, tree name, tree args ATTRIBUTE_UNUSED
 #define AMIGA_FAST_SECTION_NAME ".datafast"
 #define AMIGA_FAR_SECTION_NAME  ".datafar"
 
+/* Implement TARGET_ASM_ASSEMBLE_VISIBILITY.  The hunk format has no symbol
+   visibility, so nothing is emitted.  maybe_assemble_visibility calls this
+   for any decl whose DECL_VISIBILITY is not default.  That includes the
+   statics LTO partitioning promotes to hidden so another partition can
+   reach them (promote_symbol in lto-partition.cc), which carry no
+   attribute; warning for those would put one diagnostic per promoted
+   symbol in every -flto link.  Warn only when the decl has a "visibility"
+   attribute the user wrote, as the default hook does for every decl.
+   Only the diagnostic changes: no directive was emitted before either, and
+   "used" and "externally_visible" are not consulted here.  */
+
+void
+amigaos_assemble_visibility (tree decl, int vis ATTRIBUTE_UNUSED)
+{
+  if (!DECL_ARTIFICIAL (decl)
+      && lookup_attribute ("visibility", DECL_ATTRIBUTES (decl)))
+    warning_at (DECL_SOURCE_LOCATION (decl), OPT_Wattributes,
+		"visibility attribute not supported "
+		"in this configuration; ignored");
+}
+
 void
 amigaos_insert_attribute (tree decl, tree * attr)
 {
