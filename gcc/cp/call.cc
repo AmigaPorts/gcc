@@ -9778,6 +9778,11 @@ convert_default_arg (tree type, tree arg, tree fn, int parmnum,
   if (fn && DECL_TEMPLATE_INFO (fn))
     arg = tsubst_default_argument (fn, parmnum, type, arg, complain);
 
+  /* A folded explicit cast keeps the source convention.  Remember its
+     marker before the copy moves the expression to the call site.  */
+  bool explicit_cast = callconv_explicit_cast_p (arg);
+  warning_sentinel w (warn_callconv_mismatch, explicit_cast);
+
   /* Due to:
 
        [dcl.fct.default]

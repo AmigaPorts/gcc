@@ -9011,6 +9011,7 @@ extern tree cp_build_modify_expr		(location_t, tree,
 extern tree convert_for_initialization		(tree, tree, tree, int,
 						 impl_conv_rhs, tree, int,
                                                  tsubst_flags_t);
+extern bool callconv_explicit_cast_p		(tree);
 extern void maybe_warn_callconv_mismatch	(location_t, tree, tree, bool,
 					 location_t = UNKNOWN_LOCATION,
 					 location_t = UNKNOWN_LOCATION);
