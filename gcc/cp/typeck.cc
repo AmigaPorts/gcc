@@ -8607,22 +8607,60 @@ callconv_mismatch_p (tree type1, tree type2)
 	  && targetm.comp_type_attributes (type1, type2) == 2);
 }
 
+/* Keep explicit casts separate from already-issued diagnostics: an operand
+   with a prior diagnostic must not suppress a new conditional mismatch.
+   This map contains source locations only, and does not change trees.  */
+
+/* True marks an explicit cast; false marks an issued diagnostic.
+   Preserve these marks in precompiled headers too.  */
+static GTY(()) hash_map<location_hash, bool> *callconv_locations;
+
+static bool
+callconv_explicit_cast_at (location_t loc)
+{
+  if (!callconv_locations)
+    return false;
+  const bool *cast = callconv_locations->get (get_pure_location (loc));
+  return cast && *cast;
+}
+
+static void
+mark_callconv_location (location_t loc, bool explicit_cast)
+{
+  if (!callconv_locations)
+    callconv_locations = hash_map<location_hash, bool>::create_ggc (13);
+  callconv_locations->put (get_pure_location (loc), explicit_cast);
+}
+
 /* Warn at LOC, once, if TYPE2 converted to TYPE1 changes the calling
    convention (COND_P false), or if TYPE1 and TYPE2 are the operand types
-   of a conditional expression (COND_P true).  An explicit cast at LOC
-   (maybe_warn_about_useless_cast) has already turned the warning off.  */
+   of a conditional expression (COND_P true).  LOC1 and LOC2 are the
+   original conditional operand locations, before implicit conversions.  */
 
 void
 maybe_warn_callconv_mismatch (location_t loc, tree type1, tree type2,
-			      bool cond_p)
+			      bool cond_p, location_t loc1, location_t loc2)
 {
   /* Keyed on the caret: a conditional between two functions is built
      again, between pointers, when it decays, at the same caret.  */
   location_t key = get_pure_location (loc);
   bool known = !RESERVED_LOCATION_P (key);
-  if ((known && warning_suppressed_at (key, OPT_Wcallconv_mismatch))
+  if ((known && callconv_locations && callconv_locations->get (key))
       || !callconv_mismatch_p (type1, type2))
     return;
+
+  /* A folded explicit cast retains its operand's function type.  Honor
+     the cast even though the conditional has a different caret, and
+     propagate the mark to conversions of the conditional's result.  */
+  if (cond_p
+      && (callconv_explicit_cast_at (loc1)
+	  || callconv_explicit_cast_at (loc2)))
+    {
+      if (known)
+	mark_callconv_location (key, true);
+      return;
+    }
+
   if (cond_p)
     warning_at (loc, OPT_Wcallconv_mismatch,
 		"conditional expression between pointers to functions "
@@ -8632,20 +8670,23 @@ maybe_warn_callconv_mismatch (location_t loc, tree type1, tree type2,
 		"conversion between pointers to functions with "
 		"different calling conventions");
   if (known)
-    suppress_warning_at (key, OPT_Wcallconv_mismatch);
+    mark_callconv_location (key, false);
 }
 
 /* Warns if the cast from expression EXPR to type TYPE is useless.  */
 void
 maybe_warn_about_useless_cast (location_t loc, tree type, tree expr,
-			       tsubst_flags_t complain)
+			       tsubst_flags_t complain, tree result)
 {
   /* The cast is useless to C++ even between function types that differ in
      calling convention, so its result keeps EXPR's type; the cast still
      tells -Wcallconv-mismatch not to diagnose the result's conversion.  */
+  /* With a user-defined conversion, EXPR is a class object; inspect the
+     cast result too, since its function pointer type can differ from TYPE.  */
   if (!RESERVED_LOCATION_P (loc)
-      && callconv_mismatch_p (type, TREE_TYPE (expr)))
-    suppress_warning_at (get_pure_location (loc), OPT_Wcallconv_mismatch);
+      && (callconv_mismatch_p (type, TREE_TYPE (expr))
+	  || (result && callconv_mismatch_p (type, TREE_TYPE (result)))))
+    mark_callconv_location (loc, true);
 
   if (warn_useless_cast
       && complain & tf_warning)
@@ -9109,7 +9150,7 @@ build_static_cast (location_t loc, tree type, tree oexpr,
     {
       if (result != error_mark_node)
 	{
-	  maybe_warn_about_useless_cast (loc, type, expr, complain);
+	  maybe_warn_about_useless_cast (loc, type, expr, complain, result);
 	  maybe_warn_about_cast_ignoring_quals (loc, type, complain);
 	}
       if (processing_template_decl)
@@ -9432,7 +9473,7 @@ build_reinterpret_cast (location_t loc, tree type, tree expr,
 				/*valid_p=*/NULL, complain);
   if (r != error_mark_node)
     {
-      maybe_warn_about_useless_cast (loc, type, expr, complain);
+      maybe_warn_about_useless_cast (loc, type, expr, complain, r);
       maybe_warn_about_cast_ignoring_quals (loc, type, complain);
     }
   protected_set_expr_location (r, loc);
@@ -9618,7 +9659,7 @@ build_const_cast (location_t loc, tree type, tree expr,
   r = build_const_cast_1 (loc, type, expr, complain, /*valid_p=*/NULL);
   if (r != error_mark_node)
     {
-      maybe_warn_about_useless_cast (loc, type, expr, complain);
+      maybe_warn_about_useless_cast (loc, type, expr, complain, r);
       maybe_warn_about_cast_ignoring_quals (loc, type, complain);
     }
   protected_set_expr_location (r, loc);
@@ -9727,7 +9768,7 @@ cp_build_c_cast (location_t loc, tree type, tree expr,
     {
       if (result != error_mark_node)
 	{
-	  maybe_warn_about_useless_cast (loc, type, value, complain);
+	  maybe_warn_about_useless_cast (loc, type, value, complain, result);
 	  maybe_warn_about_cast_ignoring_quals (loc, type, complain);
 	}
       else if (complain & tf_error)
@@ -9751,7 +9792,7 @@ cp_build_c_cast (location_t loc, tree type, tree expr,
     {
       tree result_type;
 
-      maybe_warn_about_useless_cast (loc, type, value, complain);
+      maybe_warn_about_useless_cast (loc, type, value, complain, result);
       maybe_warn_about_cast_ignoring_quals (loc, type, complain);
 
       /* Non-class rvalues always have cv-unqualified type.  */
@@ -12500,3 +12541,5 @@ c_decl_implicit (const_tree)
 {
   return false;
 }
+
+#include "gt-cp-typeck.h"

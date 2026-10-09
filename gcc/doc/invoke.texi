@@ -9488,8 +9488,10 @@ suppress such a warning.
 @item -Wno-callconv-mismatch
 Do not warn when a pointer to a function is converted to a pointer to a
 function with a different calling convention, by assignment,
-initialization, argument passing, return or a conditional expression.  The
-conversion is still accepted; comparisons and explicit casts are not
+initialization, argument passing, return or a conditional expression.  In
+C++ and Objective-C++, this also covers conversions and conditionals between
+pointers to member functions.  The conversion is still accepted;
+comparisons and explicit casts are not
 diagnosed.  On m68k AmigaOS the calling conventions differ when an argument
 is passed in a different register or on the stack instead.  This warning
 is enabled by default.

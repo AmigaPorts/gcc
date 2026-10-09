@@ -9011,8 +9011,9 @@ extern tree cp_build_modify_expr		(location_t, tree,
 extern tree convert_for_initialization		(tree, tree, tree, int,
 						 impl_conv_rhs, tree, int,
                                                  tsubst_flags_t);
-extern void maybe_warn_callconv_mismatch	(location_t, tree, tree,
-						 bool);
+extern void maybe_warn_callconv_mismatch	(location_t, tree, tree, bool,
+					 location_t = UNKNOWN_LOCATION,
+					 location_t = UNKNOWN_LOCATION);
 extern int comp_ptr_ttypes			(tree, tree);
 extern bool comp_ptr_ttypes_const		(tree, tree, compare_bounds_t);
 extern bool error_type_p			(const_tree);
@@ -9067,7 +9068,8 @@ extern void check_template_keyword		(tree);
 extern bool check_raw_literal_operator		(const_tree decl);
 extern bool check_literal_operator_args		(const_tree, bool *, bool *);
 extern void maybe_warn_about_useless_cast       (location_t, tree, tree,
-						 tsubst_flags_t);
+						 tsubst_flags_t,
+						 tree = NULL_TREE);
 extern tree cp_perform_integral_promotions      (tree, tsubst_flags_t);
 
 extern tree finish_left_unary_fold_expr      (location_t, tree, int);

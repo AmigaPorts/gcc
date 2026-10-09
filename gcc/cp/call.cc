@@ -986,6 +986,18 @@ strip_standard_conversion (conversion *conv)
   return conv;
 }
 
+/* Return the type produced by the selected user-defined conversion, or
+   NULL_TREE for a standard conversion.  Its following identity conversion
+   can be folded away because C++ considers the two conventions equivalent.  */
+
+static tree
+callconv_user_conversion_type (conversion *conv)
+{
+  conversion *user = strip_standard_conversion (conv);
+  return (user && user->kind == ck_user
+	  ? non_reference (user->type) : NULL_TREE);
+}
+
 /* Subroutine of build_aggr_conv: check whether FROM is a valid aggregate
    initializer for array type ATYPE.  */
 
@@ -6588,7 +6600,9 @@ build_conditional_expr (const op_location_t &loc,
 
  valid_operands:
   if (complain & tf_warning)
-    maybe_warn_callconv_mismatch (loc, arg2_type, arg3_type, true);
+    maybe_warn_callconv_mismatch (loc, arg2_type, arg3_type, true,
+				  cp_expr_loc_or_loc (orig_arg2, loc),
+				  cp_expr_loc_or_loc (orig_arg3, loc));
 
   if (processing_template_decl && is_glvalue)
     {
@@ -10647,8 +10661,10 @@ build_over_call (struct z_candidate *cand, int flags, tsubst_flags_t complain)
       if (arg_complain & tf_warning)
 	{
 	  maybe_warn_pessimizing_move (arg, type, /*return_p=*/false);
+	  tree from_type = callconv_user_conversion_type (conv);
 	  maybe_warn_callconv_mismatch (cp_expr_loc_or_input_loc (arg), type,
-						TREE_TYPE (arg), false);
+				       from_type ? from_type : TREE_TYPE (arg),
+				       false);
 	}
 
       tree val = convert_like_with_context (conv, arg, fn,
@@ -14139,6 +14155,13 @@ perform_implicit_conversion_flags (tree type, tree expr,
   conv = implicit_conversion (type, TREE_TYPE (expr), expr,
 			      /*c_cast_p=*/false,
 			      flags, complain);
+
+  /* Default arguments are first checked in an unevaluated context;
+     diagnose their actual conversion at each call that uses them.  */
+  if (conv && !conv->bad_p && !cp_unevaluated_operand
+      && (complain & tf_warning))
+    if (tree from_type = callconv_user_conversion_type (conv))
+      maybe_warn_callconv_mismatch (loc, type, from_type, false);
 
   if (!conv)
     {
