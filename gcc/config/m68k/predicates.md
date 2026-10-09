@@ -175,11 +175,13 @@
        (and (match_test "m68k_symbolic_jump != NULL")
 	    (match_operand 0 "symbolic_operand"))))
 
-;; An operand that can be used as the address in a sibcall insn.
+;; An operand that can be used as the address in a sibcall insn: a direct
+;; branch target, or the scratch address register (a0 or a1) that
+;; m68k_legitimize_sibcall_address loaded the target into.
 (define_predicate "sibcall_operand"
   (ior (match_operand 0 "const_sibcall_operand")
        (and (match_code "reg")
-	    (match_test "REGNO (op) == STATIC_CHAIN_REGNUM"))))
+	    (match_test "REGNO (op) == A0_REG || REGNO (op) == A1_REG"))))
 
 ;; TODO: Add a comment here.
 

@@ -1340,9 +1340,20 @@ m68k_expand_epilogue (bool sibcall_p)
       && !restore_from_sp
       && (current_frame.reg_mask || current_frame.fpu_mask))
     {
-      if (TARGET_COLDFIRE
-	  && (current_frame.reg_no >= MIN_MOVEM_REGS
-	      || current_frame.fpu_no >= MIN_FMOVEM_REGS))
+      if (sibcall_p)
+	{
+	  /* Before a sibcall a1 may hold the call target or an argument,
+	     so walk the stack pointer down to the save area without a
+	     scratch register, on every CPU.  */
+	  emit_move_insn (stack_pointer_rtx, frame_pointer_rtx);
+	  emit_insn (gen_blockage ());
+	  emit_insn (gen_addsi3 (stack_pointer_rtx, stack_pointer_rtx,
+				 GEN_INT (-(current_frame.offset + fsize))));
+	  restore_from_sp = true;
+	}
+      else if (TARGET_COLDFIRE
+	       && (current_frame.reg_no >= MIN_MOVEM_REGS
+		   || current_frame.fpu_no >= MIN_FMOVEM_REGS))
 	{
 	  /* ColdFire's move multiple instructions do not support the
 	     (d8,Ax,Xi) addressing mode, so we're as well using a normal
@@ -1555,6 +1566,12 @@ m68k_legitimize_call_address (rtx x)
 
 /* Likewise for sibling calls.  */
 
+/* The hard register the target of the sibcall being expanded is loaded
+   into when it cannot stay a direct branch.  TARGET_FUNCTION_OK_FOR_SIBCALL
+   (m68k_is_ok_for_sibcall) picks a scratch address register that carries
+   no argument of that call, right before expand_call sets the call up.  */
+int m68k_sibcall_target_regno = STATIC_CHAIN_REGNUM;
+
 rtx
 m68k_legitimize_sibcall_address (rtx x)
 {
@@ -1562,8 +1579,11 @@ m68k_legitimize_sibcall_address (rtx x)
   if (sibcall_operand (XEXP (x, 0), VOIDmode))
     return x;
 
-  emit_move_insn (gen_rtx_REG (Pmode, STATIC_CHAIN_REGNUM), XEXP (x, 0));
-  return replace_equiv_address (x, gen_rtx_REG (Pmode, STATIC_CHAIN_REGNUM));
+  /* m68k_is_ok_for_sibcall picked a scratch address register that carries
+     no argument of this call.  */
+  rtx reg = gen_rtx_REG (Pmode, m68k_sibcall_target_regno);
+  emit_move_insn (reg, XEXP (x, 0));
+  return replace_equiv_address (x, reg);
 }
 
 /* Convert X to a legitimate address and return it if successful.  Otherwise

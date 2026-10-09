@@ -115,6 +115,7 @@ extern void init_68881_table (void);
 extern rtx m68k_legitimize_call_address (rtx);
 extern rtx m68k_legitimize_sibcall_address (rtx);
 extern bool m68k_is_ok_for_sibcall (tree, tree);
+extern int m68k_sibcall_target_regno;
 extern bool m68k_fntypes_place_args_alike (const_tree, const_tree,
 					   const_tree, const_tree);
 extern int m68k_hard_regno_rename_ok(unsigned int, unsigned int);
