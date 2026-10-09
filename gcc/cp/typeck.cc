@@ -8624,6 +8624,14 @@ callconv_explicit_cast_at (location_t loc)
   return cast && *cast;
 }
 
+/* Return true if EXPR carries an explicit calling-convention cast.  */
+
+bool
+callconv_explicit_cast_p (tree expr)
+{
+  return callconv_explicit_cast_at (cp_expr_loc_or_input_loc (expr));
+}
+
 static void
 mark_callconv_location (location_t loc, bool explicit_cast)
 {

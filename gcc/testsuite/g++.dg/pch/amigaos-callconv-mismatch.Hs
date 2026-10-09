@@ -23,3 +23,11 @@ choose_template (T c)
 {
   return c ? static_cast<fnptr_t> (stk_fn) : reg_fn;
 }
+
+void cast_default (fnptr_t = (fnptr_t) stk_fn);
+void moved_default (fnptr_t = static_cast<fnptr_t> (stack_pointer {}));
+void mixed_defaults (fnptr_t = static_cast<fnptr_t> (stack_pointer {}),
+                     fnptr_t = stack_pointer {});
+
+template <typename T>
+void template_default (T, fnptr_t = static_cast<fnptr_t> (stk_fn));
