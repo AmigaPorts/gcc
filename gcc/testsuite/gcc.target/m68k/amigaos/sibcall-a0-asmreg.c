@@ -1,8 +1,8 @@
 /* A sibcall's target is loaded into a0 (STATIC_CHAIN_REGNUM) unless it is a
    direct call that m68k_symbolic_jump can branch to.
    An __asm ("a0") parameter is passed in a0 without -mregparm,
-   so such a call must not become a sibcall: the target would replace the
-   argument.  A call with nothing in a0 stays a sibcall.  */
+   so such a call jumps through a1 instead: the target must not replace
+   the argument.  A call with nothing in a0 jumps through a0.  */
 
 /* { dg-do compile } */
 /* { dg-skip-if "amiga register-parameter ABI" { ! { m68k-*-amigaos* } } } */
@@ -26,5 +26,6 @@ dir_asm (char *p, ulong d)
 }
 
 /* { dg-final { scan-assembler-not "jmp \\(a0\\)" } } */
-/* { dg-final { scan-assembler-times "jsr \\(a1\\)" 1 } } */
+/* { dg-final { scan-assembler-not "jsr" } } */
+/* { dg-final { scan-assembler-times "jmp \\(a1\\)" 1 } } */
 /* { dg-final { scan-assembler-times "jra _ext_asm" 1 } } */

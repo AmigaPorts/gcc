@@ -2,8 +2,8 @@
    direct call that m68k_symbolic_jump can branch to.
    With -mpcrel a direct target goes in a register too; under
    -mregparm=3 a pointer argument is in a0,
-   so such a call must not become a sibcall: the target would replace the
-   argument.  A call with nothing in a0 stays a sibcall.  */
+   so such a call jumps through a1 instead: the target must not replace
+   the argument.  A call with nothing in a0 jumps through a0.  */
 
 /* { dg-do compile } */
 /* { dg-skip-if "amiga register-parameter ABI" { ! { m68k-*-amigaos* } } } */
@@ -26,7 +26,10 @@ dir_int (ulong x)
   return ext_int (x);
 }
 
-/* dir_ptr loads the target into a1 and calls; dir_int still jumps.  */
+/* dir_ptr loads the target into a1 and jumps through it; dir_int jumps
+   through a0.  */
 /* { dg-final { scan-assembler-times "lea \\(_ext_ptr:w,pc\\),a1" 1 } } */
 /* { dg-final { scan-assembler-not "lea \\(_ext_ptr:w,pc\\),a0" } } */
+/* { dg-final { scan-assembler-times "jmp \\(a1\\)" 1 } } */
 /* { dg-final { scan-assembler-times "jmp \\(a0\\)" 1 } } */
+/* { dg-final { scan-assembler-not "jsr" } } */

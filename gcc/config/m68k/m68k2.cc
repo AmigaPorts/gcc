@@ -114,14 +114,18 @@ struct m68k_args
 static struct m68k_args mycum, othercum;
 
 bool m68k_is_ok_for_sibcall(tree decl, tree exp);
+
 /**
- * Sibcall is only ok, if max regs d0/d1/a0 are used;
- * others might be trashed due to stack pop.
+ * Sibcall is only ok, if max regs d0/d1/a0/a1 (and fp0) are used; they are
+ * call clobbered and the sibcall epilogue leaves them alone, while any other
+ * register may be restored from the stack before the jump.
  * A target that is not a direct call m68k_symbolic_jump can branch to (an
  * indirect call, or a direct one with -m68000 -fbaserel, -resident or
- * -mpcrel) is loaded into STATIC_CHAIN_REGNUM (a0 on AmigaOS) by
- * m68k_legitimize_sibcall_address, so then that register must not carry
- * an argument.
+ * -mpcrel) is loaded into an address register of its own by
+ * m68k_legitimize_sibcall_address: STATIC_CHAIN_REGNUM (a0 on AmigaOS)
+ * unless an argument lives there, then the other scratch address register.
+ * With arguments in both a0 and a1 there is no register left for the
+ * target and the call stays a normal call.
  */
 bool m68k_is_ok_for_sibcall(tree decl, tree exp)
 {
@@ -136,9 +140,16 @@ bool m68k_is_ok_for_sibcall(tree decl, tree exp)
   struct m68k_args *cum = decl == current_function_decl ? &mycum : &othercum;
   if (cum->fntype == fntype)
     {
-      long allowed = 0x010103;
+      long allowed = (1L << D0_REG) | (1L << (D0_REG + 1))
+	| (1L << A0_REG) | (1L << A1_REG) | (1L << FP0_REG);
+      m68k_sibcall_target_regno = STATIC_CHAIN_REGNUM;
       if (!decl || m68k_symbolic_jump == NULL)
-	allowed &= ~(1L << STATIC_CHAIN_REGNUM);
+	{
+	  if (cum->regs_already_used & (1L << m68k_sibcall_target_regno))
+	    m68k_sibcall_target_regno
+	      = STATIC_CHAIN_REGNUM == A0_REG ? A1_REG : A0_REG;
+	  allowed &= ~(1L << m68k_sibcall_target_regno);
+	}
       return (cum->regs_already_used & ~allowed) == 0;
     }
   return false;
