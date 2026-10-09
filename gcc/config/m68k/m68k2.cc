@@ -170,11 +170,14 @@ m68k_init_arg_regs (struct m68k_args *cum, const_tree fntype)
 	cum->num_of_regs = 0;
       else
 	{
-	  /* Only regparm (N) with N > 0 overrides the -mregparm count set
-	     above.  regparm (0) and attributes unrelated to argument
-	     passing (saveds, nonnull, ...) keep it, so with -mregparm=0
-	     they use the stack like a plain prototype.  */
+	  /* On AmigaOS, only regparm (N) with N > 0 overrides the count
+	     set above.  regparm (0) and unrelated attributes keep it,
+	     so with -mregparm=0 they use the stack like a plain prototype.
+	     Other targets retain their existing attributed-type ABI.  */
 	  tree ratree = lookup_attribute ("regparm", attrs);
+#ifndef TARGET_AMIGAOS
+	  cum->num_of_regs = regparm != 0 ? regparm : M68K_DEFAULT_REGPARM;
+#endif
 	  if (ratree)
 	    {
 	      int no = TREE_INT_CST_LOW (TREE_VALUE (TREE_VALUE (ratree)));
