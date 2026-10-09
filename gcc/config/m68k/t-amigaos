@@ -52,7 +52,17 @@ MULTILIB_EXCEPTIONS = fbaserel/m68881 fbaserel/mcpu=68060/m68881 \
 # leave the 68000 libraries: -m68030, -m68040, -m68020-40, -m68020-60 and every
 # -march= spelling linked the 68000 libgcc, libstdc++ and libnix into code
 # generated for an 020 or better.
+# -mhard-float is the same option as -m68881 (both set MASK_HARD_FLOAT, so
+# doubles come back in fp0); without the match it linked the soft-float libm,
+# whose results in d0/d1 the caller never looked at.
 MULTILIB_MATCHES    = mcpu?68020=mcpu?68030 mcpu?68020=mcpu?68040 \
                       mcpu?68020=m68020-40 mcpu?68020=m68020-60 \
                       mcpu?68020=march?68020 mcpu?68020=march?68030 \
-                      mcpu?68020=march?68040 mcpu?68060=march?68060
+                      mcpu?68020=march?68040 mcpu?68060=march?68060 \
+                      m68881=mhard-float
+# No 060 libraries are built with the FPU enabled; a 68060 with -m68881 or
+# -mhard-float takes the 020/68881 libraries, which run on it, instead of
+# falling through to the 68000 soft-float libraries.
+MULTILIB_REUSE      = mcpu.68020/m68881=mcpu.68060/m68881 \
+                      fbaserel/mcpu.68020/m68881=fbaserel/mcpu.68060/m68881 \
+                      fbaserel32/mcpu.68020/m68881=fbaserel32/mcpu.68060/m68881
