@@ -1,8 +1,7 @@
-/* With explicit -mregparm=0, an attributed function type takes the
-   backend's M68K_DEFAULT_REGPARM path.  regparm (0) does not force the
-   stack, nor does an unrelated attribute such as saveds; an unannotated
-   function still uses the stack.  saveds itself warns without -fbaserel,
-   hence -Wno-attributes.  */
+/* With explicit -mregparm=0 on AmigaOS, regparm (0) and attributes
+   unrelated to argument passing keep the stack count, like a plain
+   prototype.  Only regparm (N) with N > 0 overrides it.  saveds itself
+   warns without -fbaserel, hence -Wno-attributes.  */
 
 /* { dg-do compile } */
 /* { dg-skip-if "amiga register-parameter ABI" { ! { m68k-*-amigaos* } } } */
@@ -14,9 +13,9 @@ __attribute__ ((regparm (2))) int r2 (int);
 __attribute__ ((__stkparm__)) int stk (int);
 __attribute__ ((saveds)) int sv (int);
 
-int (*plain_from_r0) (int) = r0; /* { dg-warning "different calling convention" } */
-__attribute__ ((regparm (0))) int (*r0_from_plain) (int) = plain; /* { dg-warning "different calling convention" } */
-__attribute__ ((regparm (0))) int (*r0_from_r2) (int) = r2;
+int (*plain_from_r0) (int) = r0;
+__attribute__ ((regparm (0))) int (*r0_from_plain) (int) = plain;
+__attribute__ ((regparm (0))) int (*r0_from_r2) (int) = r2; /* { dg-warning "different calling convention" } */
 int (*plain_from_stk) (int) = stk;
-int (*plain_from_sv) (int) = sv; /* { dg-warning "different calling convention" } */
+int (*plain_from_sv) (int) = sv;
 __attribute__ ((regparm (0))) int (*r0_from_sv) (int) = sv;
