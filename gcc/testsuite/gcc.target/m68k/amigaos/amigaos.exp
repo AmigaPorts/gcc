@@ -116,7 +116,27 @@ set-torture-options {
     "-O2 -flto" "-Os -flto"
     "-O2 -m68000" "-Os -m68000"
 }
-gcc-dg-runtest [lsort [glob -nocomplain $srcdir/$subdir/*-run.c]] "" ""
+set run_tests {}
+foreach f [lsort [glob -nocomplain $srcdir/$subdir/*-run.c]] {
+    if { ![string match "*-newlib-run.c" $f] } {
+	lappend run_tests $f
+    }
+}
+gcc-dg-runtest $run_tests "" ""
 torture-finish
+
+# Run tests for the newlib runtime.  Every board pins -mcrt=nix20 and a test
+# cannot drop a board flag (two -mcrt= selectors are an error), so these run
+# with the board's runtime selector replaced by -mcrt=newlib.
+set newlib_tests [lsort [glob -nocomplain $srcdir/$subdir/*-newlib-run.c]]
+if { [llength $newlib_tests] } {
+    global board_info
+    set tboard [target_info name]
+    set saved_cflags [board_info $tboard cflags]
+    regsub -all {(-mcrt=\S+|-noixemul)} $saved_cflags "" newlib_cflags
+    set board_info($tboard,cflags) "$newlib_cflags -mcrt=newlib"
+    dg-runtest $newlib_tests "" ""
+    set board_info($tboard,cflags) $saved_cflags
+}
 
 dg-finish
