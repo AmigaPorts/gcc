@@ -1,4 +1,5 @@
 /* { dg-additional-options "-O0 -fsanitize=undefined" } */
+/* { dg-skip-if "-fsanitize is not supported" { m68k-*-amigaos* } } */
 
 extern char *foo (char *dest, const char *src)
   __attribute__ ((__nonnull__ (1, 2)));
