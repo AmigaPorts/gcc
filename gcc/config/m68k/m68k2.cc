@@ -464,6 +464,22 @@ rtx m68k_function_arg (cumulative_args_t cum_v, const function_arg_info & ai)
       else
     	  cum->last_arg_len = 1;
 
+      int arg_nregs = hard_regno_nregs (cum->last_arg_reg, ai.mode);
+
+      /* These registers represent frame/stack bases and are eliminated
+	 later.  An explicit argument binding must not be rewritten to SP.  */
+      for (i = 0; i < MAX (cum->last_arg_len, arg_nregs); ++i)
+	if (cum->last_arg_reg + i == FRAME_POINTER_REGNUM
+	    || cum->last_arg_reg + i == STACK_POINTER_REGNUM)
+	  {
+	    location_t loc = cum->current_parm_decl
+			     ? DECL_SOURCE_LOCATION (cum->current_parm_decl)
+			     : input_location;
+	    error_at (loc, "register %qs is reserved for the frame or stack pointer",
+		      reg_names[cum->last_arg_reg + i]);
+	    return 0;
+	  }
+
       for (i = 0; i < cum->last_arg_len; i++)
 	{
 	  if (cum->regs_already_used & (1 << (cum->last_arg_reg + i)))
