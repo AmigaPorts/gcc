@@ -198,6 +198,10 @@ do									\
 	     "this target, use %'-fbaserel%' instead");			\
     if (flag_sanitize)							\
       error ("%<-fsanitize%> is not supported on this target");		\
+    /* Low memory is real here: address 4 holds SysBase, so reading	\
+       *(struct ExecBase **)4 is not a null-page access to warn about.  */ \
+    SET_OPTION_IF_UNSET (&global_options, &global_options_set,	\
+			 param_min_pagesize, 0);			\
   }									\
 while (0)
 
