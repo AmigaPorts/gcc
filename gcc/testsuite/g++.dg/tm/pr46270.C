@@ -1,6 +1,7 @@
 // { dg-do compile }
 // { dg-options "-fgnu-tm" }
 // { dg-skip-if "requires hosted libstdc++ for list" { ! hostedlib } }
+// { dg-skip-if "libstdc++ is built without transaction_safe annotations" { m68k-*-amigaos* } }
 
 #include <list>
 class Game

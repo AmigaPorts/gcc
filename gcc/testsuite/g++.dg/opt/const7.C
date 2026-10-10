@@ -5,4 +5,6 @@
 
 struct B { B()=default; };
 static const B b_var;		//  { dg-bogus "" }
-// { dg-final { scan-assembler-symbol-section {b_var} {^\.(const|rodata)|\[RO\]} } }
+// { dg-final { scan-assembler-symbol-section {b_var} {^\.(const|rodata)|\[RO\]} { target { ! m68k-*-amigaos* } } } }
+// AmigaOS places read-only data in the code hunk.
+// { dg-final { scan-assembler-symbol-section {b_var} {^\.text} { target m68k-*-amigaos* } } }
