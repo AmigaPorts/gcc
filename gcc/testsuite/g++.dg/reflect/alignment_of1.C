@@ -1,5 +1,6 @@
 // { dg-do compile { target c++26 } }
 // { dg-additional-options "-freflection" }
+// { dg-skip-if "hunk objects allow at most 8-byte alignment" { m68k-*-amigaos* } }
 // Test std::meta::alignment_of.
 
 #include <meta>
