@@ -5,7 +5,9 @@
 
 /* { dg-do compile } */
 /* { dg-skip-if "amiga pic modes" { ! { m68k-*-amigaos* } } } */
-/* { dg-options "-fPIC" } */
-/* { dg-warning "-fPIC.*not supported on this target" "" { target *-*-* } 0 } */
+/* { dg-options "-fPIC -m68020" } */
+/* { dg-warning "-fPIC.*not supported on this target and are ignored" "" { target *-*-* } 0 } */
+/* { dg-final { scan-assembler-not "@GOT" } } */
 
-int dummy;
+extern int g;
+int f (void) { return g; }

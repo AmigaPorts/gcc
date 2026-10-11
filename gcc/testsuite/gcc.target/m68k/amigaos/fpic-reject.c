@@ -1,10 +1,13 @@
-/* The hunk linker has no GOT, so generic -fpic must be rejected instead of
-   silently producing a corrupt executable (the 16-bit GOT displacement it
-   emits on 68020 gets a 32-bit reloc that clobbers the next instruction).  */
+/* The hunk linker has no GOT, and the 16-bit GOT displacement -fpic emits
+   on 68020 gets a 32-bit reloc that clobbers the next instruction.  Rejecting
+   -fpic broke too many configure scripts, so it is warned about and ignored,
+   and the code addresses globals directly.  */
 
 /* { dg-do compile } */
 /* { dg-skip-if "amiga pic modes" { ! { m68k-*-amigaos* } } } */
-/* { dg-options "-fpic" } */
-/* { dg-warning "-fpic.*not supported on this target" "" { target *-*-* } 0 } */
+/* { dg-options "-fpic -m68020" } */
+/* { dg-warning "-fpic.*not supported on this target and are ignored" "" { target *-*-* } 0 } */
+/* { dg-final { scan-assembler-not "@GOT" } } */
 
-int dummy;
+extern int g;
+int f (void) { return g; }
