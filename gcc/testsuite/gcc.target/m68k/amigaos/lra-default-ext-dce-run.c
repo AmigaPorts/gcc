@@ -6,10 +6,11 @@
    only the low half of the difference survives the cast, and main checks
    that the result is still right for both signs.  The callees are noipa:
    with noinline alone the compiler still sees that pop() has no side
-   effects, drops the call, and the subtraction narrows to 32 bits.  */
+   effects, drops the call, and the subtraction narrows to 32 bits.
+   ext-dce leaves DImode destinations alone without LRA, so the
+   -O1 -mno-lra variant runs too.  */
 /* { dg-do run } */
 /* { dg-additional-options "-fext-dce" } */
-/* { dg-skip-if "reload ICE, PR 127300" { *-*-* } { "-O1 -mno-lra" } { "" } } */
 
 extern long long get (void *);
 extern int err (void *);
