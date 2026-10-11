@@ -110,6 +110,7 @@ struct m68k_args
 			      arg types on a prototype/definition spelling
 			      mismatch.  */
   tree fntype; /* initial function type */
+  bool incoming; /* the current function's own parameters, not a call */
 };
 
 static struct m68k_args mycum, othercum;
@@ -222,7 +223,8 @@ m68k_init_arg_regs (struct m68k_args *cum, const_tree fntype)
  For a library call, FNTYPE is 0.  */
 
 void
-m68k_init_cumulative_args (CUMULATIVE_ARGS *cump, tree fntype, tree decl)
+m68k_init_cumulative_args (CUMULATIVE_ARGS *cump, tree fntype, tree decl,
+			   bool incoming)
 {
   struct m68k_args * cum = decl == current_function_decl ? &mycum : &othercum;
   *cump = decl == current_function_decl;
@@ -267,6 +269,7 @@ m68k_init_cumulative_args (CUMULATIVE_ARGS *cump, tree fntype, tree decl)
   cum->current_parm_decl = (decl && decl == current_function_decl
 			    && TREE_CODE (decl) == FUNCTION_DECL)
 			   ? DECL_ARGUMENTS (decl) : 0;
+  cum->incoming = incoming;
   DPRINTF((stderr, "9m68k_init_cumulative_args %p -> %d\r\n", cum, cum->num_of_regs));
 }
 
@@ -466,11 +469,16 @@ rtx m68k_function_arg (cumulative_args_t cum_v, const function_arg_info & ai)
 
       int arg_nregs = hard_regno_nregs (cum->last_arg_reg, ai.mode);
 
-      /* These registers represent frame/stack bases and are eliminated
-	 later.  An explicit argument binding must not be rewritten to SP.  */
-      for (i = 0; i < MAX (cum->last_arg_len, arg_nregs); ++i)
+      /* The frame pointer is eliminated later, so an explicit argument
+	 binding to it would be rewritten to SP.  An incoming single-register
+	 SP parameter is fine: newlib's crt0 reads its entry stack pointer
+	 that way.  A caller must never load an argument into SP, and a
+	 multi-register argument must not spill into it.  */
+      int span = MAX (cum->last_arg_len, arg_nregs);
+      for (i = 0; i < span; ++i)
 	if (cum->last_arg_reg + i == FRAME_POINTER_REGNUM
-	    || cum->last_arg_reg + i == STACK_POINTER_REGNUM)
+	    || (cum->last_arg_reg + i == STACK_POINTER_REGNUM
+		&& (!cum->incoming || span > 1)))
 	  {
 	    location_t loc = cum->current_parm_decl
 			     ? DECL_SOURCE_LOCATION (cum->current_parm_decl)

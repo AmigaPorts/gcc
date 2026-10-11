@@ -5,6 +5,11 @@
 void valid_a4 (unsigned long *p __asm("a4")) { p[0] = 1; }
 void valid_a6 (unsigned long *p __asm("a6")) { p[0] = 1; }
 
+/* newlib's crt0 reads its entry stack pointer through an SP parameter.  */
+int saved_sp;
+void valid_sp (unsigned long len __asm("d0"), int sp __asm("sp"))
+{ saved_sp = sp + len; }
+
 void valid_pair (unsigned long long x __asm("a3"))
 { __asm__ volatile ("" : : "g" (x)); }
 

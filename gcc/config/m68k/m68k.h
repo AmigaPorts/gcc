@@ -554,7 +554,7 @@ extern enum reg_class regno_reg_class[];
 /* SBF: int is enough public info. rest is handled internally. */
 #define CUMULATIVE_ARGS int
 
-extern void m68k_init_cumulative_args (CUMULATIVE_ARGS *, tree, tree);
+extern void m68k_init_cumulative_args (CUMULATIVE_ARGS *, tree, tree, bool);
 extern int m68k_function_arg_reg(unsigned regno);
 
 /* Initialize a variable CUM of type CUMULATIVE_ARGS
@@ -562,7 +562,12 @@ extern int m68k_function_arg_reg(unsigned regno);
    For a library call, FNTYPE is 0.  */
 #undef INIT_CUMULATIVE_ARGS
 #define INIT_CUMULATIVE_ARGS(CUM, FNTYPE, LIBNAME, INDIRECT, N_NAMED_ARGS) \
-  (m68k_init_cumulative_args(&(CUM), (FNTYPE), (INDIRECT)))
+  (m68k_init_cumulative_args(&(CUM), (FNTYPE), (INDIRECT), false))
+
+/* The same for the current function's own incoming parameters.  */
+#undef INIT_CUMULATIVE_INCOMING_ARGS
+#define INIT_CUMULATIVE_INCOMING_ARGS(CUM, FNTYPE, LIBNAME) \
+  (m68k_init_cumulative_args(&(CUM), (FNTYPE), current_function_decl, true))
 
 /* 1 if N is a possible register number for function argument passing.  */
 #undef FUNCTION_ARG_REGNO_P
