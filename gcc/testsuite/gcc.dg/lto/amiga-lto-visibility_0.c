@@ -3,7 +3,7 @@
    diagnosed on a target without visibility support.  */
 /* { dg-lto-do link } */
 /* { dg-skip-if "" { ! { m68k-*-amigaos* } } } */
-/* { dg-lto-options { { -O2 -flto -flto-partition=max -fno-inline -Werror=attributes -mcrt=nix20 } } } */
+/* { dg-lto-options { { -O2 -flto -flto-partition=max -fno-inline -Werror=attributes } } } */
 
 static int counter;
 
