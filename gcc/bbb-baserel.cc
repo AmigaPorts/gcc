@@ -129,8 +129,15 @@ namespace
 	      return 0;
 	  }
 	else
-	  if (0 == strcmp(".text", secname))
-	    return 0;
+	  {
+	    if (0 == strcmp(".text", secname))
+	      return 0;
+	    /* The linker scripts collect every .list_* section (constructor,
+	       init and exit lists) into the text hunk; only .dlist_* goes to
+	       data.  Such a section is writable, but a4 cannot reach it.  */
+	    if (0 == strncmp(".list_", secname, 6))
+	      return 0;
+	  }
 
 	if (secname == 0 || strcmp(".data", secname))
 	  {
