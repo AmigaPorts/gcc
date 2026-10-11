@@ -2212,7 +2212,8 @@ load_register_parameters (struct arg_data *args, int num_actuals,
         if (known_lt (GET_MODE_SIZE (reg_mode), GET_MODE_SIZE (val_mode)))
         {
           /* Adjust the MEM mode to match reg_mode (taking the low part) */
-          rtx low_mem = adjust_address(val, reg_mode, 0);
+          rtx low_mem = adjust_address(val, reg_mode,
+				       subreg_lowpart_offset (reg_mode, val_mode));
           emit_move_insn(reg, low_mem);
         }
         else
