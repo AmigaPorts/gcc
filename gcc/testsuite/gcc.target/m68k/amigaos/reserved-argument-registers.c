@@ -1,12 +1,10 @@
-/* Reject explicit argument registers overlapping the frame or stack pointer,
-   including callers that see only the register-bound prototype.  */
+/* Reject explicit argument registers overlapping the frame pointer, and
+   multi-register arguments spilling into the stack pointer, including
+   callers that see only the register-bound prototype.  */
 /* { dg-do compile } */
 /* { dg-options "-m68000 -O2 -fomit-frame-pointer" } */
 
 void bad_a5 (unsigned long *p __asm("a5")) /* { dg-error "reserved for the frame or stack pointer" } */
-{ p[0] = 1; }
-
-void bad_sp (unsigned long *p __asm("sp")) /* { dg-error "reserved for the frame or stack pointer" } */
 { p[0] = 1; }
 
 void bad_pair (unsigned long long value __asm("a4")) /* { dg-error "reserved for the frame or stack pointer" } */
@@ -28,4 +26,13 @@ unsigned long bad_caller (unsigned long value)
 {
   unsigned long local = value;
   return Super (callback) + local; /* { dg-error "reserved for the frame or stack pointer" } */
+}
+
+/* An SP parameter only reads the entry stack pointer: a caller must not
+   load an argument into SP.  */
+extern void sp_entry (int sp __asm("sp"));
+
+void bad_sp_caller (int value)
+{
+  sp_entry (value); /* { dg-error "reserved for the frame or stack pointer" } */
 }
