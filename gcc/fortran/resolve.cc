@@ -6715,7 +6715,7 @@ resolve_variable (gfc_expr *e)
     {
       gfc_ref *ref;
       for (ref = e->ref; ref; ref = ref->next)
-	if (ref->type == REF_SUBSTRING)
+	if (ref->type == REF_SUBSTRING || ref->type == REF_INQUIRY)
 	  break;
       if (ref == NULL)
 	e->ts = sym->ts;
@@ -10742,6 +10742,16 @@ resolve_assoc_var (gfc_symbol* sym, bool resolve_target)
 			   && !gfc_has_vector_subscript (target))
 			  || gfc_is_ptr_fcn (target));
 
+  /* A type parameter inquiry is not a variable.  */
+  if (sym->assoc->variable && target->expr_type == EXPR_VARIABLE)
+    for (gfc_ref *ref = target->ref; ref; ref = ref->next)
+      if (ref->type == REF_INQUIRY
+	  && (ref->u.i == INQUIRY_LEN || ref->u.i == INQUIRY_KIND))
+	{
+	  sym->assoc->variable = false;
+	  break;
+	}
+
   /* Finally resolve if this is an array or not.  */
   if (target->expr_type == EXPR_FUNCTION && target->rank == 0
       && (sym->ts.type == BT_CLASS || sym->ts.type == BT_DERIVED))
@@ -12621,74 +12631,42 @@ gfc_count_forall_iterators (gfc_code *code)
    2) Check for shadow index-name(s) and update code block.
    3) call gfc_resolve_forall_body to resolve the FORALL body.  */
 
-/* Custom recursive expression walker that replaces symbols.
-   Visits all expressions including array subscripts.  Also called from
-   replace_in_code_recursive to handle ASSOCIATE selector expressions.  */
+/* Shadow variable that replace_forall_var substitutes in; set by
+   replace_in_expr_recursive before each traversal.  */
+
+static gfc_symtree *forall_shadow_st;
+
+/* gfc_traverse_expr callback: point a reference to OLD_SYM at the
+   construct-scoped shadow variable.  */
+
+static bool
+replace_forall_var (gfc_expr *expr, gfc_symbol *old_sym,
+		    int *f ATTRIBUTE_UNUSED)
+{
+  if (expr->expr_type == EXPR_VARIABLE && expr->symtree->n.sym == old_sym)
+    {
+      expr->symtree = forall_shadow_st;
+      expr->ts = forall_shadow_st->n.sym->ts;
+    }
+
+  return false;
+}
+
+
+/* Replace every reference to OLD_SYM in EXPR with NEW_ST.  Traversal is
+   left to gfc_traverse_expr so that all expression forms are covered;
+   character length type parameters are skipped since those belong to
+   declarations that may be shared outside the construct.  */
 
 static void
-replace_in_expr_recursive (gfc_expr *expr, gfc_symbol *old_sym, gfc_symtree *new_st)
+replace_in_expr_recursive (gfc_expr *expr, gfc_symbol *old_sym,
+			   gfc_symtree *new_st)
 {
   if (!expr)
     return;
 
-  /* Check if this is a variable reference to replace */
-  if (expr->expr_type == EXPR_VARIABLE && expr->symtree->n.sym == old_sym)
-    {
-      expr->symtree = new_st;
-      expr->ts = new_st->n.sym->ts;
-    }
-
-  /* Walk through reference chain (array subscripts, substrings, etc.) */
-  for (gfc_ref *ref = expr->ref; ref; ref = ref->next)
-    {
-      if (ref->type == REF_ARRAY)
-	{
-	  gfc_array_ref *ar = &ref->u.ar;
-	  for (int i = 0; i < ar->dimen; i++)
-	    {
-	      replace_in_expr_recursive (ar->start[i], old_sym, new_st);
-	      replace_in_expr_recursive (ar->end[i], old_sym, new_st);
-	      replace_in_expr_recursive (ar->stride[i], old_sym, new_st);
-	    }
-	}
-      else if (ref->type == REF_SUBSTRING)
-	{
-	  replace_in_expr_recursive (ref->u.ss.start, old_sym, new_st);
-	  replace_in_expr_recursive (ref->u.ss.end, old_sym, new_st);
-	}
-    }
-
-  /* Walk through sub-expressions based on expression type */
-  switch (expr->expr_type)
-    {
-    case EXPR_OP:
-      replace_in_expr_recursive (expr->value.op.op1, old_sym, new_st);
-      replace_in_expr_recursive (expr->value.op.op2, old_sym, new_st);
-      break;
-
-    case EXPR_FUNCTION:
-      for (gfc_actual_arglist *a = expr->value.function.actual; a; a = a->next)
-	replace_in_expr_recursive (a->expr, old_sym, new_st);
-      break;
-
-    case EXPR_ARRAY:
-    case EXPR_STRUCTURE:
-      for (gfc_constructor *c = gfc_constructor_first (expr->value.constructor);
-	   c; c = gfc_constructor_next (c))
-	{
-	  replace_in_expr_recursive (c->expr, old_sym, new_st);
-	  if (c->iterator)
-	    {
-	      replace_in_expr_recursive (c->iterator->start, old_sym, new_st);
-	      replace_in_expr_recursive (c->iterator->end, old_sym, new_st);
-	      replace_in_expr_recursive (c->iterator->step, old_sym, new_st);
-	    }
-	}
-      break;
-
-    default:
-      break;
-    }
+  forall_shadow_st = new_st;
+  gfc_traverse_expr (expr, old_sym, replace_forall_var, -1);
 }
 
 
@@ -12727,6 +12705,8 @@ replace_in_code_recursive (gfc_code *code, gfc_symbol *old_sym, gfc_symtree *new
 	  break;
 
 	case EXEC_SELECT:
+	case EXEC_SELECT_TYPE:
+	case EXEC_SELECT_RANK:
 	  for (gfc_code *b = c->block; b; b = b->block)
 	    {
 	      for (gfc_case *cp = b->ext.block.case_list; cp; cp = cp->next)
@@ -12736,6 +12716,26 @@ replace_in_code_recursive (gfc_code *code, gfc_symbol *old_sym, gfc_symtree *new
 		}
 	      replace_in_code_recursive (b->next, old_sym, new_st);
 	    }
+	  break;
+
+	case EXEC_IF:
+	case EXEC_WHERE:
+	  /* Each block in the chain holds its condition or mask in EXPR1
+	     and its body in NEXT; the trailing ELSE/ELSEWHERE has no
+	     condition.  The generic recursion below only reaches the first
+	     branch, so walk the whole chain here.  */
+	  for (gfc_code *b = c->block; b; b = b->block)
+	    {
+	      replace_in_expr_recursive (b->expr1, old_sym, new_st);
+	      replace_in_code_recursive (b->next, old_sym, new_st);
+	    }
+	  break;
+
+	case EXEC_ALLOCATE:
+	case EXEC_DEALLOCATE:
+	  /* Bounds and lengths of the allocate-objects.  */
+	  for (gfc_alloc *al = c->ext.alloc.list; al; al = al->next)
+	    replace_in_expr_recursive (al->expr, old_sym, new_st);
 	  break;
 
 	case EXEC_FORALL:
@@ -13754,6 +13754,7 @@ generate_component_assignments (gfc_code **code, gfc_namespace *ns)
   gfc_expr *tmp_expr = NULL;
   int error_count, depth;
   bool finalizable_lhs;
+  bool use_finalize_only;
 
   gfc_get_errors (NULL, &error_count);
 
@@ -13797,6 +13798,24 @@ generate_component_assignments (gfc_code **code, gfc_namespace *ns)
 
   finalizable_lhs = is_finalizable_type ((*code)->expr1->ts);
 
+  /* When the lhs is finalized as a whole and none of its components needs the
+     structure copy to handle it (no pointer or allocatable components), the
+     copy can be done component by component.  The whole-derived-type assignment
+     then only finalizes the lhs and a component with a defined assignment keeps
+     its post-finalization value for the INTENT (OUT) finalization in that
+     defined assignment.  */
+  use_finalize_only = finalizable_lhs;
+  if (use_finalize_only)
+    for (comp1 = (*code)->expr1->ts.u.derived->components; comp1;
+	 comp1 = comp1->next)
+      if (comp1->attr.pointer || comp1->attr.allocatable
+	  || comp1->attr.proc_pointer_comp || comp1->attr.class_pointer
+	  || comp1->attr.proc_pointer)
+	{
+	  use_finalize_only = false;
+	  break;
+	}
+
   /* Create a temporary so that functions get called only once.  */
   if ((*code)->expr2->expr_type != EXPR_VARIABLE
       && (*code)->expr2->expr_type != EXPR_CONSTANT)
@@ -13833,6 +13852,8 @@ generate_component_assignments (gfc_code **code, gfc_namespace *ns)
       this_code = build_assignment (EXEC_ASSIGN,
 				    (*code)->expr1, (*code)->expr2,
 				    NULL, NULL, (*code)->loc);
+      if (use_finalize_only)
+	this_code->expr1->finalize_only = 1;
       add_code_to_chain (&this_code, &head, &tail);
     }
 
@@ -13852,7 +13873,20 @@ generate_component_assignments (gfc_code **code, gfc_namespace *ns)
 	  || comp1->attr.proc_pointer_comp
 	  || comp1->attr.class_pointer
 	  || comp1->attr.proc_pointer)
-	continue;
+	{
+	  /* With finalize_only the whole-derived-type assignment does not copy
+	     the components, so emit the copy for this one here.  Only plain
+	     components reach this point, since use_finalize_only excludes
+	     pointer and allocatable components.  */
+	  if (use_finalize_only)
+	    {
+	      this_code = build_assignment (EXEC_ASSIGN,
+					    (*code)->expr1, (*code)->expr2,
+					    comp1, comp2, (*code)->loc);
+	      add_code_to_chain (&this_code, &head, &tail);
+	    }
+	  continue;
+	}
 
       finalizable_comp = is_finalizable_type (comp1->ts)
 			 && !finalizable_lhs;
@@ -13894,7 +13928,10 @@ generate_component_assignments (gfc_code **code, gfc_namespace *ns)
 			    && dummy_args->sym->attr.intent == INTENT_OUT;
 	  inout = dummy_args
 		  && dummy_args->sym->attr.intent == INTENT_INOUT;
-	  if ((inout || finalizable_out)
+	  /* With finalize_only the lhs component keeps its post-finalization
+	     value, so the defined assignment can finalize it directly through
+	     its INTENT (OUT) argument and no temporary is needed.  */
+	  if ((inout || (finalizable_out && !use_finalize_only))
 	      && !comp1->attr.allocatable)
 	    {
 	      gfc_code *temp_code;
@@ -13971,10 +14008,11 @@ generate_component_assignments (gfc_code **code, gfc_namespace *ns)
 	{
 	  /* Don't add intrinsic assignments since they are already
 	     effected by the intrinsic assignment of the structure, unless
-	     finalization is required.  */
+	     finalization is required or, with finalize_only, the structure
+	     assignment does not copy the components.  */
 	  if (finalizable_comp)
 	    this_code->expr1->must_finalize = 1;
-	  else
+	  else if (!use_finalize_only)
 	    {
 	      gfc_free_statements (this_code);
 	      this_code = NULL;
@@ -13995,7 +14033,7 @@ generate_component_assignments (gfc_code **code, gfc_namespace *ns)
 
       add_code_to_chain (&this_code, &head, &tail);
 
-      if (t1 && (inout || finalizable_out))
+      if (t1 && (inout || (finalizable_out && !use_finalize_only)))
 	{
 	  /* Transfer the value to the final result.  */
 	  this_code = build_assignment (EXEC_ASSIGN,

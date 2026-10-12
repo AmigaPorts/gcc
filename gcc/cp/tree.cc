@@ -5247,7 +5247,7 @@ record_has_unique_obj_representations (const_tree t, const_tree sz,
 	    inform (DECL_SOURCE_LOCATION (last_named_field),
 		    "padding occurs after %qD", last_named_field);
 	  else
-	    inform (DECL_SOURCE_LOCATION (t),
+	    inform (location_of (const_cast <tree> (t)),
 		    "%qT has padding and no data fields", t);
 	}
       return false;
@@ -5301,6 +5301,8 @@ zero_init_expr_p (tree t)
     return false;
   if (TYPE_PTRMEM_P (type))
     return null_member_pointer_value_p (t);
+  if (REFLECTION_TYPE_P (type))
+    return REFLECT_EXPR_P (t) && REFLECT_EXPR_HANDLE (t) == unknown_type_node;
   if (TREE_CODE (t) == CONSTRUCTOR)
     {
       if (COMPOUND_LITERAL_P (t)

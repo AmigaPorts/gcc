@@ -161,8 +161,13 @@ split_double_mode (machine_mode mode, rtx operands[],
 					 GET_MODE (op) == VOIDmode
 					 ? mode : GET_MODE (op), byte);
 	  /* simplify_gen_subreg will return NULL RTX for the
-	     high half of the paradoxical subreg. */
-	  hi_half[num] = tmp ? tmp : gen_reg_rtx (half_mode);
+	     high half of the paradoxical subreg.  */
+	  if (tmp)
+	    hi_half[num] = tmp;
+	  else if (can_create_pseudo_p ())
+	    hi_half[num] = gen_reg_rtx (half_mode);
+	  else
+	    hi_half[num] = CONST0_RTX (half_mode);
 	}
     }
 }
@@ -2921,6 +2926,7 @@ ix86_expand_fp_compare (enum rtx_code code, rtx op0, rtx op1)
   rtx tmp, scratch;
 
   code = ix86_prepare_fp_compare_args (code, &op0, &op1);
+  machine_mode op_mode = GET_MODE (op0);
 
   tmp = gen_rtx_COMPARE (CCFPmode, op0, op1);
   if (unordered_compare)
@@ -2931,14 +2937,14 @@ ix86_expand_fp_compare (enum rtx_code code, rtx op0, rtx op1)
     {
     case IX86_FPCMP_COMI:
       tmp = gen_rtx_COMPARE (CCFPmode, op0, op1);
+      /* VCOMX/VUCOMX only have DF/SF/HF mode instructions.  */
+      if (TARGET_AVX10_2
+	  && (code == EQ || code == NE)
+	  && (op_mode == HFmode || op_mode == SFmode || op_mode == DFmode))
+	tmp = gen_rtx_UNSPEC (CCFPmode, gen_rtvec (1, tmp), UNSPEC_OPTCOMX);
       /* We only have vcomisbf16, No vcomubf16 nor vcomxbf16 */
-      if (GET_MODE (op0) != E_BFmode)
-	{
-	  if (TARGET_AVX10_2 && (code == EQ || code == NE))
-	    tmp = gen_rtx_UNSPEC (CCFPmode, gen_rtvec (1, tmp), UNSPEC_OPTCOMX);
-	  if (unordered_compare)
-	    tmp = gen_rtx_UNSPEC (CCFPmode, gen_rtvec (1, tmp), UNSPEC_NOTRAP);
-	}
+      if (op_mode != BFmode && unordered_compare)
+	tmp = gen_rtx_UNSPEC (CCFPmode, gen_rtvec (1, tmp), UNSPEC_NOTRAP);
       cmp_mode = CCFPmode;
       emit_insn (gen_rtx_SET (gen_rtx_REG (CCFPmode, FLAGS_REG), tmp));
       break;
