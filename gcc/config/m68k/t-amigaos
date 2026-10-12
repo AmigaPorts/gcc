@@ -44,9 +44,7 @@ amigacollect2.o: amigacollect2.cc
 MULTILIB_OPTIONS    = fbaserel/fbaserel32 mcpu=68020/mcpu=68060 m68881
 MULTILIB_DIRNAMES   = libb libb32 libm020 libm060 libm881
 MULTILIB_EXTRA_OPTS = 
-MULTILIB_EXCEPTIONS = fbaserel/m68881 fbaserel/mcpu=68060/m68881 \
-                      fbaserel32 fbaserel32/m68881 fbaserel32/mcpu=68060/m68881 \
-                      m68881 mcpu=68060/m68881
+MULTILIB_EXCEPTIONS = fbaserel/m68881 fbaserel32 fbaserel32/m68881 m68881
 # Every spelling of a 68020-class or better CPU selects the multilib built for
 # it. Without these matches only -m68020, -mcpu=68020, -m68060 and -mcpu=68060
 # leave the 68000 libraries: -m68030, -m68040, -m68020-40, -m68020-60 and every
@@ -60,9 +58,6 @@ MULTILIB_MATCHES    = mcpu?68020=mcpu?68030 mcpu?68020=mcpu?68040 \
                       mcpu?68020=march?68020 mcpu?68020=march?68030 \
                       mcpu?68020=march?68040 mcpu?68060=march?68060 \
                       m68881=mhard-float
-# No 060 libraries are built with the FPU enabled; a 68060 with -m68881 or
-# -mhard-float takes the 020/68881 libraries, which run on it, instead of
-# falling through to the 68000 soft-float libraries.
-MULTILIB_REUSE      = mcpu.68020/m68881=mcpu.68060/m68881 \
-                      fbaserel/mcpu.68020/m68881=fbaserel/mcpu.68060/m68881 \
-                      fbaserel32/mcpu.68020/m68881=fbaserel32/mcpu.68060/m68881
+# A 68060 with -m68881 or -mhard-float gets libraries built for it.  The
+# 020/68881 ones run there too, but load constants with fmovecr, which the
+# 68060 FPU does not implement: every one traps into 68060.library.
