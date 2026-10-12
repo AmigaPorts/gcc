@@ -997,5 +997,14 @@ m68k_costs (rtx x,
         initialized = true;
         m68k_init_costs (speed);
       }
-    return m68k_costs_engine (x, mode, outer_code, opno, total, speed);
+    bool done = m68k_costs_engine (x, mode, outer_code, opno, total, speed);
+
+    /* The cost tables describe one register-sized operation.  An integer
+       value wider than a word takes one per word; without this, lower-subreg
+       never finds it worth splitting DImode values.  FP modes live in a
+       single FPU register and are not scaled.  */
+    if (GET_MODE_CLASS (mode) == MODE_INT
+	&& GET_MODE_SIZE (mode) > UNITS_PER_WORD)
+      *total *= GET_MODE_SIZE (mode) / UNITS_PER_WORD;
+    return done;
 }
