@@ -455,9 +455,13 @@ m68k_select_cost_tables (void)
 }
 
 /* ============================================
-   Override loader - fills the active table only
+   Override loader - fills the active table only.
+   A tuning aid: compiled in only with M68K_SWITCHES_MODE, like the
+   M68K_SW switches, so a release compiler reads no files or environment
+   variables that could change its code generation.
    ============================================ */
 
+#if M68K_SWITCHES_MODE
 static void
 load_cost_overrides (const char *filename, int table[])
 {
@@ -510,6 +514,7 @@ load_cost_overrides (const char *filename, int table[])
 
     fclose (f);
 }
+#endif
 
 /* ============================================
    One-time initialisation
@@ -520,6 +525,7 @@ m68k_init_costs (bool speed)
 {
     m68k_select_cost_tables ();
 
+#if M68K_SWITCHES_MODE
     /* Overrides apply to whichever table is active for this build. */
     const char *env = getenv ("M68K_COSTS_FILE");
     if (env && *env)
@@ -532,6 +538,7 @@ m68k_init_costs (bool speed)
     /* Look for override files in the current directory */
     load_cost_overrides ("m68k-costs-speed.txt", active_speed);
     load_cost_overrides ("m68k-costs-size.txt",  active_size);
+#endif
 }
 
 /* ============================================
