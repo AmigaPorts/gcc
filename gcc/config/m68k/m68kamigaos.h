@@ -531,7 +531,7 @@ extern const char *amigaos_crt_check (int argc, const char **argv);
   "%{resident:-m amiga_bss -amiga-datadata-reloc -fl libb} " \
   "%{fbaserel32:%{!resident32:-m amiga_bss -fl libb32}} " \
   "%{resident32:-m amiga_bss -amiga-datadata-reloc -fl libb32} " \
-  "%{g:-amiga-debug-hunk} " \
+  "%{g*:%{%:debug-level-gt(0):-amiga-debug-hunk}} " \
   CRT_CHECK_SPEC \
   "%(link_cpu) "
 #endif
