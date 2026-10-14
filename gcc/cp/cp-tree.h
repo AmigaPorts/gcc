@@ -4879,7 +4879,7 @@ get_vec_init_expr (tree t)
 /* The underlying artificial VAR_DECL for structured binding.  On the
    artificial base VAR_DECL this can be NULL, or integer_{zero,one}_node
    for structured binding used in if/while/for resp. switch conditions,
-   or a TARGET_EXPR with the condition value after cp_finish_decomp in
+   or a NON_LVALUE_EXPR with the condition value after cp_finish_decomp in
    those cases.  */
 #define DECL_DECOMP_BASE(NODE) \
   (LANG_DECL_DECOMP_CHECK (NODE)->base)
@@ -8387,10 +8387,10 @@ extern tree convert_reflect_constant_arg	(tree, tree);
 extern GTY(()) vec<tree, va_gc> *unemitted_tinfo_decls;
 
 extern void init_rtti_processing		(void);
-extern tree build_typeid			(tree, tsubst_flags_t);
+extern tree build_typeid			(tree, tsubst_flags_t, tree = NULL_TREE);
 extern tree get_tinfo_decl_direct	        (tree, tree, int);
 extern tree get_tinfo_decl			(tree);
-extern tree get_typeid				(tree, tsubst_flags_t);
+extern tree get_typeid				(tree, tsubst_flags_t, tree = NULL_TREE);
 extern tree build_headof			(tree);
 extern tree build_dynamic_cast			(location_t, tree, tree,
 						 tsubst_flags_t);
@@ -8657,7 +8657,7 @@ extern void finish_transaction_stmt		(tree, tree, int, tree);
 extern tree build_transaction_expr		(location_t, tree, int, tree);
 extern bool cxx_omp_create_clause_info		(tree, tree, bool, bool,
 						 bool, bool);
-extern tree baselink_for_fns                    (tree);
+extern tree baselink_for_fns                    (tree, bool = false);
 extern void finish_static_assert                (tree, tree, location_t,
 						 bool, bool, bool = false);
 extern tree finish_decltype_type                (tree, bool, tsubst_flags_t);

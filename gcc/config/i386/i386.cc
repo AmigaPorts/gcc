@@ -5231,6 +5231,12 @@ ix86_gimplify_va_arg (tree valist, tree type, gimple_seq *pre_p,
   if ((unsigned int) arg_boundary > MAX_SUPPORTED_STACK_ALIGNMENT)
     arg_boundary = MAX_SUPPORTED_STACK_ALIGNMENT;
 
+  /* ARG_BOUNDARY is computed from TYPE_MAIN_VARIANT, so it can be smaller
+     than the alignment of a variant type that carries a user-specified
+     alignment (e.g. a typedef with attribute aligned).  Do not let the
+     access claim more alignment than the argument slot is placed at.  */
+  type_align = MIN (type_align, arg_boundary);
+
   /* Care for on-stack alignment if needed.  */
   if (arg_boundary <= 64 || size == 0)
     t = ovf;
@@ -8625,42 +8631,10 @@ struct stack_access_data
   unsigned int *stack_alignment;
 };
 
-/* SET stores into OP, a MEM linked to parameter BASE.  Return true if
-   SET stores BASE's argument register into OP.  This is a spill: the
-   callee saves its own register argument to the stack.  It is not a
-   stack argument set up by the caller:
-
-     (set (mem/c:V2DI (plus:DI (reg/f:DI 7 sp)
-		(const_int -16 [0xfffffffffffffff0])) [4 a1+0 S16 A128])
-	  (reg:V2DI 20 xmm0 [ a1 ]))
- */
+/* Return true if OP is a stack argument set up by the caller.  */
 
 static bool
-ix86_spill_register_argument_p (const_rtx set, const_rtx op, tree base)
-{
-  rtx src = SET_SRC (set);
-
-  /* Not a hard register store, so not a spill.  */
-  if (!REG_P (src) || !HARD_REGISTER_P (src))
-    return false;
-
-  rtx dest = SET_DEST (set);
-  tree reg_expr = REG_EXPR (src);
-
-  /* If spilling an SSA_NAME into OP, the argument-linked memory is
-     also used to store a local variable.  */
-  return dest == op && (reg_expr == base
-			|| (reg_expr
-			    && TREE_CODE (reg_expr) == SSA_NAME));
-}
-
-/* Return true if OP, found in PAT, is a stack argument set up by the
-   caller.  Return false if OP is a register argument that the callee
-   spilled to its own stack frame.  Both cases share the same MEM_EXPR,
-   so we must check PAT to tell them apart.  */
-
-static bool
-ix86_argument_passed_on_stack_p (const_rtx op, const_rtx pat)
+ix86_argument_passed_on_stack_p (const_rtx op)
 {
   tree mem_expr = MEM_EXPR (op);
   if (!mem_expr)
@@ -8670,12 +8644,10 @@ ix86_argument_passed_on_stack_p (const_rtx op, const_rtx pat)
   if (TREE_CODE (var) != PARM_DECL)
     return false;
 
-  /* PAT is always a single SET here: note_stores splits PARALLEL
-     patterns into separate SETs before calling this function.  */
-  if (GET_CODE (pat) == SET)
-    return !ix86_spill_register_argument_p (pat, op, var);
-
-  return true;
+  /* For PARM_DECL, DECL_INCOMING_RTL holds an RTL for the stack slot
+     or register where the data was actually passed.  Return true if
+     OP is passed in memory.  */
+  return DECL_INCOMING_RTL (var) && MEM_P (DECL_INCOMING_RTL (var));
 }
 
 /* Update the maximum stack slot alignment from memory alignment in PAT.  */
@@ -8697,7 +8669,7 @@ ix86_update_stack_alignment (rtx, const_rtx pat, void *data)
 	     responsible to align the outgoing stack for arguments
 	     passed on stack.  */
 	  if (reg_mentioned_p (p->reg, XEXP (op, 0))
-	      && !ix86_argument_passed_on_stack_p (op, pat))
+	      && !ix86_argument_passed_on_stack_p (op))
 	    {
 	      unsigned int alignment = MEM_ALIGN (op);
 
@@ -24755,7 +24727,17 @@ ix86_split_stlf_stall_load ()
 	     register.  */
 	  || GET_MODE (src) != E_V2DFmode
 	  || !MEM_EXPR (src)
-	  || TREE_CODE (get_base_address (MEM_EXPR (src))) != PARM_DECL)
+	  || TREE_CODE (get_base_address (MEM_EXPR (src))) != PARM_DECL
+	  /* Avoid invalid memory address.
+	     i.e.
+	     (mem/c:V2DF (plus:DI (reg/f:DI 7 sp)
+				  (const_int 2147483640 [0x7ffffff8])))
+	     Adjusting it by 8 puts the displacement at 0x80000000, out of
+	     range for the signed 32-bit field an x86 address can encode.  */
+	  || !memory_address_addr_space_p (DFmode,
+					   XEXP (adjust_address_nv (src, DFmode,
+								    8), 0),
+					   MEM_ADDR_SPACE (src)))
 	continue;
 
       rtx zero = CONST0_RTX (V2DFmode);

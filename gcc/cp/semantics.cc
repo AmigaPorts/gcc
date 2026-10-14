@@ -1138,13 +1138,13 @@ maybe_convert_cond (tree cond)
 
   /* For structured binding used in condition, the conversion needs to be
      evaluated before the individual variables are initialized in the
-     std::tuple_{size,elemenet} case.  cp_finish_decomp saved the conversion
-     result in a TARGET_EXPR, pick it up from there.  */
+     std::tuple_{size,element} case.  cp_finish_decomp saved the conversion
+     result in a NON_LVALUE_EXPR, pick it up from there.  */
   if (DECL_DECOMPOSITION_P (cond)
       && DECL_DECOMP_IS_BASE (cond)
       && DECL_DECOMP_BASE (cond)
-      && TREE_CODE (DECL_DECOMP_BASE (cond)) == TARGET_EXPR)
-    cond = TARGET_EXPR_SLOT (DECL_DECOMP_BASE (cond));
+      && TREE_CODE (DECL_DECOMP_BASE (cond)) == NON_LVALUE_EXPR)
+    cond = TREE_OPERAND (DECL_DECOMP_BASE (cond), 0);
 
   if (warn_sequence_point && !processing_template_decl)
     verify_sequence_points (cond);
@@ -1931,13 +1931,13 @@ finish_switch_cond (tree cond, tree switch_stmt)
       tree orig_cond = cond;
       /* For structured binding used in condition, the conversion needs to be
 	 evaluated before the individual variables are initialized in the
-	 std::tuple_{size,elemenet} case.  cp_finish_decomp saved the
-	 conversion result in a TARGET_EXPR, pick it up from there.  */
+	 std::tuple_{size,element} case.  cp_finish_decomp saved the
+	 conversion result in a NON_LVALUE_EXPR, pick it up from there.  */
       if (DECL_DECOMPOSITION_P (cond)
 	  && DECL_DECOMP_IS_BASE (cond)
 	  && DECL_DECOMP_BASE (cond)
-	  && TREE_CODE (DECL_DECOMP_BASE (cond)) == TARGET_EXPR)
-	cond = TARGET_EXPR_SLOT (DECL_DECOMP_BASE (cond));
+	  && TREE_CODE (DECL_DECOMP_BASE (cond)) == NON_LVALUE_EXPR)
+	cond = TREE_OPERAND (DECL_DECOMP_BASE (cond), 0);
       cond = build_expr_type_conversion (WANT_INT | WANT_ENUM, cond, true);
       if (cond == NULL_TREE)
 	{
@@ -4505,23 +4505,22 @@ finish_base_specifier (tree base, tree access, bool virtual_p,
 /* If FNS is a member function, a set of member functions, or a
    template-id referring to one or more member functions, return a
    BASELINK for FNS, incorporating the current access context.
-   Otherwise, return FNS unchanged.  */
+   Otherwise, return FNS unchanged.  If IGNORE_CURRENT_CLASS_P is
+   true, we do not consider the currently open derived class.  */
 
 tree
-baselink_for_fns (tree fns)
+baselink_for_fns (tree fns, bool ignore_current_class_p/*=false*/)
 {
-  tree scope;
-  tree cl;
-
-  if (BASELINK_P (fns)
-      || error_operand_p (fns))
+  if (BASELINK_P (fns) || error_operand_p (fns))
     return fns;
 
-  scope = ovl_scope (fns);
+  tree scope = ovl_scope (fns);
   if (!CLASS_TYPE_P (scope))
     return fns;
 
-  cl = currently_open_derived_class (scope);
+  tree cl = (ignore_current_class_p
+	     ? NULL_TREE
+	     : currently_open_derived_class (scope));
   if (!cl)
     cl = scope;
   tree access_path = TYPE_BINFO (cl);

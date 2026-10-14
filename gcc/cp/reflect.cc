@@ -141,7 +141,7 @@ get_reflection (location_t loc, tree t, reflect_kind kind/*=REFLECT_UNDEF*/)
 
   /* Constant template parameters and pack-index-expressions cannot
      appear as operands of the reflection operator.  */
-  if (PACK_INDEX_P (t))
+  if (TREE_CODE (t) == PACK_INDEX_EXPR)
     {
       error_at (loc, "%<^^%> cannot be applied to a pack index");
       return error_mark_node;
@@ -1828,11 +1828,13 @@ eval_is_data_member_spec (const_tree r, reflect_kind kind)
    object parameter.  Otherwise, false.  */
 
 static tree
-eval_is_explicit_object_parameter (const_tree r, reflect_kind kind)
+eval_is_explicit_object_parameter (tree r, reflect_kind kind)
 {
-  if (eval_is_function_parameter (r, kind) == boolean_true_node
-      && r == DECL_ARGUMENTS (DECL_CONTEXT (r))
-      && DECL_XOBJ_MEMBER_FUNCTION_P (DECL_CONTEXT (r)))
+  if (eval_is_function_parameter (r, kind) == boolean_false_node)
+    return boolean_false_node;
+  r = maybe_update_function_parm (r);
+  tree fn = DECL_CONTEXT (r);
+  if (r == DECL_ARGUMENTS (fn) && DECL_XOBJ_MEMBER_FUNCTION_P (fn))
     return boolean_true_node;
   else
     return boolean_false_node;
@@ -2672,6 +2674,8 @@ eval_source_location_of (location_t loc, tree r, reflect_kind kind,
        for now use location_t of the base parent (i.e. the derived
        class).  */
     r = direct_base_derived (r);
+  else
+    r = maybe_get_first_fn (r);
   if (OVERLOAD_TYPE_P (r) || (TYPE_P (r) && typedef_variant_p (r)))
     rloc = DECL_SOURCE_LOCATION (TYPE_NAME (r));
   else if (DECL_P (r) && r != global_namespace)
@@ -7085,16 +7089,17 @@ class_members_of (location_t loc, const constexpr_ctx *ctx, tree r,
     {
       tree m = field;
       if (TREE_CODE (field) == FIELD_DECL && DECL_ARTIFICIAL (field))
-	continue; /* Ignore bases and the vptr.  */
+	/* Ignore bases and the vptr.  */
+	continue;
+      else if (DECL_CLONED_FUNCTION_P (field))
+	/* Ignore cloned cdtors.  */
+	continue;
       else if (DECL_SELF_REFERENCE_P (field))
 	continue;
       else if (TREE_CODE (field) == TYPE_DECL)
 	m = TREE_TYPE (field);
       else if (TREE_CODE (field) == FUNCTION_DECL)
 	{
-	  /* Ignore cloned cdtors.  */
-	  if (DECL_CLONED_FUNCTION_P (field))
-	    continue;
 	  /* Ignore functions with unsatisfied constraints.  */
 	  if (!constraints_satisfied_p (field))
 	    continue;
@@ -8776,6 +8781,11 @@ splice (tree refl)
      it comes from e.g. members_of it is not.  */
   if (DECL_FUNCTION_TEMPLATE_P (refl))
     refl = ovl_make (refl, NULL_TREE);
+  /* Also add a BASELINK so that we handle &[:R:].  Since R was already
+     resolved (e.g. via members_of), we don't want to consider the enclosing
+     class for the access path.  */
+  if (is_overloaded_fn (refl))
+    refl = baselink_for_fns (refl, /*ignore_current_class_p=*/true);
 
   return refl;
 }
@@ -9242,6 +9252,12 @@ check_splice_expr (location_t loc, location_t start_loc, tree t,
 		   bool address_p, bool member_access_p, bool template_p,
 		   bool targs_p, bool complain_p)
 {
+  t = MAYBE_BASELINK_FUNCTIONS (t);
+  tree expr = t;
+  if (TREE_CODE (t) == TEMPLATE_ID_EXPR)
+    t = TREE_OPERAND (t, 0);
+  t = OVL_FIRST (t);
+
   /* We may not have gotten an expression.  */
   if (TREE_CODE (t) == TYPE_DECL
       || TREE_CODE (t) == NAMESPACE_DECL
@@ -9277,7 +9293,7 @@ check_splice_expr (location_t loc, location_t start_loc, tree t,
   /* [expr.prim.splice]/2 For a splice-expression of the form
      splice-specifier, the expression is ill-formed if it is:  */
   /* -- a constructor or a destructor  */
-  if (TREE_CODE (t) == FUNCTION_DECL
+  if (TREE_CODE (STRIP_TEMPLATE (t)) == FUNCTION_DECL
       && (DECL_CONSTRUCTOR_P (t) || DECL_DESTRUCTOR_P (t)))
     {
       if (complain_p)
@@ -9316,7 +9332,7 @@ check_splice_expr (location_t loc, location_t start_loc, tree t,
     }
 
   if (member_access_p
-      && !valid_splice_for_member_access_p (t, /*decls_only_p=*/false))
+      && !valid_splice_for_member_access_p (expr, /*decls_only_p=*/false))
     {
       if (complain_p)
 	error_at (loc, "cannot use %qE to access a class member", t);
@@ -9414,8 +9430,8 @@ check_splice_expr (location_t loc, location_t start_loc, tree t,
 	  return false;
 	}
       gcc_checking_assert (reflection_function_template_p (t)
-			   || get_template_info (t)
-			   || TREE_CODE (t) == TEMPLATE_ID_EXPR
+			   || get_template_info (expr)
+			   || TREE_CODE (expr) == TEMPLATE_ID_EXPR
 			   || variable_template_p (t)
 			   || dependent_splice_p (t));
     }
