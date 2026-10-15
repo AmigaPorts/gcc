@@ -55,11 +55,14 @@ MULTILIB_EXCEPTIONS = fbaserel/m68881 fbaserel/mcpu=68060/m68881 \
 # -mhard-float is the same option as -m68881 (both set MASK_HARD_FLOAT, so
 # doubles come back in fp0); without the match it linked the soft-float libm,
 # whose results in d0/d1 the caller never looked at.
+# -resident and -resident32 generate base-relative code, so they must select
+# the matching multilibs even without an explicit -fbaserel option.
 MULTILIB_MATCHES    = mcpu?68020=mcpu?68030 mcpu?68020=mcpu?68040 \
                       mcpu?68020=m68020-40 mcpu?68020=m68020-60 \
                       mcpu?68020=march?68020 mcpu?68020=march?68030 \
                       mcpu?68020=march?68040 mcpu?68060=march?68060 \
-                      m68881=mhard-float
+                      m68881=mhard-float \
+                      fbaserel=resident fbaserel32=resident32
 # No 060 libraries are built with the FPU enabled; a 68060 with -m68881 or
 # -mhard-float takes the 020/68881 libraries, which run on it, instead of
 # falling through to the 68000 soft-float libraries.
