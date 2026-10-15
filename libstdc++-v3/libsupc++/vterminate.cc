@@ -58,6 +58,13 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       {
 	// Note that "name" is the mangled name.
 	char const *name = t->name();
+#ifdef __amigaos__
+	// Print it as is: __cxa_demangle would pull ~40 KB of demangler
+	// into every program that can throw.
+	fputs("terminate(): uncaught exception ", stderr);
+	fputs(name, stderr);
+	fputs("\n", stderr);
+#else
 	{
 	  int status = -1;
 	  char *dem = 0;
@@ -74,6 +81,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
 	  if (status == 0)
 	    free(dem);
 	}
+#endif
 
 	// If the exception is derived from std::exception, we can
 	// give more information.
