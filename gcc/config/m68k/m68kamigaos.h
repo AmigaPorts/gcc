@@ -189,6 +189,15 @@ amiga_declare_object = 0
 
 #define JUMP_TABLES_IN_TEXT_SECTION 1
 
+/* EH data (.eh_frame, .gcc_except_table) is always absolute on AmigaOS.
+   m68k.h picks DW_EH_PE_pcrel (and indirect for globals) when flag_pic, which
+   -fbaserel, -fbaserel32, -resident and -resident32 set; but a PC-relative
+   reference from the except table to a typeinfo pointer in a data hunk
+   crosses hunks, which the hunk format cannot express ("reloc ... out of
+   range"). RELOC32 relocates an absolute pointer in every code model.  */
+#undef ASM_PREFERRED_EH_DATA_FORMAT
+#define ASM_PREFERRED_EH_DATA_FORMAT(CODE, GLOBAL) DW_EH_PE_absptr
+
 /* In m68k svr4, using swbeg is the standard way to do switch
    table.  */
 #undef ASM_OUTPUT_BEFORE_CASE_LABEL
