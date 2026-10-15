@@ -1572,7 +1572,17 @@ instantiate_virtual_regs_in_insn (rtx_insn *insn)
 	  seq = get_insns ();
 	  end_sequence ();
 
-	  emit_insn_before (seq, insn);
+	  rtx_insn *last = emit_insn_before (seq, insn);
+
+	  /* SBF: keep the REG_INC note on the insn that now sets the register.
+	     The m68k block move/set expanders copy the address into a fresh
+	     pseudo, mark that copy with REG_INC and then use the pseudo with
+	     post_inc.  cse and cprop do not record the marked copy; without
+	     the note they treat the pseudo as equal to the address and reuse
+	     it after it has been incremented.  */
+	  if (find_reg_note (insn, REG_INC, SET_DEST (set)))
+	    add_reg_note (last, REG_INC, SET_DEST (set));
+
 	  delete_insn (insn);
 	  return;
 	}
