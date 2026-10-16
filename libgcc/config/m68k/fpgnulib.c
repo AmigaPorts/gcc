@@ -941,118 +941,74 @@ __addxf3 (long double a, long double b)
         }
     }
 
-  /* Align exponents.  */
-  unsigned int guard = 0;
-  unsigned int sticky = 0;
+  /* Align exponents.  X is the operand with the larger exponent; Y is
+     shifted right to match, and EXT keeps the bits shifted out of it:
+     exactly for shifts up to 64, with anything lower ORed into bit 0.  */
+  unsigned int guard, sticky, sign_x, sign_y;
+  unsigned long long mant_x, mant_y, ext = 0;
+  int shift;
 
-  if (exp_a > exp_b)
+  if (exp_a >= exp_b)
     {
-      int shift = exp_a - exp_b;
-      exp_r = exp_a;
-
-      if (shift >= 66)
-        {
-          guard = 0;
-          sticky = 1;
-          mant_b = 0;
-        }
-      else if (shift == 65)
-        {
-          guard = 0;
-          sticky = (mant_b != 0);
-          mant_b = 0;
-        }
-      else if (shift == 64)
-        {
-          guard = (unsigned int) (mant_b >> 63);
-          sticky = ((mant_b & 0x7FFFFFFFFFFFFFFFULL) != 0);
-          mant_b = 0;
-        }
-      else
-        {
-          unsigned long long g_mask = 1ULL << (shift - 1);
-          guard = (mant_b & g_mask) != 0;
-          sticky = (mant_b & (g_mask - 1ULL)) != 0;
-          mant_b >>= shift;
-        }
-    }
-  else if (exp_b > exp_a)
-    {
-      int shift = exp_b - exp_a;
-      exp_r = exp_b;
-
-      if (shift >= 66)
-        {
-          guard = 0;
-          sticky = 1;
-          mant_a = 0;
-        }
-      else if (shift == 65)
-        {
-          guard = 0;
-          sticky = (mant_a != 0);
-          mant_a = 0;
-        }
-      else if (shift == 64)
-        {
-          guard = (unsigned int) (mant_a >> 63);
-          sticky = ((mant_a & 0x7FFFFFFFFFFFFFFFULL) != 0);
-          mant_a = 0;
-        }
-      else
-        {
-          unsigned long long g_mask = 1ULL << (shift - 1);
-          guard = (mant_a & g_mask) != 0;
-          sticky = (mant_a & (g_mask - 1ULL)) != 0;
-          mant_a >>= shift;
-        }
+      sign_x = sign_a, mant_x = mant_a, exp_r = exp_a;
+      sign_y = sign_b, mant_y = mant_b, shift = exp_a - exp_b;
     }
   else
     {
-      exp_r = exp_a;
+      sign_x = sign_b, mant_x = mant_b, exp_r = exp_b;
+      sign_y = sign_a, mant_y = mant_a, shift = exp_b - exp_a;
     }
 
-  /* Add or subtract mantissas.  */
-  if (sign_a == sign_b)
+  if (shift == 0)
+    ;
+  else if (shift < 64)
     {
-      /* Same sign: addition.  */
-      sign_r = sign_a;
-      mant_r = mant_a + mant_b;
+      ext = mant_y << (64 - shift);
+      mant_y >>= shift;
+    }
+  else if (shift == 64)
+    {
+      ext = mant_y;
+      mant_y = 0;
+    }
+  else if (shift < 128)
+    {
+      ext = (mant_y >> (shift - 64)) | ((mant_y << (128 - shift)) != 0);
+      mant_y = 0;
+    }
+  else
+    {
+      ext = 1;		/* mant_y is not zero here.  */
+      mant_y = 0;
+    }
 
-      if (mant_r < mant_a)
+  /* Add or subtract mantissas, as 128-bit numbers mant:ext.  */
+  if (sign_x == sign_y)
+    {
+      sign_r = sign_x;
+      mant_r = mant_x + mant_y;
+
+      if (mant_r < mant_x)
         {
           /* Overflow beyond bit 63.  */
-          sticky |= guard;
-          guard = (unsigned int) (mant_r & 1ULL);
+          ext = (ext >> 1) | (ext & 1ULL) | (mant_r << 63);
           mant_r = (mant_r >> 1) | 0x8000000000000000ULL;
           exp_r++;
         }
     }
   else
     {
-      /* Different signs: subtraction.  */
-      if (mant_a > mant_b || (mant_a == mant_b && (guard || sticky)))
+      /* After a shift, mant_y < 2^63 <= mant_x; without one, ext is 0.  */
+      if (mant_x > mant_y)
         {
-          sign_r = sign_a;
-          /* 128-bit subtraction including guard and sticky.  */
-          if (sticky || guard)
-            {
-              mant_r = mant_a - mant_b - 1ULL;
-              if (!guard)
-                sticky = 1;
-              guard = !guard;
-            }
-          else
-            {
-              mant_r = mant_a - mant_b;
-            }
+          sign_r = sign_x;
+          mant_r = mant_x - mant_y - (ext != 0);
+          ext = -ext;
         }
-      else if (mant_b > mant_a)
+      else if (mant_y > mant_x)
         {
-          sign_r = sign_b;
-          mant_r = mant_b - mant_a;
-          guard = 0;
-          sticky = 0;
+          sign_r = sign_y;
+          mant_r = mant_y - mant_x;
         }
       else
         {
@@ -1060,14 +1016,18 @@ __addxf3 (long double a, long double b)
           return __xf_pack (0, 0, 0);
         }
 
-      /* Normalize after subtraction.  */
-      while ((mant_r & 0x8000000000000000ULL) == 0 && mant_r != 0)
+      /* Normalize after subtraction.  A shift of more than one bit only
+         follows an alignment shift of at most one, so EXT is exact.  */
+      while ((mant_r & 0x8000000000000000ULL) == 0)
         {
-          mant_r = (mant_r << 1) | guard;
-          guard = 0; /* Guard shifts into mantissa.  */
+          mant_r = (mant_r << 1) | (ext >> 63);
+          ext <<= 1;
           exp_r--;
         }
     }
+
+  guard = (unsigned int) (ext >> 63);
+  sticky = (ext << 1) != 0;
 
   /* Underflow handling for subnormals.  */
   if (exp_r < XF_EMIN)
