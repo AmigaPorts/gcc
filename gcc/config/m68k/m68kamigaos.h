@@ -358,13 +358,22 @@ if (target_flags & (MASK_RESTORE_A4|MASK_ALWAYS_RESTORE_A4)) \
    code, base relative code with automatic relocation (-resident), their
    32-bit versions, libnix, profiling or plain crt0.o.  */
 
+/* ixemul installs its startup files only in ixemul/lib, not in the
+   multilib subdirectories, and newlib ships its own crt0.o in lib/libm020
+   and friends.  A %s search tries the multilib subdirectory of every prefix
+   before any bare prefix, so -m68020 would pick newlib's crt0.o.  Name
+   ixemul's startup files by their full path instead.  */
+#define IXEMUL_STARTFILE(NAME) "%:sdk_root(ixemul/lib/" NAME ") "
+
 #define STARTFILE_IXEMUL_SPEC \
-  "%{fbaserel:%{!resident:bcrt0.o%s}}" \
-  "%{resident:rcrt0.o%s}" \
-  "%{fbaserel32:%{!resident32:lcrt0.o%s}}" \
-  "%{resident32:scrt0.o%s}" \
+  "%{fbaserel:%{!resident:" IXEMUL_STARTFILE("bcrt0.o") "}}" \
+  "%{resident:" IXEMUL_STARTFILE("rcrt0.o") "}" \
+  "%{fbaserel32:%{!resident32:" IXEMUL_STARTFILE("lcrt0.o") "}}" \
+  "%{resident32:" IXEMUL_STARTFILE("scrt0.o") "}" \
   "%{!resident:%{!fbaserel:%{!resident32:%{!fbaserel32:" \
-    "%{pg:gcrt0.o%s}%{!pg:%{p:mcrt0.o%s}%{!p:crt0.o%s}}}}}}"
+    "%{pg:" IXEMUL_STARTFILE("gcrt0.o") "}" \
+    "%{!pg:%{p:" IXEMUL_STARTFILE("mcrt0.o") "}" \
+    "%{!p:" IXEMUL_STARTFILE("crt0.o") "}}}}}}"
 
 #define STARTFILE_LIBNIX_SPEC \
   "%{shared:init_shared.o%s}" \
