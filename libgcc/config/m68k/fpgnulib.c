@@ -495,6 +495,12 @@ union long_double_union
    so E = 0 holds [2^-16383, 2^-16382) as well as the subnormals below.  */
 #define XF_EMIN (-16383)
 
+/* Mantissas for EXP_SENTINEL_INF_NAN.  With an exponent of 0x7FFF the
+   integer bit does not matter: 0 is the canonical infinity, which is what
+   GCC emits for constants, and all ones is the 68881's default NaN.  */
+#define XF_INF_MANT 0ULL
+#define XF_NAN_MANT 0xFFFFFFFFFFFFFFFFULL
+
 #ifdef __UNPACK
 /* Unpack Motorola 80-bit extended long double into sign, unbiased
    exponent, and mantissa.  Stored exponent E is biased by 16383.
@@ -548,22 +554,23 @@ __xf_pack (unsigned int sign, int exp, unsigned long long mant)
   unsigned int upper;
   int E;
 
-  /* Zero.  */
-  if (mant == 0)
-    {
-      u.w.upper = (sign ? 0x80000000u : 0x00000000u);
-      u.w.middle = 0;
-      u.w.lower = 0;
-      return u.ld;
-    }
-
-  /* Infinity or NaN (sentinel exp == EXP_SENTINEL_INF_NAN).  */
+  /* Infinity or NaN (sentinel exp == EXP_SENTINEL_INF_NAN).  Before the
+     zero test: XF_INF_MANT is 0.  */
   if (exp == EXP_SENTINEL_INF_NAN)
     {
       upper = ((unsigned int) sign << 31) | (0x7FFFu << 16);
       u.w.upper = upper;
       u.w.middle = (unsigned int) (mant >> 32);
       u.w.lower = (unsigned int) (mant & 0xFFFFFFFFu);
+      return u.ld;
+    }
+
+  /* Zero.  */
+  if (mant == 0)
+    {
+      u.w.upper = (sign ? 0x80000000u : 0x00000000u);
+      u.w.middle = 0;
+      u.w.lower = 0;
       return u.ld;
     }
 
@@ -584,7 +591,7 @@ __xf_pack (unsigned int sign, int exp, unsigned long long mant)
   if (E >= 0x7FFF)
     {
       u.w.upper = ((unsigned int) sign << 31) | (0x7FFFu << 16);
-      u.w.middle = 0x80000000u; /* IEEE 754 x87 Inf has bit 63 set.  */
+      u.w.middle = 0; /* XF_INF_MANT */
       u.w.lower = 0;
       return u.ld;
     }
@@ -908,7 +915,7 @@ __addxf3 (long double a, long double b)
     {
       if (exp_b == EXP_SENTINEL_INF_NAN && sign_a != sign_b)
         return __xf_pack (0, EXP_SENTINEL_INF_NAN,
-                          0x8000000000000000ULL); /* NaN.  */
+                          XF_NAN_MANT);
       return a;
     }
   if (exp_b == EXP_SENTINEL_INF_NAN)
@@ -1077,7 +1084,7 @@ __addxf3 (long double a, long double b)
   /* Overflow.  */
   if (exp_r > 16383)
     return __xf_pack (sign_r, EXP_SENTINEL_INF_NAN,
-                      0x8000000000000000ULL);
+                      XF_INF_MANT);
 
   return __xf_pack (sign_r, exp_r, mant_r);
 }
@@ -1119,10 +1126,12 @@ __mulxf3 (long double a, long double b)
       && (mant_b & 0x7FFFFFFFFFFFFFFFULL) != 0)
     return b;
 
-  /* Infinity handling.  */
+  /* Infinity handling: Inf * 0 = NaN.  */
   if (exp_a == EXP_SENTINEL_INF_NAN || exp_b == EXP_SENTINEL_INF_NAN)
     return __xf_pack (sign_r, EXP_SENTINEL_INF_NAN,
-                      0x8000000000000000ULL);
+                      (exp_a != EXP_SENTINEL_INF_NAN && mant_a == 0)
+                      || (exp_b != EXP_SENTINEL_INF_NAN && mant_b == 0)
+                      ? XF_NAN_MANT : XF_INF_MANT);
 
   /* Zero handling.  */
   if (mant_a == 0 || mant_b == 0)
@@ -1241,7 +1250,7 @@ __mulxf3 (long double a, long double b)
   /* Overflow.  */
   if (exp_r > 16383)
     return __xf_pack (sign_r, EXP_SENTINEL_INF_NAN,
-                      0x8000000000000000ULL);
+                      XF_INF_MANT);
 
   return __xf_pack (sign_r, exp_r, mant_r);
 }
@@ -1265,9 +1274,8 @@ __divxf3 (long double a, long double b)
   sign_r = sign_a ^ sign_b;
 
   /* NaN handling: exponent sentinel with at least one fraction bit
-     set.  The canonical infinity has mantissa 0x8000000000000000 -
-     the integer bit alone does not count as a NaN fraction and must
-     not be recognized as NaN.  */
+     set.  The integer bit of an infinity may be set (see XF_INF_MANT);
+     it does not count as a NaN fraction.  */
   if (exp_a == EXP_SENTINEL_INF_NAN
       && (mant_a & 0x7FFFFFFFFFFFFFFFULL) != 0)
     return a;
@@ -1282,11 +1290,11 @@ __divxf3 (long double a, long double b)
       /* Inf / Inf = NaN.  */
       if (exp_b == EXP_SENTINEL_INF_NAN)
         return __xf_pack (0, EXP_SENTINEL_INF_NAN,
-                          0x8000000000000000ULL);
+                          XF_NAN_MANT);
 
       /* Inf / finite = Inf.  */
       return __xf_pack (sign_r, EXP_SENTINEL_INF_NAN,
-                        0x8000000000000000ULL);
+                        XF_INF_MANT);
     }
 
   if (exp_b == EXP_SENTINEL_INF_NAN)
@@ -1301,7 +1309,7 @@ __divxf3 (long double a, long double b)
       /* 0 / 0 = NaN.  */
       if (mant_b == 0)
         return __xf_pack (0, EXP_SENTINEL_INF_NAN,
-                          0x8000000000000000ULL);
+                          XF_NAN_MANT);
 
       /* 0 / finite = +/-0.  */
       return __xf_pack (sign_r, 0, 0);
@@ -1311,7 +1319,7 @@ __divxf3 (long double a, long double b)
     {
       /* finite / 0 = Inf.  */
       return __xf_pack (sign_r, EXP_SENTINEL_INF_NAN,
-                        0x8000000000000000ULL);
+                        XF_INF_MANT);
     }
 
   /* Normalize subnormal (and unnormal) operands exactly: shift
@@ -1427,7 +1435,7 @@ __divxf3 (long double a, long double b)
       /* Overflow.  */
       if (exp_r > 16383)
         return __xf_pack (sign_r, EXP_SENTINEL_INF_NAN,
-                          0x8000000000000000ULL);
+                          XF_INF_MANT);
     }
   else
     {
@@ -1515,6 +1523,12 @@ __xfcmp (long double a, long double b)
 
   xsign = SIGNX (x) != 0;
   ysign = SIGNX (y) != 0;
+
+  /* An infinity may come with or without the integer bit.  */
+  if (xexp == EXPXMASK)
+    x.l.middle &= MANTXMASK;
+  if (yexp == EXPXMASK)
+    y.l.middle &= MANTXMASK;
 
   /* Different signs.  */
   if (xsign != ysign)
