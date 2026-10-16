@@ -2740,11 +2740,20 @@ final_scan_insn (rtx_insn *insn, FILE *file, int optimize_p ATTRIBUTE_UNUSED,
 			&& rtx_equal_p (src2, cc_status.value2))
 
 		/** compare with zero can be omitted, if reg is zero and mode is smaller,
-		 *  if next insn is a jmp EQ
+		 *  if next insn is a jmp EQ.
+		 *  The flags were set by an insn writing cc_status.value1, so they
+		 *  describe the bits of value1's mode only: every bit the mask says
+		 *  may be set must lie inside both value1's and src2's mode, and
+		 *  value1 must fit one register (a multi-word set, e.g. add.l/addx.l,
+		 *  leaves flags from its last word op only).
 		 */
 		    || (src2 != 0 && GET_CODE(XEXP(src1, 1)) == CONST_INT && INTVAL((XEXP(src1, 1))) == 0
 			&& cc_status.value1 && REG_P(cc_status.value1) && src2 && REG_P(src2) && REGNO(cc_status.value1) == REGNO(src2)
-			&& (note = find_reg_note(insn, REG_BIT_MASK, 0)) && INTVAL(XEXP(note,0)) < (1 << (8*GET_MODE_SIZE(GET_MODE(src2))))
+			&& GET_MODE_SIZE (GET_MODE (cc_status.value1)) <= UNITS_PER_WORD
+			&& (note = find_reg_note(insn, REG_BIT_MASK, 0))
+			&& (UINTVAL (XEXP (note, 0))
+			    & ~(GET_MODE_MASK (GET_MODE (cc_status.value1))
+				& GET_MODE_MASK (GET_MODE (src2)))) == 0
 			&& JUMP_P(ninsn = NEXT_INSN(insn)) && (nset = single_set(ninsn)) && (GET_CODE(nss = XEXP(SET_SRC(nset),0)) == EQ || GET_CODE(nss) == NE)
 			)
 		    )
