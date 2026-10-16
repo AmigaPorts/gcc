@@ -4664,6 +4664,19 @@ track_regs ()
 	      continue;
 	    }
 
+	  /* The masks are kept per 32-bit register.  An operation on a value
+	     wider than one register (a DImode shift or add on a register pair)
+	     moves bits between the words, e.g. the carry of add.l/addx.l, so
+	     no per-register mask can be derived from it: forget all its words.  */
+	  if (ii.get_src_op ()
+	      && GET_MODE_SIZE (ii.get_mode ()) > UNITS_PER_WORD
+	      && REG_P (SET_DEST (set)))
+	    {
+	      for (unsigned r = 0; r < REG_NREGS (SET_DEST (set)); ++r)
+		track->clear (SImode, dregno + r, index);
+	      continue;
+	    }
+
 	  if (ii.get_src_op ())
 	    {
 	      if (ii.get_src_op() == AND || ii.get_src_op() == IOR || ii.get_src_op() == XOR || ii.get_src_op() == PLUS)
