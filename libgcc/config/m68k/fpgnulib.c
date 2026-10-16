@@ -490,6 +490,11 @@ union long_double_union
 
 #define EXP_SENTINEL_INF_NAN 16384
 
+/* Unbiased exponent of a stored exponent of 0.  Unlike the x87 format,
+   the 68881 does not bump it to 1: the integer bit is stored there too,
+   so E = 0 holds [2^-16383, 2^-16382) as well as the subnormals below.  */
+#define XF_EMIN (-16383)
+
 #ifdef __UNPACK
 /* Unpack Motorola 80-bit extended long double into sign, unbiased
    exponent, and mantissa.  Stored exponent E is biased by 16383.
@@ -517,7 +522,7 @@ __xf_unpack (long double x, unsigned int *sign, int *exp,
       if (*mant == 0)
         *exp = 0;
       else
-        *exp = -16382;
+        *exp = XF_EMIN;
     }
   else if (E == 0x7FFF)
     {
@@ -562,9 +567,9 @@ __xf_pack (unsigned int sign, int exp, unsigned long long mant)
       return u.ld;
     }
 
-  /* Denormal/subnormal.  If bit 63 is not set, this is a subnormal
-     number (E = 0).  */
-  if (exp <= -16382 && (mant & 0x8000000000000000ULL) == 0)
+  /* E = 0, with or without the integer bit (see XF_EMIN).  The callers
+     have already shifted subnormal mantissas to XF_EMIN.  */
+  if (exp <= XF_EMIN)
     {
       u.w.upper = ((unsigned int) sign << 31); /* Biased E = 0.  */
       u.w.middle = (unsigned int) (mant >> 32);
@@ -919,7 +924,7 @@ __addxf3 (long double a, long double b)
     return a;
 
   /* Normalize subnormal inputs.  */
-  if (exp_a == -16382)
+  if (exp_a == XF_EMIN)
     {
       while ((mant_a & 0x8000000000000000ULL) == 0)
         {
@@ -927,7 +932,7 @@ __addxf3 (long double a, long double b)
           exp_a--;
         }
     }
-  if (exp_b == -16382)
+  if (exp_b == XF_EMIN)
     {
       while ((mant_b & 0x8000000000000000ULL) == 0)
         {
@@ -1065,9 +1070,9 @@ __addxf3 (long double a, long double b)
     }
 
   /* Underflow handling for subnormals.  */
-  if (exp_r < -16382)
+  if (exp_r < XF_EMIN)
     {
-      int shift = -16382 - exp_r;
+      int shift = XF_EMIN - exp_r;
 
       if (shift > 65)
         return __xf_pack (sign_r, 0, 0);
@@ -1095,7 +1100,7 @@ __addxf3 (long double a, long double b)
           sticky = new_sticky;
           mant_r >>= shift;
         }
-      exp_r = -16382;
+      exp_r = XF_EMIN;
     }
 
   /* IEEE 754 round-to-nearest-even.  */
@@ -1164,7 +1169,7 @@ __mulxf3 (long double a, long double b)
     return __xf_pack (sign_r, 0, 0);
 
   /* Normalize subnormal inputs (ensure bit 63 is set).  */
-  if (exp_a == -16382)
+  if (exp_a == XF_EMIN)
     {
       while ((mant_a & 0x8000000000000000ULL) == 0)
         {
@@ -1173,7 +1178,7 @@ __mulxf3 (long double a, long double b)
         }
     }
 
-  if (exp_b == -16382)
+  if (exp_b == XF_EMIN)
     {
       while ((mant_b & 0x8000000000000000ULL) == 0)
         {
@@ -1182,7 +1187,7 @@ __mulxf3 (long double a, long double b)
         }
     }
 
-  /* Add exponents (unbiased, range -16382 to +16383).  */
+  /* Add exponents (unbiased, range XF_EMIN to +16383).  */
   exp_r = exp_a + exp_b;
 
   /* Exact 64x64 -> 128-bit multiplication (hi:lo).  */
@@ -1225,9 +1230,9 @@ __mulxf3 (long double a, long double b)
 
   /* Underflow and subnormal shifting including guard/sticky
      accumulation.  */
-  if (exp_r < -16382)
+  if (exp_r < XF_EMIN)
     {
-      int shift = -16382 - exp_r;
+      int shift = XF_EMIN - exp_r;
 
       if (shift > 65)
         return __xf_pack (sign_r, 0, 0);
@@ -1257,7 +1262,7 @@ __mulxf3 (long double a, long double b)
           mant_r >>= shift;
         }
 
-      exp_r = -16382;
+      exp_r = XF_EMIN;
     }
 
   /* IEEE 754 round-to-nearest-even.  */
@@ -1438,7 +1443,7 @@ __divxf3 (long double a, long double b)
     }
 
   /* Round-to-nearest-even, exact and without double rounding.  */
-  if (exp_r >= -16382)
+  if (exp_r >= XF_EMIN)
     {
       /* Normal range: round mant_r to 64 bits.  Round up if
          rem/mant_b > 1/2, or exactly 1/2 and mant_r is odd.
@@ -1476,7 +1481,7 @@ __divxf3 (long double a, long double b)
 
          s = right shift from the 64-bit normal case to the subnormal
          grid (1 .. 16447).  */
-      s = -16382 - exp_r;
+      s = XF_EMIN - exp_r;
 
       if (s > 64)
         {
@@ -1489,7 +1494,7 @@ __divxf3 (long double a, long double b)
           /* Value in [0.5, 1) ulp of the smallest subnormal.  */
           if (mant_r > 0x8000000000000000ULL
               || (mant_r == 0x8000000000000000ULL && rem != 0))
-            return __xf_pack (sign_r, -16382, 1);
+            return __xf_pack (sign_r, XF_EMIN, 1);
 
           return __xf_pack (sign_r, 0, 0);
         }
@@ -1504,7 +1509,7 @@ __divxf3 (long double a, long double b)
           || (lo == half && (rem != 0 || (mant_r & 1))))
         mant_r++;       /* Can become 2^63 = smallest normal.  */
 
-      exp_r = -16382;
+      exp_r = XF_EMIN;
     }
 
   return __xf_pack (sign_r, exp_r, mant_r);
