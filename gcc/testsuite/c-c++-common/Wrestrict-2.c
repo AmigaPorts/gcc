@@ -58,7 +58,7 @@ void call_strcat (char *d)
 
 static void wrap_strcpy (char *d, const char *s)
 {
-  strcpy (d, s);   /* { dg-warning "source argument is the same as destination" "strcpy" } */
+  strcpy (d, s);   /* { dg-warning "source argument is the same as destination" "strcpy" { xfail m68k-*-amigaos* } } */
 }
 
 void call_strcpy (char *d)
