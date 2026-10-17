@@ -7531,3 +7531,16 @@ m68k_preferred_doloop_mode (machine_mode mode)
 
   return SImode;
 }
+
+/* Adjust a source that is read after DST changes its address register.  */
+rtx
+m68k_adjust_for_autoinc (rtx src, rtx dst, int delta)
+{
+  if (!MEM_P (src) || !MEM_P (dst))
+    return src;
+  rtx a = XEXP (dst, 0);
+  if (GET_RTX_CLASS (GET_CODE (a)) != RTX_AUTOINC
+      || !reg_mentioned_p (XEXP (a, 0), XEXP (src, 0)))
+    return src;
+  return replace_equiv_address_nv (src, plus_constant (Pmode, XEXP (src, 0), delta));
+}
