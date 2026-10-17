@@ -757,3 +757,13 @@ amigaos_prelink_hook((const char **)(LD1_ARGV), (STRIP))
    technique.  */
 #undef PCC_STATIC_STRUCT_RETURN
 #define DEFAULT_PCC_STRUCT_RETURN 0
+
+/* Address zero is mapped on AmigaOS, so deleting checks after a null
+   dereference changes valid program behavior.  A library may also define
+   calloc using malloc and memset; do not turn that sequence into a call
+   back into calloc by default.  An explicit positive option overrides
+   either target default.  */
+#undef DRIVER_SELF_SPECS
+#define DRIVER_SELF_SPECS \
+  "%{!fdelete-null-pointer-checks:-fno-delete-null-pointer-checks}", \
+  "%{!fmalloc-memset-to-calloc:-fno-malloc-memset-to-calloc}"

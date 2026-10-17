@@ -2508,6 +2508,10 @@ m68k*-*-amigaos*)
 	extra_options="${extra_options} m68k/amigaos.opt"
 	extra_gcc_objs="driver-amigaos.o"
 	gnu_ld=yes
+	# Register static and thread_local destructors through the C++ ABI.
+	# libnix provides __cxa_atexit and __dso_handle, and libstdc++
+	# provides the thread-local destructor registration path.
+	default_use_cxa_atexit=yes
 	CFLAGS="-Os"
   	case ${enable_threads} in
 	    yes | posix) thread_file='posix' ;;

@@ -3814,6 +3814,29 @@ last_stmt_ptr_check (tree ptr, basic_block bb)
   return true;
 }
 
+/* True if STMT is in a function named calloc: the current function, or one
+   inlined into it.  A program's own calloc built from malloc and memset
+   must not be turned into a call to calloc.  */
+
+static bool
+stmt_in_calloc_p (gimple *stmt)
+{
+  if (current_function_decl
+      && DECL_NAME (current_function_decl)
+      && id_equal (DECL_NAME (current_function_decl), "calloc"))
+    return true;
+  for (tree b = stmt ? gimple_block (stmt) : NULL_TREE;
+       b && TREE_CODE (b) == BLOCK; b = BLOCK_SUPERCONTEXT (b))
+    if (inlined_function_outer_scope_p (b))
+      {
+	tree fn = block_ultimate_origin (b);
+	if (fn && TREE_CODE (fn) == FUNCTION_DECL && DECL_NAME (fn)
+	    && id_equal (DECL_NAME (fn), "calloc"))
+	  return true;
+      }
+  return false;
+}
+
 /* Check if doing a malloc+memset to calloc is a good idea. PTR is the
    return value of the malloc/where the memset happens. MALLOC_BB is
    the basic block of the malloc. MEMSET_BB is basic block of the memset.  */
@@ -3948,7 +3971,13 @@ strlen_pass::handle_builtin_memset (bool *zero_write)
   else if (!allow_memset_malloc_to_calloc (ptr, gimple_bb (si1->stmt), gimple_bb (memset_stmt)))
      return false;
   else if (code1 == BUILT_IN_MALLOC
-	   && operand_equal_p (memset_size, alloc_size, 0))
+	   && operand_equal_p (memset_size, alloc_size, 0)
+	   /* -fno-malloc-memset-to-calloc turns this off; and never inside
+	      calloc itself, which a program may define as malloc + memset:
+	      it would call itself for ever.  */
+	   && flag_malloc_memset_to_calloc
+	   && !stmt_in_calloc_p (si1->stmt)
+	   && !stmt_in_calloc_p (memset_stmt))
     {
       /* Replace the malloc + memset calls with calloc.  */
       gimple_stmt_iterator gsi1 = gsi_for_stmt (si1->stmt);

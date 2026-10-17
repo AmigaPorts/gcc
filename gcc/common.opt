@@ -3289,6 +3289,10 @@ foptimize-strlen
 Common Var(flag_optimize_strlen) Optimization
 Enable string length optimizations on trees.
 
+fmalloc-memset-to-calloc
+Common Var(flag_malloc_memset_to_calloc) Init(1) Optimization
+Turn a malloc followed by a memset of the whole block to zero into calloc.
+
 fisolate-erroneous-paths-dereference
 Common Var(flag_isolate_erroneous_paths_dereference) Optimization
 Detect paths that trigger erroneous or undefined behavior due to
