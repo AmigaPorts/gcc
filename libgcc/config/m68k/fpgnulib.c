@@ -490,6 +490,17 @@ union long_double_union
 
 #define EXP_SENTINEL_INF_NAN 16384
 
+/* Unbiased exponent of a stored exponent of 0.  Unlike the x87 format,
+   the 68881 does not bump it to 1: the integer bit is stored there too,
+   so E = 0 holds [2^-16383, 2^-16382) as well as the subnormals below.  */
+#define XF_EMIN (-16383)
+
+/* Mantissas for EXP_SENTINEL_INF_NAN.  With an exponent of 0x7FFF the
+   integer bit does not matter: 0 is the canonical infinity, which is what
+   GCC emits for constants, and all ones is the 68881's default NaN.  */
+#define XF_INF_MANT 0ULL
+#define XF_NAN_MANT 0xFFFFFFFFFFFFFFFFULL
+
 #ifdef __UNPACK
 /* Unpack Motorola 80-bit extended long double into sign, unbiased
    exponent, and mantissa.  Stored exponent E is biased by 16383.
@@ -517,7 +528,7 @@ __xf_unpack (long double x, unsigned int *sign, int *exp,
       if (*mant == 0)
         *exp = 0;
       else
-        *exp = -16382;
+        *exp = XF_EMIN;
     }
   else if (E == 0x7FFF)
     {
@@ -543,16 +554,8 @@ __xf_pack (unsigned int sign, int exp, unsigned long long mant)
   unsigned int upper;
   int E;
 
-  /* Zero.  */
-  if (mant == 0)
-    {
-      u.w.upper = (sign ? 0x80000000u : 0x00000000u);
-      u.w.middle = 0;
-      u.w.lower = 0;
-      return u.ld;
-    }
-
-  /* Infinity or NaN (sentinel exp == EXP_SENTINEL_INF_NAN).  */
+  /* Infinity or NaN (sentinel exp == EXP_SENTINEL_INF_NAN).  Before the
+     zero test: XF_INF_MANT is 0.  */
   if (exp == EXP_SENTINEL_INF_NAN)
     {
       upper = ((unsigned int) sign << 31) | (0x7FFFu << 16);
@@ -562,9 +565,18 @@ __xf_pack (unsigned int sign, int exp, unsigned long long mant)
       return u.ld;
     }
 
-  /* Denormal/subnormal.  If bit 63 is not set, this is a subnormal
-     number (E = 0).  */
-  if (exp <= -16382 && (mant & 0x8000000000000000ULL) == 0)
+  /* Zero.  */
+  if (mant == 0)
+    {
+      u.w.upper = (sign ? 0x80000000u : 0x00000000u);
+      u.w.middle = 0;
+      u.w.lower = 0;
+      return u.ld;
+    }
+
+  /* E = 0, with or without the integer bit (see XF_EMIN).  The callers
+     have already shifted subnormal mantissas to XF_EMIN.  */
+  if (exp <= XF_EMIN)
     {
       u.w.upper = ((unsigned int) sign << 31); /* Biased E = 0.  */
       u.w.middle = (unsigned int) (mant >> 32);
@@ -579,7 +591,7 @@ __xf_pack (unsigned int sign, int exp, unsigned long long mant)
   if (E >= 0x7FFF)
     {
       u.w.upper = ((unsigned int) sign << 31) | (0x7FFFu << 16);
-      u.w.middle = 0x80000000u; /* IEEE 754 x87 Inf has bit 63 set.  */
+      u.w.middle = 0; /* XF_INF_MANT */
       u.w.lower = 0;
       return u.ld;
     }
@@ -903,7 +915,7 @@ __addxf3 (long double a, long double b)
     {
       if (exp_b == EXP_SENTINEL_INF_NAN && sign_a != sign_b)
         return __xf_pack (0, EXP_SENTINEL_INF_NAN,
-                          0x8000000000000000ULL); /* NaN.  */
+                          XF_NAN_MANT);
       return a;
     }
   if (exp_b == EXP_SENTINEL_INF_NAN)
@@ -919,7 +931,7 @@ __addxf3 (long double a, long double b)
     return a;
 
   /* Normalize subnormal inputs.  */
-  if (exp_a == -16382)
+  if (exp_a == XF_EMIN)
     {
       while ((mant_a & 0x8000000000000000ULL) == 0)
         {
@@ -927,7 +939,7 @@ __addxf3 (long double a, long double b)
           exp_a--;
         }
     }
-  if (exp_b == -16382)
+  if (exp_b == XF_EMIN)
     {
       while ((mant_b & 0x8000000000000000ULL) == 0)
         {
@@ -936,118 +948,74 @@ __addxf3 (long double a, long double b)
         }
     }
 
-  /* Align exponents.  */
-  unsigned int guard = 0;
-  unsigned int sticky = 0;
+  /* Align exponents.  X is the operand with the larger exponent; Y is
+     shifted right to match, and EXT keeps the bits shifted out of it:
+     exactly for shifts up to 64, with anything lower ORed into bit 0.  */
+  unsigned int guard, sticky, sign_x, sign_y;
+  unsigned long long mant_x, mant_y, ext = 0;
+  int shift;
 
-  if (exp_a > exp_b)
+  if (exp_a >= exp_b)
     {
-      int shift = exp_a - exp_b;
-      exp_r = exp_a;
-
-      if (shift >= 66)
-        {
-          guard = 0;
-          sticky = 1;
-          mant_b = 0;
-        }
-      else if (shift == 65)
-        {
-          guard = 0;
-          sticky = (mant_b != 0);
-          mant_b = 0;
-        }
-      else if (shift == 64)
-        {
-          guard = (unsigned int) (mant_b >> 63);
-          sticky = ((mant_b & 0x7FFFFFFFFFFFFFFFULL) != 0);
-          mant_b = 0;
-        }
-      else
-        {
-          unsigned long long g_mask = 1ULL << (shift - 1);
-          guard = (mant_b & g_mask) != 0;
-          sticky = (mant_b & (g_mask - 1ULL)) != 0;
-          mant_b >>= shift;
-        }
-    }
-  else if (exp_b > exp_a)
-    {
-      int shift = exp_b - exp_a;
-      exp_r = exp_b;
-
-      if (shift >= 66)
-        {
-          guard = 0;
-          sticky = 1;
-          mant_a = 0;
-        }
-      else if (shift == 65)
-        {
-          guard = 0;
-          sticky = (mant_a != 0);
-          mant_a = 0;
-        }
-      else if (shift == 64)
-        {
-          guard = (unsigned int) (mant_a >> 63);
-          sticky = ((mant_a & 0x7FFFFFFFFFFFFFFFULL) != 0);
-          mant_a = 0;
-        }
-      else
-        {
-          unsigned long long g_mask = 1ULL << (shift - 1);
-          guard = (mant_a & g_mask) != 0;
-          sticky = (mant_a & (g_mask - 1ULL)) != 0;
-          mant_a >>= shift;
-        }
+      sign_x = sign_a, mant_x = mant_a, exp_r = exp_a;
+      sign_y = sign_b, mant_y = mant_b, shift = exp_a - exp_b;
     }
   else
     {
-      exp_r = exp_a;
+      sign_x = sign_b, mant_x = mant_b, exp_r = exp_b;
+      sign_y = sign_a, mant_y = mant_a, shift = exp_b - exp_a;
     }
 
-  /* Add or subtract mantissas.  */
-  if (sign_a == sign_b)
+  if (shift == 0)
+    ;
+  else if (shift < 64)
     {
-      /* Same sign: addition.  */
-      sign_r = sign_a;
-      mant_r = mant_a + mant_b;
+      ext = mant_y << (64 - shift);
+      mant_y >>= shift;
+    }
+  else if (shift == 64)
+    {
+      ext = mant_y;
+      mant_y = 0;
+    }
+  else if (shift < 128)
+    {
+      ext = (mant_y >> (shift - 64)) | ((mant_y << (128 - shift)) != 0);
+      mant_y = 0;
+    }
+  else
+    {
+      ext = 1;		/* mant_y is not zero here.  */
+      mant_y = 0;
+    }
 
-      if (mant_r < mant_a)
+  /* Add or subtract mantissas, as 128-bit numbers mant:ext.  */
+  if (sign_x == sign_y)
+    {
+      sign_r = sign_x;
+      mant_r = mant_x + mant_y;
+
+      if (mant_r < mant_x)
         {
           /* Overflow beyond bit 63.  */
-          sticky |= guard;
-          guard = (unsigned int) (mant_r & 1ULL);
+          ext = (ext >> 1) | (ext & 1ULL) | (mant_r << 63);
           mant_r = (mant_r >> 1) | 0x8000000000000000ULL;
           exp_r++;
         }
     }
   else
     {
-      /* Different signs: subtraction.  */
-      if (mant_a > mant_b || (mant_a == mant_b && (guard || sticky)))
+      /* After a shift, mant_y < 2^63 <= mant_x; without one, ext is 0.  */
+      if (mant_x > mant_y)
         {
-          sign_r = sign_a;
-          /* 128-bit subtraction including guard and sticky.  */
-          if (sticky || guard)
-            {
-              mant_r = mant_a - mant_b - 1ULL;
-              if (!guard)
-                sticky = 1;
-              guard = !guard;
-            }
-          else
-            {
-              mant_r = mant_a - mant_b;
-            }
+          sign_r = sign_x;
+          mant_r = mant_x - mant_y - (ext != 0);
+          ext = -ext;
         }
-      else if (mant_b > mant_a)
+      else if (mant_y > mant_x)
         {
-          sign_r = sign_b;
-          mant_r = mant_b - mant_a;
-          guard = 0;
-          sticky = 0;
+          sign_r = sign_y;
+          mant_r = mant_y - mant_x;
         }
       else
         {
@@ -1055,19 +1023,23 @@ __addxf3 (long double a, long double b)
           return __xf_pack (0, 0, 0);
         }
 
-      /* Normalize after subtraction.  */
-      while ((mant_r & 0x8000000000000000ULL) == 0 && mant_r != 0)
+      /* Normalize after subtraction.  A shift of more than one bit only
+         follows an alignment shift of at most one, so EXT is exact.  */
+      while ((mant_r & 0x8000000000000000ULL) == 0)
         {
-          mant_r = (mant_r << 1) | guard;
-          guard = 0; /* Guard shifts into mantissa.  */
+          mant_r = (mant_r << 1) | (ext >> 63);
+          ext <<= 1;
           exp_r--;
         }
     }
 
+  guard = (unsigned int) (ext >> 63);
+  sticky = (ext << 1) != 0;
+
   /* Underflow handling for subnormals.  */
-  if (exp_r < -16382)
+  if (exp_r < XF_EMIN)
     {
-      int shift = -16382 - exp_r;
+      int shift = XF_EMIN - exp_r;
 
       if (shift > 65)
         return __xf_pack (sign_r, 0, 0);
@@ -1095,7 +1067,7 @@ __addxf3 (long double a, long double b)
           sticky = new_sticky;
           mant_r >>= shift;
         }
-      exp_r = -16382;
+      exp_r = XF_EMIN;
     }
 
   /* IEEE 754 round-to-nearest-even.  */
@@ -1112,7 +1084,7 @@ __addxf3 (long double a, long double b)
   /* Overflow.  */
   if (exp_r > 16383)
     return __xf_pack (sign_r, EXP_SENTINEL_INF_NAN,
-                      0x8000000000000000ULL);
+                      XF_INF_MANT);
 
   return __xf_pack (sign_r, exp_r, mant_r);
 }
@@ -1154,17 +1126,19 @@ __mulxf3 (long double a, long double b)
       && (mant_b & 0x7FFFFFFFFFFFFFFFULL) != 0)
     return b;
 
-  /* Infinity handling.  */
+  /* Infinity handling: Inf * 0 = NaN.  */
   if (exp_a == EXP_SENTINEL_INF_NAN || exp_b == EXP_SENTINEL_INF_NAN)
     return __xf_pack (sign_r, EXP_SENTINEL_INF_NAN,
-                      0x8000000000000000ULL);
+                      (exp_a != EXP_SENTINEL_INF_NAN && mant_a == 0)
+                      || (exp_b != EXP_SENTINEL_INF_NAN && mant_b == 0)
+                      ? XF_NAN_MANT : XF_INF_MANT);
 
   /* Zero handling.  */
   if (mant_a == 0 || mant_b == 0)
     return __xf_pack (sign_r, 0, 0);
 
   /* Normalize subnormal inputs (ensure bit 63 is set).  */
-  if (exp_a == -16382)
+  if (exp_a == XF_EMIN)
     {
       while ((mant_a & 0x8000000000000000ULL) == 0)
         {
@@ -1173,7 +1147,7 @@ __mulxf3 (long double a, long double b)
         }
     }
 
-  if (exp_b == -16382)
+  if (exp_b == XF_EMIN)
     {
       while ((mant_b & 0x8000000000000000ULL) == 0)
         {
@@ -1182,7 +1156,7 @@ __mulxf3 (long double a, long double b)
         }
     }
 
-  /* Add exponents (unbiased, range -16382 to +16383).  */
+  /* Add exponents (unbiased, range XF_EMIN to +16383).  */
   exp_r = exp_a + exp_b;
 
   /* Exact 64x64 -> 128-bit multiplication (hi:lo).  */
@@ -1225,9 +1199,9 @@ __mulxf3 (long double a, long double b)
 
   /* Underflow and subnormal shifting including guard/sticky
      accumulation.  */
-  if (exp_r < -16382)
+  if (exp_r < XF_EMIN)
     {
-      int shift = -16382 - exp_r;
+      int shift = XF_EMIN - exp_r;
 
       if (shift > 65)
         return __xf_pack (sign_r, 0, 0);
@@ -1257,7 +1231,7 @@ __mulxf3 (long double a, long double b)
           mant_r >>= shift;
         }
 
-      exp_r = -16382;
+      exp_r = XF_EMIN;
     }
 
   /* IEEE 754 round-to-nearest-even.  */
@@ -1276,7 +1250,7 @@ __mulxf3 (long double a, long double b)
   /* Overflow.  */
   if (exp_r > 16383)
     return __xf_pack (sign_r, EXP_SENTINEL_INF_NAN,
-                      0x8000000000000000ULL);
+                      XF_INF_MANT);
 
   return __xf_pack (sign_r, exp_r, mant_r);
 }
@@ -1300,9 +1274,8 @@ __divxf3 (long double a, long double b)
   sign_r = sign_a ^ sign_b;
 
   /* NaN handling: exponent sentinel with at least one fraction bit
-     set.  The canonical infinity has mantissa 0x8000000000000000 -
-     the integer bit alone does not count as a NaN fraction and must
-     not be recognized as NaN.  */
+     set.  The integer bit of an infinity may be set (see XF_INF_MANT);
+     it does not count as a NaN fraction.  */
   if (exp_a == EXP_SENTINEL_INF_NAN
       && (mant_a & 0x7FFFFFFFFFFFFFFFULL) != 0)
     return a;
@@ -1317,11 +1290,11 @@ __divxf3 (long double a, long double b)
       /* Inf / Inf = NaN.  */
       if (exp_b == EXP_SENTINEL_INF_NAN)
         return __xf_pack (0, EXP_SENTINEL_INF_NAN,
-                          0x8000000000000000ULL);
+                          XF_NAN_MANT);
 
       /* Inf / finite = Inf.  */
       return __xf_pack (sign_r, EXP_SENTINEL_INF_NAN,
-                        0x8000000000000000ULL);
+                        XF_INF_MANT);
     }
 
   if (exp_b == EXP_SENTINEL_INF_NAN)
@@ -1336,7 +1309,7 @@ __divxf3 (long double a, long double b)
       /* 0 / 0 = NaN.  */
       if (mant_b == 0)
         return __xf_pack (0, EXP_SENTINEL_INF_NAN,
-                          0x8000000000000000ULL);
+                          XF_NAN_MANT);
 
       /* 0 / finite = +/-0.  */
       return __xf_pack (sign_r, 0, 0);
@@ -1346,7 +1319,7 @@ __divxf3 (long double a, long double b)
     {
       /* finite / 0 = Inf.  */
       return __xf_pack (sign_r, EXP_SENTINEL_INF_NAN,
-                        0x8000000000000000ULL);
+                        XF_INF_MANT);
     }
 
   /* Normalize subnormal (and unnormal) operands exactly: shift
@@ -1438,7 +1411,7 @@ __divxf3 (long double a, long double b)
     }
 
   /* Round-to-nearest-even, exact and without double rounding.  */
-  if (exp_r >= -16382)
+  if (exp_r >= XF_EMIN)
     {
       /* Normal range: round mant_r to 64 bits.  Round up if
          rem/mant_b > 1/2, or exactly 1/2 and mant_r is odd.
@@ -1462,7 +1435,7 @@ __divxf3 (long double a, long double b)
       /* Overflow.  */
       if (exp_r > 16383)
         return __xf_pack (sign_r, EXP_SENTINEL_INF_NAN,
-                          0x8000000000000000ULL);
+                          XF_INF_MANT);
     }
   else
     {
@@ -1476,7 +1449,7 @@ __divxf3 (long double a, long double b)
 
          s = right shift from the 64-bit normal case to the subnormal
          grid (1 .. 16447).  */
-      s = -16382 - exp_r;
+      s = XF_EMIN - exp_r;
 
       if (s > 64)
         {
@@ -1489,7 +1462,7 @@ __divxf3 (long double a, long double b)
           /* Value in [0.5, 1) ulp of the smallest subnormal.  */
           if (mant_r > 0x8000000000000000ULL
               || (mant_r == 0x8000000000000000ULL && rem != 0))
-            return __xf_pack (sign_r, -16382, 1);
+            return __xf_pack (sign_r, XF_EMIN, 1);
 
           return __xf_pack (sign_r, 0, 0);
         }
@@ -1504,7 +1477,7 @@ __divxf3 (long double a, long double b)
           || (lo == half && (rem != 0 || (mant_r & 1))))
         mant_r++;       /* Can become 2^63 = smallest normal.  */
 
-      exp_r = -16382;
+      exp_r = XF_EMIN;
     }
 
   return __xf_pack (sign_r, exp_r, mant_r);
@@ -1550,6 +1523,12 @@ __xfcmp (long double a, long double b)
 
   xsign = SIGNX (x) != 0;
   ysign = SIGNX (y) != 0;
+
+  /* An infinity may come with or without the integer bit.  */
+  if (xexp == EXPXMASK)
+    x.l.middle &= MANTXMASK;
+  if (yexp == EXPXMASK)
+    y.l.middle &= MANTXMASK;
 
   /* Different signs.  */
   if (xsign != ysign)
