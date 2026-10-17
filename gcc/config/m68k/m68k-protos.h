@@ -77,6 +77,7 @@ extern bool m68k_matches_q_p (rtx);
 extern bool m68k_matches_u_p (rtx);
 extern rtx legitimize_pic_address (rtx, machine_mode, rtx);
 extern rtx m68k_legitimize_tls_address (rtx);
+extern rtx m68k_adjust_for_autoinc (rtx, rtx, int);
 extern bool m68k_tls_reference_p (rtx, bool);
 extern int valid_dbcc_comparison_p_2 (rtx, machine_mode);
 extern rtx m68k_libcall_value (machine_mode);
