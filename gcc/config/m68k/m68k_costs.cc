@@ -445,7 +445,9 @@ m68k_select_cost_tables (void)
         active_speed = cost_speed_68030;
         active_size  = cost_size_68030;
       }
-    else if (m68k_tune == u68040)
+    /* The 68060 has no table of its own; its pipeline is closer to the
+       68040's than to the 68080's.  TUNE_68060 includes -m68020-60.  */
+    else if (m68k_tune == u68040 || TUNE_68060)
       {
         active_speed = cost_speed_68040;
         active_size  = cost_size_68040;
@@ -588,7 +590,7 @@ m68k_lsl_shift_per_step (void)
     if (TUNE_68000_10)                      return 2;
     if (m68k_tune == u68020 || m68k_tune == u68020_40) return 2;
     if (m68k_tune == u68030)                return 2;
-    if (m68k_tune == u68040)                return 0;
+    if (m68k_tune == u68040 || TUNE_68060)  return 0;
     return 1;                               /* 68080 */
 }
 
@@ -919,7 +921,7 @@ m68k_costs_engine (rtx x,
         if (TUNE_68000_10 || m68k_tune == u68020 || m68k_tune == u68020_40
             || m68k_tune == u68030)
             *total = GET_MODE_SIZE (mode) > 2 ? 260 : 0;
-        else if (m68k_tune == u68040)
+        else if (m68k_tune == u68040 || TUNE_68060)
             *total = GET_MODE_SIZE (mode) > 2 ? 38 : 44;
         else
             *total = GET_MODE_SIZE (mode) > 2 ? 6 : 4;
