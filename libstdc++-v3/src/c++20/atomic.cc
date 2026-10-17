@@ -291,7 +291,12 @@ namespace
   {
     // Don't use std::hardware_destructive_interference_size here because we
     // don't want the layout of library types to depend on compiler options.
+#ifdef __amigaos__
+    // Amiga hunk/a.out objects cannot align beyond 8 bytes (MAX_OFILE_ALIGNMENT).
+    static constexpr auto _S_align = 8;
+#else
     static constexpr auto _S_align = 64;
+#endif
 
     // Count of threads blocked waiting on this state.
     alignas(_S_align) __platform_wait_t _M_waiters = 0;
