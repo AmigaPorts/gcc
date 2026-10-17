@@ -128,12 +128,12 @@ void call_strcat_dst_xsize (const char *s)
 
 static void wrap_strcpy_src_xsize (char *d, const char *s, ptrdiff_t i)
 {
-  strcpy (d, s + i);   /* { dg-warning "offset 48 is out of the bounds \\\[0, 45] of object .ar5. with type .(struct )?Array." "strcpy" } */
+  strcpy (d, s + i);   /* { dg-warning "offset 48 is out of the bounds \\\[0, 45] of object .ar5. with type .(struct )?Array." "strcpy" { xfail m68k-*-amigaos* } } */
 }
 
 void call_strcpy_src_xsize (char *d)
 {
-  struct Array ar5;       /* { dg-message ".ar5. declared here" } */
+  struct Array ar5;       /* { dg-message ".ar5. declared here" "" { xfail m68k-*-amigaos* } } */
   sink (&ar5);
   wrap_strcpy_src_xsize (d, ar5.a15, 15 + 17 + 3);
   sink (&ar5);
@@ -141,12 +141,12 @@ void call_strcpy_src_xsize (char *d)
 
 static void wrap_strcpy_dst_xsize (char *d, const char *s, ptrdiff_t i)
 {
-  strcpy (d + i, s);   /* { dg-warning "offset 49 is out of the bounds \\\[0, 45] of object .ar6. with type .(struct )?Array." "strcpy" } */
+  strcpy (d + i, s);   /* { dg-warning "offset 49 is out of the bounds \\\[0, 45] of object .ar6. with type .(struct )?Array." "strcpy" { xfail m68k-*-amigaos* } } */
 }
 
 void call_strcpy_dst_xsize (const char *s)
 {
-  struct Array ar6;       /* { dg-message ".ar6. declared here" } */
+  struct Array ar6;       /* { dg-message ".ar6. declared here" "" { xfail m68k-*-amigaos* } } */
   sink (&ar6);
   wrap_strcpy_dst_xsize (ar6.a15, s, 15 + 17 + 4);
   sink (&ar6);

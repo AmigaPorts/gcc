@@ -1,5 +1,9 @@
 /* { dg-skip-if "" { powerpc*-*-aix* } } */
 /* { dg-skip-if "" { "avr-*-*" } } */
+/* libnix, which the m68k-amigaos test boards use, exposes errno as a
+   pointer variable, which the analyzer does not model: it knows errno
+   only through __errno_location() and the like.  */
+/* { dg-skip-if "errno is a pointer variable" { m68k-*-amigaos* } } */
 
 #include <errno.h>
 #include "../../gcc.dg/analyzer/analyzer-decls.h"
