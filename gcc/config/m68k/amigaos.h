@@ -181,6 +181,9 @@ while (0)
 #define SUBTARGET_OVERRIDE_OPTIONS					\
 do									\
   {									\
+    /* Address zero is mapped; keep null reads unless explicitly requested. */ \
+    if (!OPTION_SET_P (flag_delete_null_pointer_checks))		\
+      flag_delete_null_pointer_checks = 0;				\
     if (flag_resident)							\
       {									\
         if (flag_pic)							\
