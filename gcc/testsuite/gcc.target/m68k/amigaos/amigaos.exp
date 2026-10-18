@@ -107,7 +107,12 @@ if { !$multilib_pinned } {
 	{-fbaserel32 -m68060}		"libb32/libm060"
 	{-resident}			"libb"
 	{-resident -m68020}		"libb/libm020"
+	{-resident -m68060}		"libb/libm060"
+	{-resident -mcpu=68020 -mhard-float}	"libb/libm020/libm881"
+	{-resident -m68060 -mhard-float}	"libb/libm020/libm881"
 	{-resident32 -m68020}		"libb32/libm020"
+	{-resident32 -m68030 -m68881}	"libb32/libm020/libm881"
+	{-resident32 -march=68060 -mhard-float}	"libb32/libm020/libm881"
     } {
 	amigaos_check_multi_dir $opts $dir
     }
