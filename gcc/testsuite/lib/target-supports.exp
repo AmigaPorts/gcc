@@ -10696,11 +10696,36 @@ proc check_missing_uclibc_feature {feature} {
     "]
 }
 
-# Return true if this is a Newlib target.
+# Return true if this is a Newlib target.  Having a newlib.h is not enough:
+# the C libraries built on newlib's headers on m68k-amigaos, libnix and
+# clib2, ship one too, and define their own macro instead.
 
 proc check_effective_target_newlib {} {
     return [check_no_compiler_messages newlib object {
 	#include <newlib.h>
+	#if !defined (__NEWLIB__) || defined (__libnix__) || defined (__CLIB2__)
+	#error not newlib
+	#endif
+    }]
+}
+
+# Return true if the C library is libnix (m68k-amigaos, -mcrt=nix20).
+
+proc check_effective_target_libnix {} {
+    return [check_no_compiler_messages libnix assembly {
+	#ifndef __libnix__
+	#error not libnix
+	#endif
+    }]
+}
+
+# Return true if the C library is clib2 (m68k-amigaos, -mcrt=clib2).
+
+proc check_effective_target_clib2 {} {
+    return [check_no_compiler_messages clib2 assembly {
+	#ifndef __CLIB2__
+	#error not clib2
+	#endif
     }]
 }
 
