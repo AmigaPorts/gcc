@@ -1,9 +1,9 @@
 /* Derived from OpenAmigaGCC; Copyright (C) 2026 Dalsin Limited.  */
 /* { dg-do run } */
-/* { dg-options "-Os -m68040 -fomit-frame-pointer" } */
-/* 64-bit libcall arguments pushed from stack slots (-m68040/-m68060 tuning,
-   no frame pointer): (s64)m * 4294967296 / det pushes 0 and then m's low
-   word; that second push must not read 4 bytes too low.
+/* { dg-options "-Os -fomit-frame-pointer" } */
+/* 64-bit libcall arguments pushed from stack slots (no frame pointer):
+   (s64)m * 4294967296 / det pushes 0 and then m's low word; that second
+   push must not read 4 bytes too low.  It fails at -Os on every CPU.
    The arithmetic is OpenGPU's affine compositing, reduced. */
 typedef long long s64;
 volatile long M[6] = { 0x18000, 0x6000, 0x30000, -0x4000, 0x14000, 0x20000 };
