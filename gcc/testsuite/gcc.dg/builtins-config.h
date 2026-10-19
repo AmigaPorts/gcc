@@ -46,7 +46,15 @@
    version will be found before the newlib version.  Similarly, uClibc
    lacks the C99 functions.  */
 #include <sys/types.h>
-#if defined(_NEWLIB_VERSION) || defined(__UCLIBC__)
+#if defined(__amigaos__)
+/* m68k-amigaos: the compiler assumes the C99 functions.  Its newlib has
+   them all, "l" variants included; libnix lacks exp2, exp2f, log2f and
+   several "l" functions.  libnix and clib2 ship a newlib.h of their own,
+   so test the macro newlib's sys/types.h defines, not the header.  */
+#if defined(_NEWLIB_VERSION) && !defined(__libnix__) && !defined(__CLIB2__)
+#define HAVE_C99_RUNTIME
+#endif
+#elif defined(_NEWLIB_VERSION) || defined(__UCLIBC__)
 #elif defined(__sun) && __STDC_VERSION__ - 0 < 199901L
 /* If you're including this file, you probably want to test the newer
    behavior, so ensure the right flags were used for each test: */
