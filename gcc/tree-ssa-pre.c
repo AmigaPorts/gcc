@@ -4053,7 +4053,7 @@ eliminate_dom_walker::before_dom_children (basic_block b)
       tree sprime = NULL_TREE;
       gimple *stmt = gsi_stmt (gsi);
 
-      if (stmt->code == GIMPLE_DEBUG || stmt->code == GIMPLE_LABEL)
+      if (stmt->code == GIMPLE_DEBUG || stmt->code == GIMPLE_LABEL || stmt->code == GIMPLE_PREDICT)
 	continue;
 
       tree lhs = gimple_get_lhs (stmt);
