@@ -24,6 +24,7 @@ extern enum m68k_function_kind m68k_get_function_kind (tree);
 extern HOST_WIDE_INT m68k_initial_elimination_offset (int from, int to);
 
 extern void split_di (rtx[], int, rtx[], rtx[]);
+extern void m68k_expand_mulsidi3 (rtx, rtx, rtx, bool);
 
 extern bool valid_mov3q_const (HOST_WIDE_INT);
 extern bool check_move_simode (const rtx *);
