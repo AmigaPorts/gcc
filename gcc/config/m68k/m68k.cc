@@ -4230,6 +4230,81 @@ split_di (rtx operands[], int num, rtx lo_half[], rtx hi_half[])
     }
 }
 
+/* Return the 32-bit product of the low 16 bits of X and Y, with MULU.W.  */
+
+static rtx
+m68k_umulhisi (rtx x, rtx y)
+{
+  rtx dest = gen_reg_rtx (SImode);
+
+  emit_insn (gen_umulhisi3 (dest, gen_lowpart (HImode, x),
+			    gen_lowpart (HImode, y)));
+  return dest;
+}
+
+/* Set DImode register DEST to the 64-bit product of SImode A and B, signed
+   unless UNSIGNEDP, with four MULU.W partial products.  This is for
+   -m68020-60 and -m68060, where MULU.L and MULS.L with a 64-bit result
+   would trap on the 68060.  Splitting each operand into 16-bit halves,
+   the middle sums cannot overflow 32 bits, so no carry is propagated:
+
+     t  = al * bh + (al * bl >> 16)
+     u  = ah * bl + (t & 0xffff)
+     lo = u << 16 | (al * bl & 0xffff)
+     hi = ah * bh + (t >> 16) + (u >> 16)
+
+   A signed product then subtracts B from HI when A is negative, and A
+   when B is.  */
+
+void
+m68k_expand_mulsidi3 (rtx dest, rtx a, rtx b, bool unsignedp)
+{
+  rtx ah, bh, ll, lh, hl, hh, t, u, lo, hi;
+
+  a = force_reg (SImode, a);
+  b = force_reg (SImode, b);
+  ah = expand_shift (RSHIFT_EXPR, SImode, a, 16, NULL_RTX, 1);
+  bh = expand_shift (RSHIFT_EXPR, SImode, b, 16, NULL_RTX, 1);
+
+  ll = m68k_umulhisi (a, b);
+  lh = m68k_umulhisi (a, bh);
+  hl = m68k_umulhisi (ah, b);
+  hh = m68k_umulhisi (ah, bh);
+
+  t = expand_shift (RSHIFT_EXPR, SImode, ll, 16, NULL_RTX, 1);
+  t = expand_simple_binop (SImode, PLUS, lh, t, NULL_RTX, 1, OPTAB_DIRECT);
+  u = expand_simple_binop (SImode, AND, t, GEN_INT (0xffff), NULL_RTX, 1,
+			   OPTAB_DIRECT);
+  u = expand_simple_binop (SImode, PLUS, hl, u, NULL_RTX, 1, OPTAB_DIRECT);
+
+  lo = expand_shift (LSHIFT_EXPR, SImode, u, 16, NULL_RTX, 1);
+  ll = expand_simple_binop (SImode, AND, ll, GEN_INT (0xffff), NULL_RTX, 1,
+			    OPTAB_DIRECT);
+  lo = expand_simple_binop (SImode, IOR, lo, ll, NULL_RTX, 1, OPTAB_DIRECT);
+
+  t = expand_shift (RSHIFT_EXPR, SImode, t, 16, NULL_RTX, 1);
+  hi = expand_simple_binop (SImode, PLUS, hh, t, NULL_RTX, 1, OPTAB_DIRECT);
+  u = expand_shift (RSHIFT_EXPR, SImode, u, 16, NULL_RTX, 1);
+  hi = expand_simple_binop (SImode, PLUS, hi, u, NULL_RTX, 1, OPTAB_DIRECT);
+
+  if (!unsignedp)
+    {
+      rtx m;
+
+      m = expand_shift (RSHIFT_EXPR, SImode, a, 31, NULL_RTX, 0);
+      m = expand_simple_binop (SImode, AND, m, b, NULL_RTX, 1, OPTAB_DIRECT);
+      hi = expand_simple_binop (SImode, MINUS, hi, m, NULL_RTX, 1,
+				OPTAB_DIRECT);
+      m = expand_shift (RSHIFT_EXPR, SImode, b, 31, NULL_RTX, 0);
+      m = expand_simple_binop (SImode, AND, m, a, NULL_RTX, 1, OPTAB_DIRECT);
+      hi = expand_simple_binop (SImode, MINUS, hi, m, NULL_RTX, 1,
+				OPTAB_DIRECT);
+    }
+
+  emit_move_insn (gen_lowpart (SImode, dest), lo);
+  emit_move_insn (gen_highpart (SImode, dest), hi);
+}
+
 /* Split X into a base and a constant offset, storing them in *BASE
    and *OFFSET respectively.  */
 
