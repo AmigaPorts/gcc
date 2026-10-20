@@ -47,3 +47,9 @@ amigaos_alternate_frame_setup (int fsize);
 
 extern void
 amigaos_assemble_visibility (tree decl, int vis);
+
+extern tree
+amigaos_mangle_decl_assembler_name (tree decl, tree id);
+
+extern void
+amigaos_output_labelref (FILE *file, const char *name);

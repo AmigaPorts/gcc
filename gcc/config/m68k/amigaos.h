@@ -239,3 +239,6 @@ while (0)
 #undef TARGET_COMP_TYPE_ATTRIBUTES
 #define TARGET_COMP_TYPE_ATTRIBUTES amigaos_callconv_comp_type_attributes
 
+#undef TARGET_MANGLE_DECL_ASSEMBLER_NAME
+#define TARGET_MANGLE_DECL_ASSEMBLER_NAME amigaos_mangle_decl_assembler_name
+
