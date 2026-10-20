@@ -17,6 +17,9 @@ __attribute__((noinline)) u32 umulhi (u32 a, u32 b)
 {
   return ((u64) a * b) >> 32;
 }
+/* Squares: both operands of the multiply in the same register. */
+__attribute__((noinline)) u64 usq (u32 a) { return (u64) a * a; }
+__attribute__((noinline)) s64 ssq (long a) { return (s64) a * a; }
 
 /* The unsigned product of A and B as HI:LO, with no 64-bit type. */
 static void
@@ -51,6 +54,8 @@ check (u32 a, u32 b)
   s = smul ((long) a, (long) b);
   if ((u32) ((u64) s >> 32) != hi || (u32) s != lo)
     abort ();
+  if (a == b && (usq (a) != umul (a, a) || ssq ((long) a) != s))
+    abort ();
 }
 
 static const u32 edge[] = {
@@ -76,6 +81,7 @@ main (void)
       x = x * 1664525 + 1013904223;
       b = x >> (x & 31);
       check (a, b);
+      check (a, a);
     }
   return 0;
 }
