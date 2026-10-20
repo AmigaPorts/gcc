@@ -1,11 +1,11 @@
 /* Address 4 holds SysBase on AmigaOS, so reading it is the standard way to
    reach exec.library, not a null-page access.  -Wall used to report
    "array subscript 0 is outside array bounds" on every such read.
-   Explicit null-pointer deletion still diagnoses a null dereference.  */
+   A dereference of a null pointer is still diagnosed.  */
 
 /* { dg-do compile } */
 /* { dg-skip-if "amiga SysBase" { ! { m68k-*-amigaos* } } } */
-/* { dg-options "-O2 -Wall -Wnull-dereference -fdelete-null-pointer-checks" } */
+/* { dg-options "-O2 -Wall -Wnull-dereference" } */
 
 struct ExecBase;
 struct Task { int dummy; };
