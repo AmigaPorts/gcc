@@ -111,6 +111,7 @@ struct m68k_args
 			      mismatch.  */
   tree fntype; /* initial function type */
   bool incoming; /* the current function's own parameters, not a call */
+  bool sas; /* assign registers as -msasregparm does */
 };
 
 static struct m68k_args mycum, othercum;
@@ -172,7 +173,8 @@ m68k_init_arg_regs (struct m68k_args *cum, const_tree fntype)
   cum->last_arg_reg = -1;
   cum->regs_already_used = 0;
   cum->arg_num = 0;
-  
+  cum->sas = false;
+
   if (!fntype)
     return;
 
@@ -361,7 +363,7 @@ m68k_arg_regno (struct m68k_args * cum, machine_mode mode, const_tree type)
 	  else
 	    regbegin = 0; /* Dx */
 
-	  if (!sas_regparm)
+	  if (!sas_regparm && !cum->sas)
 	    altregbegin = 8 - regbegin;
 	  len = (GET_MODE_SIZE (mode) + (UNITS_PER_WORD - 1)) / UNITS_PER_WORD;
 	}
@@ -549,6 +551,62 @@ m68k_fntypes_place_args_alike (const_tree fntype1, const_tree args1,
 	!= m68k_place_next_arg (&cum2, TREE_VALUE (args2)))
       return false;
   return true;
+}
+
+/* The registers the arguments of a function of type FNTYPE take, in
+   argument order: "d0", "a1", "fp0", or "s" for an argument on the stack
+   before the last one in a register; NULL if none is in a register.  The
+   string is xmalloc'ed.  Set *SAS when every argument is where a SAS/C
+   __regargs function takes it: what -msasregparm assigns.  */
+
+char *
+m68k_fntype_arg_regs (const_tree fntype, bool *sas)
+{
+  static const char *const names[] = {
+    "d0", "d1", "d2", "d3", "d4", "d5", "d6", "d7",
+    "a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7",
+    "fp0", "fp1", "fp2", "fp3", "fp4", "fp5", "fp6", "fp7"
+  };
+  struct m68k_args cum, sascum;
+  char *regs = xstrdup ("");
+  size_t used = 0;
+
+  m68k_init_arg_regs (&cum, fntype);
+  m68k_init_arg_regs (&sascum, fntype);
+  /* -msasregparm, but a variadic function keeps the stack.  */
+  sascum.sas = true;
+  if (!stdarg_p (fntype))
+    sascum.num_of_regs = 2;
+
+  *sas = true;
+  for (const_tree arg = TYPE_ARG_TYPES (fntype);
+       arg && TREE_VALUE (arg) != void_type_node; arg = TREE_CHAIN (arg))
+    {
+      const_tree type = TREE_VALUE (arg);
+      int regno = m68k_place_next_arg (&cum, type);
+      int sasregno = m68k_arg_regno (&sascum, TYPE_MODE (type), type);
+
+      if (sasregno != -1)
+	for (int i = 0; i < sascum.last_arg_len; i++)
+	  sascum.regs_already_used |= 1 << (sasregno + i);
+      sascum.last_arg_reg = -1;
+      if (regno != sasregno)
+	*sas = false;
+
+      const char *name = (regno >= 0 && regno < (int) ARRAY_SIZE (names)
+			  ? names[regno] : "s");
+      regs = reconcat (regs, regs, name, NULL);
+      if (regno != -1)
+	used = strlen (regs);
+    }
+  if (!used)
+    {
+      free (regs);
+      return NULL;
+    }
+  /* Stack arguments after the last register one say nothing.  */
+  regs[used] = '\0';
+  return regs;
 }
 
 void

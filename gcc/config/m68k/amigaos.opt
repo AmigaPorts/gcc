@@ -16,6 +16,10 @@ mcrt=
 Target RejectNegative Var(amigaos_crt) Joined
 Specify the C runtime: newlib, nix20, nix13, ixemul, clib2 or library
 
+mmangle-regparm
+Target Var(flag_mangle_regparm)
+Name functions that take arguments in registers after their registers, SAS/C style.
+
 mrestore-a4
 Restore a4 in public functions
 Target Common Mask(RESTORE_A4)

@@ -202,6 +202,50 @@ amigaos_assemble_visibility (tree decl, int vis ATTRIBUTE_UNUSED)
 		"in this configuration; ignored");
 }
 
+/* TARGET_MANGLE_DECL_ASSEMBLER_NAME.  With -mmangle-regparm, a function
+   that takes an argument in a register is named after its registers, so a
+   caller that disagrees with the definition fails to link instead of
+   passing arguments where the callee does not look.  SAS/C names a
+   __regargs function @foo; any other assignment becomes _<regs>@foo, such
+   as _d0a0d1@foo.  Calls to builtins use the stack whatever the options,
+   so a builtin keeps its name.  */
+
+tree
+amigaos_mangle_decl_assembler_name (tree decl, tree id)
+{
+  bool sas;
+  char *regs;
+
+  if (!flag_mangle_regparm || TREE_CODE (decl) != FUNCTION_DECL
+      || fndecl_built_in_p (decl))
+    return id;
+  regs = m68k_fntype_arg_regs (TREE_TYPE (decl), &sas);
+  if (!regs)
+    return id;
+  const char *name = IDENTIFIER_POINTER (id);
+  id = get_identifier (sas ? ACONCAT (("@", name, NULL))
+		       : ACONCAT (("_", regs, "@", name, NULL)));
+  free (regs);
+  return id;
+}
+
+/* ASM_OUTPUT_LABELREF.  A name mangled by -mmangle-regparm already has
+   its prefix, and gas takes the @ in it only in quotes.  */
+
+void
+amigaos_output_labelref (FILE *file, const char *name)
+{
+  if (!strchr (name, '@'))
+    asm_fprintf (file, "%U%s", name);
+#ifdef TARGET_AMIGAOS_VASM
+  else
+    fputs (name, file);
+#else
+  else
+    fprintf (file, "\"%s\"", name);
+#endif
+}
+
 void
 amigaos_insert_attribute (tree decl, tree * attr)
 {

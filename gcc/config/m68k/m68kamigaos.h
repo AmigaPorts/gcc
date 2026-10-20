@@ -675,6 +675,10 @@ extern const char *amigaos_crt_check (int argc, const char **argv);
 #define IMMEDIATE_PREFIX "#"
 #endif
 
+/* -mmangle-regparm names carry their own prefix.  */
+#undef ASM_OUTPUT_LABELREF
+#define ASM_OUTPUT_LABELREF(FILE,NAME) amigaos_output_labelref ((FILE), (NAME))
+
 /* begin-GG-local: dynamic libraries */
 
 extern int amigaos_do_collecting (void);
