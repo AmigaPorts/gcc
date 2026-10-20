@@ -118,6 +118,59 @@ if { !$multilib_pinned } {
     }
 }
 
+# Link flavors.  The driver tells ld which subdirectory of each -L directory
+# to search first (-fl), for the libraries it only names by their base
+# directory: libnix, clib2 and ixemul.  The flavor must be the multilib the
+# code is compiled for, and ld falls back to the bare directory, not to
+# another flavor: when -m68060 still asked for libm060 after that multilib
+# was dropped, a 68060 libnix program linked the 68000 libnix.  Driver-only,
+# via -### on a link, so it needs no board support and nothing is run.
+proc amigaos_check_link_flavors { gcc_opts flavors } {
+    global tool
+
+    set src [open "[pwd]/flavor-probe.c" w]
+    puts $src "int main (void) { return 0; }"
+    close $src
+    set options [list "additional_flags=[concat "-###" $gcc_opts]"]
+    set gcc_output [${tool}_target_compile "[pwd]/flavor-probe.c" "flavor-probe.exe" "executable" $options]
+    file delete "[pwd]/flavor-probe.c"
+    set got {}
+    foreach line [split $gcc_output "\n"] {
+	if { [string match "*collect2*" $line] } {
+	    foreach {match flavor} [regexp -all -inline -- {-fl (\S+)} $line] {
+		lappend got $flavor
+	    }
+	}
+    }
+    if { $got eq $flavors } {
+	pass "link flavors $gcc_opts: $flavors"
+    } else {
+	fail "link flavors $gcc_opts: $flavors (got $got)"
+    }
+}
+
+if { !$multilib_pinned } {
+    foreach {opts flavors} {
+	{-m68000}			{}
+	{-m68020}			{libm020}
+	{-m68030}			{libm020}
+	{-m68040}			{libm020}
+	{-mcpu=68040}			{libm020}
+	{-m68020-60}			{libm020}
+	{-m68060}			{libm020}
+	{-mcpu=68060}			{libm020}
+	{-march=68060}			{libm020}
+	{-m68040 -msoft-float}		{libm020}
+	{-m68020 -m68881}		{libm020 libm881}
+	{-m68040 -m68881}		{libm020 libm881}
+	{-m68060 -m68881}		{libm020 libm881}
+	{-m68060 -mhard-float}		{libm020 libm881}
+	{-march=68060 -mhard-float}	{libm020 libm881}
+    } {
+	amigaos_check_link_flavors $opts $flavors
+    }
+}
+
 # Runtime register-ABI check, swept over -O level, allocator and CPU (the
 # result is invariant, so every combination must pass once fixed).  The caller
 # lives in a companion TU (*-run-lib.c, pulled in by dg-additional-sources)

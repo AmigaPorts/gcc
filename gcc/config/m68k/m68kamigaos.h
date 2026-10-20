@@ -558,8 +558,9 @@ extern const char *amigaos_crt_check (int argc, const char **argv);
    they must follow the multilibs: a 68060 gets its own libraries, and
    only an explicit -m68881 or -mhard-float means the hard-float ABI.  */
 #define LINK_CPU_SPEC \
-  "%{m6806*|mc6806*|mcpu=6806*|march=6806*:-fl libm060;" \
-  "m6802*|mc6802*|m6803*|m6804*|m6808*|mcpu=6802*|mcpu=6803*|mcpu=6804*|mcpu=6808*|march=6802*|march=6803*|march=6804*:-fl libm020} " \
+  "%{m6802*|mc6802*|m6803*|m6804*|m6806*|m6808*|mc6806*|" \
+  "mcpu=6802*|mcpu=6803*|mcpu=6804*|mcpu=6806*|mcpu=6808*|" \
+  "march=6802*|march=6803*|march=6804*|march=6806*:-fl libm020} " \
   "%{mhard-float|m68881:-fl libm881}"
 
 #ifdef TARGET_AMIGAOS_VASM
