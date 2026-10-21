@@ -556,6 +556,14 @@ extern const char *amigaos_crt_check (int argc, const char **argv);
   "%{resident32:-fbaserel32} " \
   "%{msmall-code:-fno-function-cse}"
 
+/* Without aliases, -fdeclone-ctor-dtor (implied by -Os) turns the complete
+   and base [cd]tors into calls to a unified one (C4/D4), and inlining them
+   leaves references to a C4 that libstdc++'s explicit instantiations don't
+   export: an -Os program moving a std::string fails to link.  Drop this
+   once https://gcc.gnu.org/PR125359 is fixed.  */
+#define CC1PLUS_SPEC \
+  "%{!fdeclone-ctor-dtor:-fno-declone-ctor-dtor}"
+
 /* The linker flavors pick the library variant in the C runtime trees the
    driver only adds by their base directory (libnix, clib2, ixemul), so
    they must follow the multilibs: a 68060 gets its own libraries, and
