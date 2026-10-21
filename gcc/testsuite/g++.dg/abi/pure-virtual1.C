@@ -5,6 +5,8 @@
 // { dg-additional-options "-Wl,-undefined,dynamic_lookup" { target *-*-darwin* } }
 // { dg-xfail-if "AIX weak" { powerpc-ibm-aix* } }
 // { dg-xfail-if PR119369 { amdgcn-*-* } }
+// The amiga hunk linker does not resolve undefined weak symbols to 0.
+// { dg-skip-if "No weak unsat" { m68k-*-amigaos* } }
 
 struct A
 {
