@@ -396,8 +396,11 @@ if (target_flags & (MASK_RESTORE_A4|MASK_ALWAYS_RESTORE_A4)) \
         "%{fbaserel:nbcrt0.o%s}" \
         "%{!fbaserel:ncrt0.o%s}}}}"
 
+/* Not crt0.o: on this target crt0.o and friends are ixemul's, and newlib
+   installs its startup file in every multilib directory, where a %s search
+   finds it before ixemul's flat ixemul/lib.  */
 #define STARTFILE_NEWLIB_SPEC \
-    "crt0.o%s "
+    "newlib-crt0.o%s "
 
 #define SELF_SPEC \
  "%{noixemul:-B %:sdk_root(libnix/lib/)} " \
