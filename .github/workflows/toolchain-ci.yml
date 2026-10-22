@@ -2,14 +2,9 @@ name: Toolchain build
 
 # Building the m68k-amigaos toolchain lives in AmigaPorts/m68k-amigaos-gcc.
 # Label a pull request here with a ci-* tag to build the whole toolchain
-# with this branch swapped in for gcc. The reusable workflow inherits this
-# pull_request event, so the label picks what to build:
-#   ci-linux         - the Linux toolchain (plus the amigaos.exp testsuite)
-#   ci-macos         - the macOS toolchain
-#   ci-amigaos       - the AmigaOS-hosted toolchain
-#   ci-mingw         - the MinGW-hosted toolchain
-#   ci-testsuite-c   - the Linux toolchain with the gcc C testsuite
-#   ci-testsuite-cxx - the Linux toolchain with the g++ testsuite (slow)
+# with this pull request swapped in for gcc. The ci-* tags and what they
+# build are documented in the top-level repo:
+# https://github.com/AmigaPorts/m68k-amigaos-gcc/blob/master/.github/workflows/toolchain.yml
 # Re-add the label to rebuild after pushing new commits.
 on:
   pull_request:
@@ -22,4 +17,6 @@ jobs:
     with:
       checkout_repo: AmigaPorts/m68k-amigaos-gcc
       checkout_ref: master
-      repos: gcc=${{ github.event.pull_request.head.repo.clone_url }}#${{ github.event.pull_request.head.sha }}
+      # GitHub's merge of the pull request into its base branch, as of the
+      # label, rather than the branch alone: what merging would build.
+      repos: gcc=${{ github.event.pull_request.base.repo.clone_url }}#refs/pull/${{ github.event.pull_request.number }}/merge
