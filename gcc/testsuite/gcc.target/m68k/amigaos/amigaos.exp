@@ -27,9 +27,12 @@ if { ![istarget m68k-*-amigaos*] } {
     return
 }
 
-# Codegen (scan-assembler) tests.  Each fixes its own -O via dg-options;
-# allocator and CPU are scan-invariant, so a single run is enough.  The
-# runtime test and its companion are handled separately below.
+# Codegen (scan-assembler) tests.  Each fixes its own -O and CPU via
+# dg-options, so a single run is enough.  The board's cflags come after
+# dg-options on the command line, so a board that pins a CPU or FPU
+# (volamos-fpu: -m68020 -m68881) would override the test's; they are
+# dropped here.  The runtime test and its companion are handled
+# separately below.
 dg-init
 set scan_tests {}
 foreach f [lsort [glob -nocomplain $srcdir/$subdir/*.c]] {
@@ -38,7 +41,13 @@ foreach f [lsort [glob -nocomplain $srcdir/$subdir/*.c]] {
 	lappend scan_tests $f
     }
 }
+global board_info
+set tboard [target_info name]
+set saved_cflags [board_info $tboard cflags]
+regsub -all {(-m680[0-9]+(-[0-9]+)?|-mcpu=\S+|-march=\S+|-mtune=\S+|-m68881|-msoft-float|-mhard-float)(?=\s|$)} $saved_cflags "" scan_cflags
+set board_info($tboard,cflags) $scan_cflags
 dg-runtest $scan_tests "" ""
+set board_info($tboard,cflags) $saved_cflags
 
 # Multilib selection.  Every spelling of a 68020-class or better CPU must
 # select the multilib built for it; before the MULTILIB_MATCHES entries in
