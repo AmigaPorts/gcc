@@ -1,4 +1,5 @@
 /* { dg-do run } */
+/* { dg-require-effective-target m68020_runtime } */
 /* { dg-options "-m68020-60" } */
 
 /* Check the -m68020-60 widening multiplies against a reference built

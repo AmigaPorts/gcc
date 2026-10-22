@@ -181,6 +181,19 @@ if { !$multilib_pinned } {
 # state.  CPU is limited to what the amigaos simulator board runs (68020).
 # This stays inside the single dg session (dg-finish is called once, at the
 # end) so gcc-dg-runtest's dg-test calls run against live dg state.
+# Whether the board runs 68020 code: one that emulates a 68000 cannot run
+# the tests built for -m68020-60.  extb.l does not exist on a 68000.
+proc check_effective_target_m68020_runtime { } {
+    return [check_runtime m68020_runtime {
+	int main (void)
+	{
+	  int x = 1;
+	  __asm__ volatile ("extb.l %0" : "+d" (x));
+	  return x != 1;
+	}
+    } "-m68020"]
+}
+
 torture-init
 set-torture-options {
     "-O0" "-O1" "-O2" "-O3" "-Os"
