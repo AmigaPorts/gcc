@@ -1,0 +1,50 @@
+# We need to enable the altivec in the assembler as
+# crtsavevr.S needs it. Not sure how this is handled
+# on other platforms or if this is a limitiation
+# of our binutils.
+HOST_LIBGCC2_CFLAGS += -Wa,-maltivec
+
+# The shared library needs to be compiled with -fPIC
+
+gcc_s_compile += -fPIC
+
+
+# We want fine grained libraries, so use the new code to build the
+# floating point emulation libraries.
+FPBIT = fp-bit.c
+DPBIT = dp-bit.c
+
+dp-bit.c: $(srcdir)/config/fp-bit.c
+	cat $(srcdir)/config/fp-bit.c > dp-bit.c
+
+fp-bit.c: $(srcdir)/config/fp-bit.c
+	echo '#define FLOAT' > fp-bit.c
+	cat $(srcdir)/config/fp-bit.c >> fp-bit.c
+
+# Build a shared libgcc library.
+# Note that this also builds clib2 shared lib which is not useable at
+# this writing
+#
+# We don't set LIBGCC2_CFLAGS += -fPIC here as this will also
+# produce a position independend static library. The -fPIC is
+# ensured in the special libgcc t-amigaos file.
+#
+SHLIB_DIR = @multilib_dir@
+SHLIB_SLIBDIR_QUAL = @shlib_slibdir_qual@
+SHLIB_OBJS = @shlib_objs@
+SHLIB_EXT = .so
+SHLIB_SONAME = @shlib_base_name@$(SHLIB_EXT)
+SHLIB_LINK = $(GCC_FOR_TARGET) -shared $(SHLIB_OBJS) -nodefaultlibs $(LIBGCC2_CFLAGS) \
+	-Wl,--soname=libgcc$(SHLIB_EXT) \
+	-o $(SHLIB_DIR)/$(SHLIB_SONAME) @multilib_flags@ $(SHLIB_LC)
+
+# Install the shared libgcc library, but ensure that the name is libgcc.so
+SHLIB_INSTALL = \
+	$(mkinstalldirs) $(DESTDIR)$(inst_libdir); \
+	$(INSTALL_DATA) $(SHLIB_DIR)/$(SHLIB_SONAME) \
+	  $(DESTDIR)$(inst_libdir)/libgcc$(SHLIB_EXT);
+
+EXTRA_PARTS += gthr-amigaos-native.o gthr-amigaos-single.o gthr-amigaos-pthread.o
+
+gthr-amigaos-%.o: $(srcdir)/gthr-amigaos-%.c $(srcdir)/gthr-amigaos.h
+	$(gcc_compile) -c $<
