@@ -58,6 +58,12 @@ typedef __builtin_va_list __gnuc_va_list;
 #endif
 #define __va_copy(d,s)	__builtin_va_copy(d,s)
 
+#ifdef __amigaos4__
+/* Linear vararg support for AmigaOS 4 */
+#define va_startlinear(v,l)    __builtin_va_start(v,l)
+#define va_getlinearva(v,t)    __builtin_getlinearva(&(v))
+#endif /* __amigaos4__ */
+
 /* Define va_list, if desired, from __gnuc_va_list. */
 /* We deliberately do not define va_list when called from
    stdio.h, because ANSI C says that stdio.h is not supposed to define
