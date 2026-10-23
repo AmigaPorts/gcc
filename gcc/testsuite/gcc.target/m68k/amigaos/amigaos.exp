@@ -255,4 +255,7 @@ if { [llength $ixemul_tests] } {
     set board_info($tboard,cflags) $saved_cflags
 }
 
+# SAS/C interoperability of -msasregparm -mmangle-regparm: sas/README.
+source $srcdir/$subdir/sas/sas-interop.tcl
+
 dg-finish
