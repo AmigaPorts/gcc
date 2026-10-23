@@ -675,6 +675,11 @@ extern const char *amigaos_crt_check (int argc, const char **argv);
 #define IMMEDIATE_PREFIX "#"
 #endif
 
+/* -mmangle-regparm labels a function without arguments @name too.  */
+#undef ASM_DECLARE_FUNCTION_NAME
+#define ASM_DECLARE_FUNCTION_NAME(FILE, NAME, DECL) \
+  amigaos_declare_function_name ((FILE), (NAME), (DECL))
+
 /* -mmangle-regparm names carry their own prefix.  */
 #undef ASM_OUTPUT_LABELREF
 #define ASM_OUTPUT_LABELREF(FILE,NAME) amigaos_output_labelref ((FILE), (NAME))

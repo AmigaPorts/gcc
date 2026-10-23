@@ -80,12 +80,14 @@ proc sas_run { name driver caller callee opts xfail } {
 #  struct: SAS/C passes structures on the stack whatever their size and
 #    returns them through a buffer it passes on the stack, gcc passes
 #    small ones in registers and returns them in d0/d1.  Left as is.
-#  noargs: SAS/C names a function without arguments @name, gcc _name.
+#  noargs: SAS/C names a function without arguments @name.  gcc labels
+#    its own @name too, but calls _name, which only parameters=both
+#    SAS/C code defines.
 #  asm: SAS/C names an __asm function _name, gcc after its registers.
-#    These two are to be fixed.
+#    To be fixed.
 array set sas_xfail {
     struct {gcc->sas sas->gcc plain->sas}
-    noargs {gcc->sas sas->gcc}
+    noargs {gcc->sas}
     asm {gcc->sas sas->gcc}
 }
 
