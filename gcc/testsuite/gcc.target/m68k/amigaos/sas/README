@@ -37,13 +37,22 @@ a caller and a callee half in every pairing and runs it:
   plain->sas  gcc without either option calling the _functions SAS/C's
               parameters=both adds for stack callers
 
+To run these alone, from the toolchain repository (sas/core for one
+group):
+  DEJAGNU=$PWD/dejagnu-site.exp make -C build-Linux-m68k-amigaos/gcc \
+    check-gcc-c "RUNTESTFLAGS=--target_board=volamos amigaos.exp=sas/*"
+On a board without a 68881 (volamos), the fpu group is unsupported;
+volamos-fpu runs it.
+
 Known differences
 -----------------
 - A function without arguments: SAS/C names it @name, -mmangle-regparm
-  leaves _name (noargs gcc->sas and sas->gcc fail to link).
+  leaves _name (noargs gcc->sas and sas->gcc fail to link: XFAIL until
+  fixed).
 - Explicit registers: SAS/C names an __asm function _name whatever its
   registers, -mmangle-regparm _<regs>@name, or @name when the registers
-  happen to be d0/d1/a0/a1 (asm gcc->sas and sas->gcc fail to link).
+  happen to be d0/d1/a0/a1 (asm gcc->sas and sas->gcc fail to link:
+  XFAIL until fixed).
 - Structures (XFAIL): SAS/C passes them on the stack whatever their size
   and returns them through a buffer whose address it passes on the
   stack; gcc passes small ones in registers and returns those of up to 8
