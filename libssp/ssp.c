@@ -62,12 +62,21 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #include <windows.h>
 #include <wincrypt.h>
 # define _PATH_TTY "CONOUT$"
+#elif defined (__amigaos4__)
+# define _PATH_TTY "CONSOLE:"
 #else
 # define _PATH_TTY "/dev/tty"
 #endif
 #endif
 #ifdef HAVE_SYSLOG_H
 # include <syslog.h>
+#endif
+#ifdef __amigaos4__
+/* clib2 declares _exit in stdlib.h and has no alloca.h.  */
+# include <stdlib.h>
+# ifndef alloca
+#  define alloca __builtin_alloca
+# endif
 #endif
 
 void *__stack_chk_guard = 0;
@@ -93,7 +102,7 @@ __guard_setup (void)
         }
       CryptReleaseContext(hprovider, 0);
     }
-#else
+#elif !defined(__amigaos4__)
   int fd = open ("/dev/urandom", O_RDONLY);
   if (fd != -1)
     {
@@ -152,12 +161,13 @@ fail (const char *msg1, size_t msg1len, const char *msg3)
         }
       close (fd);
     }
-
+#ifndef __amigaos4__
 #ifdef HAVE_SYSLOG_H
   /* Only send the error to syslog if there was no tty available.  */
   else
     syslog (LOG_CRIT, "%s", msg3);
 #endif /* HAVE_SYSLOG_H */
+#endif
 
   /* Try very hard to exit.  Note that signals may be blocked preventing
      the first two options from working.  The use of volatile is here to
