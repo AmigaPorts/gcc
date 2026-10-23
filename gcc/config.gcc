@@ -3058,6 +3058,14 @@ pdp11-*-*)
 	tm_file="${tm_file} newlib-stdint.h"
 	use_gcc_stdint=wrap
 	;;
+powerpc-*-amigaos*)
+	tm_file="${tm_file} elfos.h amigaos-stdint.h rs6000/sysv4.h rs6000/amigaos.h"
+	tm_p_file="${tm_p_file} rs6000/amigaos-protos.h"
+	extra_options="${extra_options} rs6000/sysv4.opt rs6000/amigaos.opt"
+	tmake_file="rs6000/t-amigaos"
+	extra_objs="$extra_objs amigaos.o"
+	use_collect2=no
+	;;
 # port not yet contributed
 #powerpc-*-openbsd*)
 #	tmake_file="${tmake_file} rs6000/t-fprules"

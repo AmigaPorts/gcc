@@ -1,0 +1,56 @@
+; Options for the PowerPC AmigaOS port
+;
+; Copyright (C) 2005 Free Software Foundation, Inc.
+; Contributed by Jens Langner <Jens.Langner@light-speed.de>
+;
+; This file is part of GCC.
+;
+; GCC is free software; you can redistribute it and/or modify it under
+; the terms of the GNU General Public License as published by the Free
+; Software Foundation; either version 2, or (at your option) any later
+; version.
+;
+; GCC is distributed in the hope that it will be useful, but WITHOUT
+; ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+; or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public
+; License for more details.
+;
+; You should have received a copy of the GNU General Public License
+; along with GCC; see the file COPYING.  If not, write to the Free
+; Software Foundation, 51 Franklin Street, Fifth Floor, Boston, MA
+; 02110-1301, USA.
+
+mcrt=
+Target RejectNegative Joined Var(amigaos_crt) Init("newlib")
+Select C runtime library
+
+mbaserel
+Target Mask(BASEREL)
+Generate base relative data access
+
+mcheck68kfuncptr
+Target Var(CHECK68KFUNCPTR)
+Generate target checking for function pointers
+
+pthread
+Driver. Will link with -lpthread and nothing more
+
+use-dynld
+Target Driver
+Generated binary employs the dynamic linker for shared objects.
+
+Enum
+Name(athread) Type(int) UnknownError(argument %qs to %<-athread%> not recognized)
+
+EnumValue
+Enum(athread) String(single) Value(0)
+
+EnumValue
+Enum(athread) String(native) Value(1)
+
+EnumValue
+Enum(athread) String(pthread) Value(2)
+
+athread=
+Driver RejectNegative Joined Enum(athread)
+Specifies the thread implementation that is linked to the final binary.
