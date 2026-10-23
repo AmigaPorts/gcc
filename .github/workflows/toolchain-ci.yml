@@ -4,8 +4,8 @@ name: Toolchain build
 # Comment "/ci <target>..." on a pull request here, e.g. "/ci linux
 # check-c", to build the whole toolchain with this pull request, merged
 # into the current tip of its base branch, swapped in for gcc; post it
-# again to rebuild.  A ci-* label builds a target the same way, from
-# GitHub's merge ref, which may lag the base branch.  The targets are
+# again to rebuild.  A ci-* label builds a target the same way.  The
+# targets are
 # documented in the top-level repo:
 # https://github.com/AmigaPorts/m68k-amigaos-gcc/blob/master/.github/workflows/ci-command.yml
 on:
@@ -21,9 +21,12 @@ jobs:
     with:
       checkout_repo: AmigaPorts/m68k-amigaos-gcc
       checkout_ref: master
-      # GitHub's merge of the pull request into its base branch, as of the
-      # label, rather than the branch alone: what merging would build.
-      repos: gcc=${{ github.event.pull_request.base.repo.clone_url }}#refs/pull/${{ github.event.pull_request.number }}/merge
+      # The labelled head commit merged into the base branch tip, as
+      # merging would build it: not refs/pull/N/merge, which GitHub
+      # recomputes a while after a push and only when the pull request
+      # changes, so a label put on right after a push can build the
+      # previous head.
+      repos: gcc=${{ github.event.pull_request.base.repo.clone_url }}#${{ github.event.pull_request.base.ref }}+${{ github.event.pull_request.head.sha }}
 
   command:
     if: >-
