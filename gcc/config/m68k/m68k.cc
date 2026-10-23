@@ -910,6 +910,20 @@ m68k_handle_fndecl_attribute (tree *node, tree name,
   return NULL_TREE;
 }
 
+/* True if -mschulz saves the call-saved FP registers as doubles, with one
+   fmove.d each, rather than as extended with fmovem.x.
+
+   That rounds a caller's extended values to double, so an interrupt
+   handler never does it.  */
+
+static bool
+m68k_fp_save_df_p (void)
+{
+  return (m68k_fp_save_df && TARGET_68881
+	  && m68k_get_function_kind (current_function_decl)
+	     != m68k_fk_interrupt_handler);
+}
+
 static void
 m68k_compute_frame_layout (void)
 {
@@ -954,7 +968,9 @@ m68k_compute_frame_layout (void)
 	      mask |= 1 << (regno - FP0_REG);
 	      saved++;
 	    }
-      current_frame.foffset = saved * TARGET_FP_REG_SIZE;
+      current_frame.foffset = saved * (m68k_fp_save_df_p ()
+				       ? GET_MODE_SIZE (DFmode)
+				       : TARGET_FP_REG_SIZE);
       current_frame.offset += current_frame.foffset;
     }
   current_frame.fpu_no = saved;
@@ -1127,6 +1143,40 @@ m68k_set_frame_related (rtx_insn *insn)
       RTX_FRAME_RELATED_P (XVECEXP (body, 0, i)) = 1;
 }
 
+/* Save (STORE_P) or restore the FP registers in current_frame.fpu_mask
+   with one fmove.d each.
+
+   - A null BASE pushes onto or pops off the stack.
+   - Otherwise the save area starts at BASE + OFFSET.
+   - fp2 is at the lowest address, as with fmovem.  */
+
+static void
+m68k_emit_fp_df_moves (rtx base, HOST_WIDE_INT offset, bool store_p)
+{
+  for (int n = 0; n < 8; n++)
+    {
+      int i = store_p && !base ? 7 - n : n;
+      if (!(current_frame.fpu_mask & (1 << i)))
+	continue;
+      rtx reg = gen_rtx_REG (DFmode, FP0_REG + i);
+      rtx addr;
+      if (base)
+	{
+	  addr = plus_constant (Pmode, base, offset);
+	  offset += GET_MODE_SIZE (DFmode);
+	}
+      else if (store_p)
+	addr = gen_rtx_PRE_DEC (Pmode, stack_pointer_rtx);
+      else
+	addr = gen_rtx_POST_INC (Pmode, stack_pointer_rtx);
+      rtx mem = gen_frame_mem (DFmode, addr);
+      if (store_p)
+	m68k_set_frame_related (emit_move_insn (mem, reg));
+      else
+	emit_move_insn (reg, mem);
+    }
+}
+
 /* Emit RTL for the "prologue" define_expand.  */
 
 void
@@ -1209,7 +1259,9 @@ m68k_expand_prologue (void)
   if (current_frame.fpu_mask)
     {
       gcc_assert (current_frame.fpu_no >= MIN_FMOVEM_REGS);
-      if (TARGET_68881)
+      if (m68k_fp_save_df_p ())
+	m68k_emit_fp_df_moves (NULL_RTX, 0, true);
+      else if (TARGET_68881)
 	m68k_set_frame_related
 	  (m68k_emit_movem (stack_pointer_rtx,
 			    current_frame.fpu_no * -GET_MODE_SIZE (XFmode),
@@ -1425,7 +1477,20 @@ m68k_expand_epilogue (bool sibcall_p)
 
   if (current_frame.fpu_no > 0)
     {
-      if (big)
+      if (m68k_fp_save_df_p ())
+	{
+	  if (big)
+	    m68k_emit_fp_df_moves (gen_rtx_PLUS (Pmode,
+						 gen_rtx_REG (Pmode, A1_REG),
+						 frame_pointer_rtx),
+				   -(current_frame.foffset + fsize), false);
+	  else if (restore_from_sp)
+	    m68k_emit_fp_df_moves (NULL_RTX, 0, false);
+	  else
+	    m68k_emit_fp_df_moves (frame_pointer_rtx,
+				   -(current_frame.foffset + fsize), false);
+	}
+      else if (big)
 	m68k_emit_movem (gen_rtx_PLUS (Pmode,
 				       gen_rtx_REG (Pmode, A1_REG),
 				       frame_pointer_rtx),

@@ -215,6 +215,10 @@ msasregparm
 Target RejectNegative Var(sas_regparm,1)
 Same as -mregparm=2 but do not use alternate registers
 
+mschulz
+Target RejectNegative Var(m68k_fp_save_df,1)
+Save call-saved FP registers as doubles with fmove.d instead of fmovem.x.
+
 fdouble-indirect
 Target Var(flag_double_indirect) Init(1)
 Use double indirect addressing mode.
