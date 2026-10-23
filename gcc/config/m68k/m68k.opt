@@ -215,6 +215,10 @@ msasregparm
 Target RejectNegative Var(sas_regparm,1)
 Pass arguments in registers as SAS/C __regargs does: the first two integral arguments in d0/d1, the first two pointers in a0/a1 and, with an FPU, the first two floating point arguments in fp0/fp1; the rest on the stack.
 
+mschulz
+Target RejectNegative Var(m68k_fp_save_df,1)
+Save call-saved FP registers as doubles with fmove.d instead of fmovem.x.
+
 fdouble-indirect
 Target Var(flag_double_indirect) Init(1)
 Use double indirect addressing mode.
