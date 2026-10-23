@@ -1,0 +1,24 @@
+name: Toolchain build
+
+# Building the m68k-amigaos toolchain lives in AmigaPorts/m68k-amigaos-gcc.
+# Label a pull request here with a ci-* tag to build the whole toolchain
+# with this pull request swapped in for gcc. The ci-* tags and what they
+# build are documented in the top-level repo:
+# https://github.com/AmigaPorts/m68k-amigaos-gcc/blob/master/.github/workflows/toolchain.yml
+# Re-add the label to rebuild after pushing new commits.
+on:
+  pull_request:
+    types: [labeled]
+
+jobs:
+  toolchain:
+    if: startsWith(github.event.label.name, 'ci')
+    uses: AmigaPorts/m68k-amigaos-gcc/.github/workflows/toolchain.yml@master
+    with:
+      # this branch is gcc 6: build the toolchain for it, not the default
+      gcc_version: "6"
+      checkout_repo: AmigaPorts/m68k-amigaos-gcc
+      checkout_ref: master
+      # GitHub's merge of the pull request into its base branch, as of the
+      # label, rather than the branch alone: what merging would build.
+      repos: gcc=${{ github.event.pull_request.base.repo.clone_url }}#refs/pull/${{ github.event.pull_request.number }}/merge
