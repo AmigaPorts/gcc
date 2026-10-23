@@ -4410,6 +4410,10 @@ build_function_call_vec (location_t loc, vec<location_t> arg_loc,
   int nargs;
   tree *argarray;
 
+#ifdef TARGET_AMIGAOS4
+  vec<tree, va_gc> *new_params = NULL;
+  vec<tree, va_gc> *new_origtypes = NULL;
+#endif
 
   /* Strip NON_LVALUE_EXPRs, etc., since we aren't using as an lvalue.  */
   STRIP_TYPE_NOPS (function);
@@ -4471,6 +4475,31 @@ build_function_call_vec (location_t loc, vec<location_t> arg_loc,
   /* fntype now gets the type of function pointed to.  */
   fntype = TREE_TYPE (fntype);
   tree return_type = TREE_TYPE (fntype);
+
+#ifdef TARGET_AMIGAOS4
+  if (lookup_attribute ("libcall", TYPE_ATTRIBUTES (fntype)) ||
+      lookup_attribute ("libcall2", TYPE_ATTRIBUTES (fntype)))
+  {
+       if (TREE_CODE (function) == COMPONENT_REF && lvalue_p (function))
+       {
+               /* We copy the involved vectors here, as adding an element may
+                * free the original pointer, but we are not the owner of those.
+                *
+                * FIXME: At the moment, we don't free the memory allocated here
+                * If it is freed at the exit of the function via VEC_free() in
+                * some cases a segfault occurs */
+               params = new_params = vec_safe_copy(params);
+               origtypes = new_origtypes = vec_safe_copy(origtypes);
+
+               /* Type of 0 operand of a component ref is always a dereferenced object but
+                * we need to pass the address of this object */
+               vec_safe_insert(params,0,
+                       build1(ADDR_EXPR, build_pointer_type (TREE_TYPE (TREE_OPERAND (function, 0))),
+                               TREE_OPERAND (function, 0)));
+               vec_safe_insert(origtypes,0,(tree)NULL);
+       }
+  }
+#endif
 
   /* Convert the parameters to the types declared in the
      function prototype, or apply default promotions.  */
@@ -4798,6 +4827,10 @@ convert_arguments (location_t loc, vec<location_t> arg_loc, tree fntype,
   bool type_generic_overflow_p = false;
   bool type_generic_bit_query = false;
   tree selector;
+#ifdef TARGET_AMIGAOS4
+  const bool checktags = fundecl
+    && lookup_attribute ("checktags", TYPE_ATTRIBUTES (TREE_TYPE (fundecl)));
+#endif
 
   /* Change pointer to function to the function itself for
      diagnostics.  */
@@ -4872,6 +4905,9 @@ convert_arguments (location_t loc, vec<location_t> arg_loc, tree fntype,
      individual converted arguments.  */
 
   tree typetail, builtin_typetail, val;
+#ifdef TARGET_AMIGAOS4
+  tree prev_tagtype = NULL_TREE;
+#endif
   for (typetail = typelist,
 	 builtin_typetail = builtin_typelist,
 	 parmnum = 0;
@@ -5004,6 +5040,30 @@ convert_arguments (location_t loc, vec<location_t> arg_loc, tree fntype,
 	  if (TYPE_MAIN_VARIANT (valtype) == bfloat16_type_node)
 	    promote_float_arg = false;
 	}
+
+#ifdef TARGET_AMIGAOS4
+      /* If this is a function call with checktags try to improve the expected
+       * type on base of recorded tag <-> type mapping, but only if we don't know
+       * the expected type (e.g. on a var) or if the expected type is an integer.
+       * The latter case usually happens on the first tag item.
+       */
+      if (checktags && (type == NULL_TREE || TREE_CODE(type) == INTEGER_TYPE))
+        {
+          extern tree amigaos_get_type_associated_tagtype(tree type);
+
+          if (prev_tagtype)
+            {
+              type = prev_tagtype;
+              prev_tagtype = NULL_TREE;
+            }
+          else
+            {
+              prev_tagtype = amigaos_get_type_associated_tagtype(val);
+              if (!prev_tagtype)
+                prev_tagtype = amigaos_get_type_associated_tagtype((*origtypes)[parmnum]);
+            }
+        }
+#endif
 
       if (type != NULL_TREE)
 	{

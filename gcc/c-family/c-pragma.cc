@@ -1370,6 +1370,17 @@ handle_pragma_message (cpp_reader *)
 	    TREE_STRING_POINTER (message));
 }
 
+#ifdef TARGET_AMIGAOS4
+/* This is queried by the invoker of the handler */
+int was_tagtypepragma;
+/* Tagtype pragma */
+static void
+handle_pragma_tagtype (cpp_reader *)
+{
+  was_tagtypepragma = 1;
+}
+#endif
+
 /* Ignore a no-op pragma that GCC recognizes, but which has no effect.  */
 static void
 handle_pragma_ignore (cpp_reader *)
@@ -1873,6 +1884,9 @@ init_pragma (void)
 
   c_register_pragma_with_expansion (0, "message", handle_pragma_message);
 
+#ifdef TARGET_AMIGAOS4
+  c_register_pragma_with_expansion ("amigaos", "tagtype", handle_pragma_tagtype);
+#endif
 #ifdef REGISTER_TARGET_PRAGMAS
   REGISTER_TARGET_PRAGMAS ();
 #endif

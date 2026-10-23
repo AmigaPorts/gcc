@@ -107,6 +107,63 @@ set_c_expr_source_range (c_expr *expr,
 }
 
 
+#ifdef TARGET_AMIGAOS4
+static htab_t amigaos_tagdecl_to_type;
+
+struct amigaos_hash_type
+{
+  tree decl;
+  tree type;
+};
+
+static hashval_t
+amigaos_hash_descriptor (const void *p)
+{
+  return htab_hash_pointer (((const amigaos_hash_type *)p)->decl);
+}
+
+static int
+amigaos_eq_descriptor (const void *p1, const void *p2)
+{
+  return ((const amigaos_hash_type *)p1)->decl == ((const amigaos_hash_type *)p2)->decl;
+}
+
+tree amigaos_get_type_associated_tagtype(tree decl)
+{
+  amigaos_hash_type aht = {decl, 0};
+  amigaos_hash_type *faht;
+
+  if (!amigaos_tagdecl_to_type)
+    return NULL;
+
+  faht = (amigaos_hash_type *)htab_find(amigaos_tagdecl_to_type, &aht);
+  if (!faht)
+    return NULL;
+  return faht->type;
+}
+
+static void amigaos_put_type_associated_tagtype(tree decl, tree type)
+{
+  gcc_assert(decl);
+
+  if (!amigaos_tagdecl_to_type)
+    amigaos_tagdecl_to_type = htab_create (10, amigaos_hash_descriptor, amigaos_eq_descriptor, NULL);
+
+  amigaos_hash_type *aht = (amigaos_hash_type *)xmalloc(sizeof(*aht));
+  aht->decl = decl;
+  aht->type = type;
+
+  void **pentry = htab_find_slot (amigaos_tagdecl_to_type, aht, INSERT);
+  gcc_assert(pentry);
+  gcc_assert(*pentry == NULL);
+  *pentry = aht;
+}
+
+/* Contains the tagtype that is currently processed or NULL_TREE
+ * if no tagtype is processed. */
+static tree amigaos_current_tagtype;
+#endif
+
 /* Initialization routine for this file.  */
 
 void
@@ -877,7 +934,7 @@ static bool
 c_token_starts_declaration (c_token *token)
 {
   if (c_token_starts_declspecs (token)
-      || token->keyword == RID_STATIC_ASSERT)
+      || token->keyword == RID_STATIC_ASSERT || token->keyword == RID_STATIC_WARNING)
     return true;
   else
     return false;
@@ -2484,6 +2541,12 @@ c_parser_declaration_or_fndef (c_parser *parser, bool fndef_ok,
       c_parser_static_assert_declaration (parser);
       return result;
     }
+  if (static_assert_ok
+      && c_parser_next_token_is_keyword (parser, RID_STATIC_WARNING))
+    {
+      c_parser_static_assert_declaration (parser);
+      return result;
+    }
   specs = build_null_declspecs ();
 
   /* Handle any standard attributes parsed in the caller.  */
@@ -3502,7 +3565,8 @@ c_parser_static_assert_declaration_no_semi (c_parser *parser)
   tree value;
   tree string = NULL_TREE;
 
-  gcc_assert (c_parser_next_token_is_keyword (parser, RID_STATIC_ASSERT));
+  bool warning = c_parser_next_token_is_keyword (parser, RID_STATIC_WARNING);
+  gcc_assert (c_parser_next_token_is_keyword (parser, RID_STATIC_ASSERT) || warning);
   tree spelling = c_parser_peek_token (parser)->value;
   assert_loc = c_parser_peek_token (parser)->location;
   if (flag_isoc99)
@@ -3895,6 +3959,11 @@ c_parser_declspecs (c_parser *parser, struct c_declspecs *specs,
 	  t = c_parser_enum_specifier (parser);
           invoke_plugin_callbacks (PLUGIN_FINISH_TYPE, t.spec);
 	  declspecs_add_type (loc, specs, t);
+#ifdef TARGET_AMIGAOS4
+	  /* Handle special tagtype enhanced enums */
+	  if (amigaos_current_tagtype != NULL_TREE && t.spec != NULL_TREE)
+	    amigaos_put_type_associated_tagtype(t.spec, amigaos_current_tagtype);
+#endif
 	  break;
 	case RID_STRUCT:
 	case RID_UNION:
@@ -15991,6 +16060,25 @@ c_parser_pragma_unroll (c_parser *parser)
   return unroll;
 }
 
+#ifdef TARGET_AMIGAOS4
+/* This function is called whenever a declaration was finished that was preceded
+ * by a tagtype pragma.
+ *
+ * @param gcc_data will be the finished declaration
+ * @param user_data will be the parsed c type of the declaration (c_type_name *)
+ *  that was specified ahead of the declaration via the pragma.
+ */
+static void amigaos_tagtype_finish_decl_callback (void *gcc_data, void *user_data)
+{
+  tree decl = (tree)gcc_data;
+  c_type_name *ctype = (c_type_name*)user_data;
+  tree type = groktypename (ctype, NULL, NULL);
+
+  /* Now put the association in our own hash table */
+  amigaos_put_type_associated_tagtype(decl, type);
+}
+#endif
+
 /* Handle pragmas.  Some OpenMP pragmas are associated with, and therefore
    should be considered, statements.  ALLOW_STMT is true if we're within
    the context of a function and such pragmas are to be allowed.  Returns
@@ -16315,6 +16403,49 @@ c_parser_pragma (c_parser *parser, enum pragma_context context, bool *if_p,
 
   c_parser_consume_pragma (parser);
   c_invoke_pragma_handler (id);
+
+#ifdef TARGET_AMIGAOS4
+  /* If was_tagtypepragma is set, the pragma was a tagtype one,
+   * which, at the moment, cannot easily handled outside of this
+   * file.
+   */
+  extern int was_tagtypepragma;
+  if (was_tagtypepragma)
+  {
+    c_token *tok = c_parser_peek_token (the_parser);
+    c_parser_consume_token(parser);
+
+    c_type_name *ctype = c_parser_type_name(parser);
+    tree ctypetree = groktypename (ctype, NULL, NULL);
+
+    /* Make the parsed type available to all functions called from here on */
+    amigaos_current_tagtype = ctypetree;
+
+    tok = c_parser_peek_token (the_parser);
+    c_parser_consume_token(parser);
+    c_parser_skip_to_pragma_eol(parser);
+
+    tok = c_parser_peek_token (the_parser);
+
+    /* Parse the line that follows. We will register for a PLUGIN_FINISH_DECL event
+     * to minimize contermination
+     */
+    bool old_flag_plugin_added = flag_plugin_added;
+    register_callback ("amigaos-tagtype", PLUGIN_FINISH_DECL,
+                       amigaos_tagtype_finish_decl_callback,
+                       ctype);
+    flag_plugin_added = 1;
+    c_parser_declaration_or_fndef (parser, false, false, true, false, true,
+                                   false, NULL);
+    unregister_callback ("amigaos-tagtype", PLUGIN_FINISH_DECL);
+    flag_plugin_added = old_flag_plugin_added;
+    /* Reset the variable that is set in the pragma handler */
+    was_tagtypepragma = 0;
+    /* The tagtype has been processed */
+    amigaos_current_tagtype = NULL_TREE;
+    return false;
+  }
+#endif
 
   /* Skip to EOL, but suppress any error message.  Those will have been
      generated by the handler routine through calling error, as opposed
