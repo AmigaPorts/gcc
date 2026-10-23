@@ -4507,11 +4507,16 @@ driver_handle_option (struct gcc_options *opts,
       if (ENABLE_OFFLOADING)
 	forward_offload_option (opt_index, arg, validated);
 
+#ifdef TARGET_AMIGAOS
+      /* The m68k AmigaOS specs pick the math and pthread libraries for the
+	 selected runtime with %{lm:...} and %{lpthread:...}, so keep these
+	 two as switches.  Other targets have no spec to validate them.  */
       if (0 == strcmp("m", arg)  || 0 == strcmp("pthread", arg))
 	{
 	  save_switch (concat ("-l", arg, NULL), 0, NULL, validated, true);
 	  return true;
 	}
+#endif
       do_save = false;
       break;
 
