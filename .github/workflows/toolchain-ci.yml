@@ -1,14 +1,18 @@
 name: Toolchain build
 
 # Building the m68k-amigaos toolchain lives in AmigaPorts/m68k-amigaos-gcc.
-# Label a pull request here with a ci-* tag to build the whole toolchain
-# with this pull request swapped in for gcc. The ci-* tags and what they
-# build are documented in the top-level repo:
-# https://github.com/AmigaPorts/m68k-amigaos-gcc/blob/master/.github/workflows/toolchain.yml
-# Re-add the label to rebuild after pushing new commits.
+# Comment "/ci <target>..." on a pull request here, e.g. "/ci linux
+# check-c", to build the whole toolchain with this pull request, merged
+# into the current tip of its base branch, swapped in for gcc; post it
+# again to rebuild.  A ci-* label builds a target the same way, from
+# GitHub's merge ref, which may lag the base branch.  The targets are
+# documented in the top-level repo:
+# https://github.com/AmigaPorts/m68k-amigaos-gcc/blob/master/.github/workflows/ci-command.yml
 on:
   pull_request:
     types: [labeled]
+  issue_comment:
+    types: [created]
 
 jobs:
   toolchain:
@@ -20,3 +24,15 @@ jobs:
       # GitHub's merge of the pull request into its base branch, as of the
       # label, rather than the branch alone: what merging would build.
       repos: gcc=${{ github.event.pull_request.base.repo.clone_url }}#refs/pull/${{ github.event.pull_request.number }}/merge
+
+  command:
+    if: >-
+      github.event.issue.pull_request &&
+      (github.event.comment.body == '/ci' || startsWith(github.event.comment.body, '/ci '))
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+    uses: AmigaPorts/m68k-amigaos-gcc/.github/workflows/ci-command.yml@master
+    with:
+      module: gcc
