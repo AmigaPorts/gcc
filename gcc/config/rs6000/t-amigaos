@@ -1,0 +1,20 @@
+# Makefile fragment for AmigaOS/PPC target.
+
+# Extra object file linked to the cc1* executables.
+amigaos.o: $(srcdir)/config/rs6000/amigaos.cc $(CONFIG_H)
+	$(CXX) -c $(ALL_CXXFLAGS) $(ALL_CPPFLAGS) $(INCLUDES) $< $(OUTPUT_OPTION)
+
+# We always have limits.h.
+LIMITS_H_TEST = true
+
+# Override defaults.
+# FIXME: This is only correct when building a native version natively.
+NATIVE_SYSTEM_HEADER_DIR=/gcc/include
+#OTHER_FIXINCLUDES_DIRS=${gcc_tooldir}/include
+
+# Build the libraries for both newlib, clib2 and clib4 
+# We do not build soft float flavours as none of the
+# libs support soft floats
+MULTILIB_OPTIONS = mcrt=newlib/mcrt=clib2/mcrt=clib4
+MULTILIB_DIRNAMES = newlib clib2 clib4
+#MULTILIB_REUSE = =mcrt=newlib

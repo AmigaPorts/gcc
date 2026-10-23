@@ -62,6 +62,11 @@ typedef struct rs6000_stack {
   int altivec_padding_size;	/* size of altivec alignment padding */
   HOST_WIDE_INT total_size;	/* total bytes allocated for stack */
   int savres_strategy;
+#ifdef TARGET_BASEREL
+  int baserel_save_p;		/* true if r2 (baserel base) must be saved */
+  int baserel_save_offset;	/* offset to save r2 from initial SP */
+  int baserel_size;		/* size of r2 save slot */
+#endif
 } rs6000_stack_t;
 
 

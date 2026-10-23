@@ -3337,6 +3337,18 @@ rs6000_expand_builtin (tree exp, rtx target, rtx /* subtarget */,
 		       machine_mode /* mode */, int ignore)
 {
   tree fndecl = TREE_OPERAND (CALL_EXPR_FN (exp), 0);
+
+#ifdef SUBTARGET_EXPAND_BUILTIN
+  {
+    bool subtarget_success = false;
+    rtx subtarget_ret = SUBTARGET_EXPAND_BUILTIN (exp, target, NULL_RTX,
+						   VOIDmode, ignore,
+						   &subtarget_success);
+    if (subtarget_success)
+      return subtarget_ret;
+  }
+#endif
+
   enum rs6000_gen_builtins fcode
     = (enum rs6000_gen_builtins) DECL_MD_FUNCTION_CODE (fndecl);
 

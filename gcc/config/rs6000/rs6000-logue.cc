@@ -722,6 +722,20 @@ rs6000_stack_info (void)
       && info->calls_p)
     info->rop_hash_size = 8;
 
+#ifdef TARGET_BASEREL
+  /* Check if the function wants to set up the baserel register (r2).  */
+  if (TARGET_BASEREL
+      && current_function_decl
+      && lookup_attribute ("baserel_restore",
+			   TYPE_ATTRIBUTES (TREE_TYPE (current_function_decl))))
+    {
+      info->baserel_save_p = 1;
+      info->baserel_size = reg_size;
+      df_set_regs_ever_live (2, true);
+      info->calls_p = 1;
+    }
+#endif /* TARGET_BASEREL */
+
   /* Determine if we need to save the condition code registers.  */
   if (save_reg_p (CR2_REGNO)
       || save_reg_p (CR3_REGNO)
@@ -829,7 +843,12 @@ rs6000_stack_info (void)
     case ABI_V4:
       info->fp_save_offset = -info->fp_size;
       info->gp_save_offset = info->fp_save_offset - info->gp_size;
+#ifdef TARGET_BASEREL
+      info->baserel_save_offset = info->gp_save_offset - info->baserel_size;
+      info->cr_save_offset = info->baserel_save_offset - info->cr_size;
+#else
       info->cr_save_offset = info->gp_save_offset - info->cr_size;
+#endif
 
       if (TARGET_ALTIVEC_ABI)
 	{
@@ -864,6 +883,10 @@ rs6000_stack_info (void)
 				  + info->cr_size
 				  + info->vrsave_size,
 				  save_align);
+
+#ifdef TARGET_BASEREL
+  info->save_size += RS6000_ALIGN (info->baserel_size, save_align);
+#endif
 
   non_fixed_size = info->vars_size + info->parm_size + info->save_size;
 
@@ -971,6 +994,11 @@ debug_stack_info (rs6000_stack_t *info)
   if (info->cr_save_p)
     fprintf (stderr, "\tcr_save_p           = %5d\n", info->cr_save_p);
 
+#ifdef TARGET_BASEREL
+  if (info->baserel_save_p)
+    fprintf (stderr, "\tbaserel_save_p      = %5d\n", info->baserel_save_p);
+#endif
+
   if (info->vrsave_mask)
     fprintf (stderr, "\tvrsave_mask         = 0x%x\n", info->vrsave_mask);
 
@@ -1007,6 +1035,11 @@ debug_stack_info (rs6000_stack_t *info)
   if (info->varargs_save_offset)
     fprintf (stderr, "\tvarargs_save_offset = %5d\n", info->varargs_save_offset);
 
+#ifdef TARGET_BASEREL
+  if (info->baserel_save_offset && TARGET_BASEREL)
+    fprintf (stderr, "\tbaserel_save_offset = %5d\n", info->baserel_save_offset);
+#endif
+
   if (info->total_size)
     fprintf (stderr, "\ttotal_size          = " HOST_WIDE_INT_PRINT_DEC"\n",
 	     info->total_size);
@@ -1032,6 +1065,11 @@ debug_stack_info (rs6000_stack_t *info)
 
   if (info->vrsave_size)
     fprintf (stderr, "\tvrsave_size         = %5d\n", info->vrsave_size);
+
+#ifdef TARGET_BASEREL
+  if (info->baserel_size && TARGET_BASEREL)
+    fprintf (stderr, "\tbaserel_size        = %5d\n", info->baserel_size);
+#endif
 
   if (info->altivec_padding_size)
     fprintf (stderr, "\taltivec_padding_size= %5d\n",
@@ -3413,6 +3451,24 @@ rs6000_emit_prologue (void)
 	}
     }
 
+#ifdef TARGET_BASEREL
+  if (info->baserel_save_p && TARGET_BASEREL)
+    {
+      /* Store r2 (baserel base register) into the frame.  */
+      rtx addr, reg, mem;
+      rtx_insn *insn;
+
+      addr = gen_rtx_PLUS (Pmode, frame_reg_rtx,
+			   GEN_INT (info->baserel_save_offset + frame_off));
+      mem = gen_frame_mem (reg_mode, addr);
+
+      reg = gen_rtx_REG (reg_mode, 2);
+      insn = emit_move_insn (mem, reg);
+      rs6000_frame_related (insn, frame_reg_rtx, sp_off - frame_off,
+			    NULL_RTX, NULL_RTX);
+    }
+#endif
+
   if (crtl->calls_eh_return)
     {
       unsigned int i;
@@ -3874,6 +3930,13 @@ rs6000_emit_prologue (void)
     }
 #endif
 
+#ifdef TARGET_BASEREL
+  /* Emit a blockage to prevent r2-dependent instructions from moving
+     into the prologue; r2 is set up later in amigaos_function_end_prologue.  */
+  if (info->baserel_save_p && TARGET_BASEREL)
+    emit_insn (gen_blockage ());
+#endif
+
   /* If we need to, save the TOC register after doing the stack setup.
      Do not emit eh frame info for this save.  The unwinder wants info,
      conceptually attached to instructions in this function, about
@@ -3935,6 +3998,11 @@ rs6000_output_savres_externs (FILE *file)
 	  fprintf (file, "\t.extern %s\n", name);
 	}
     }
+
+#ifdef TARGET_BASEREL
+  if (info->baserel_save_p && TARGET_BASEREL)
+    fprintf (file, "\t.extern __baserel_get_addr\n");
+#endif
 }
 
 /* Write function prologue.  */
@@ -4879,6 +4947,24 @@ rs6000_emit_epilogue (enum epilogue_type epilogue_type)
 	  emit_move_insn (gen_rtx_REG (reg_mode, regno), mem);
 	}
     }
+
+#ifdef TARGET_BASEREL
+  if (info->baserel_save_p && TARGET_BASEREL)
+    {
+      rtx addr, mem, reg;
+
+      /* Restore r2 (baserel base register) from the frame.  */
+      addr = gen_rtx_PLUS (Pmode, frame_reg_rtx,
+			   GEN_INT (info->baserel_save_offset + frame_off));
+      mem = gen_frame_mem (reg_mode, addr);
+
+      reg = gen_rtx_REG (reg_mode, 2);
+      emit_move_insn (reg, mem);
+
+      /* Mark register as used.  */
+      emit_insn (gen_rtx_USE (VOIDmode, reg));
+    }
+#endif
 
   /* Restore GPRs.  This is done as a PARALLEL if we are using
      the load-multiple instructions.  */

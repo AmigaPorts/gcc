@@ -617,6 +617,12 @@ init_cumulative_args (CUMULATIVE_ARGS *cum, tree fntype,
 	}
     }
 
+  /* AmigaOS4: Check if either libcall or linear varargs, set appropriate cookie */
+  if (fntype && (lookup_attribute ("libcall", TYPE_ATTRIBUTES (fntype))))
+    cum->call_cookie |= CALL_LINEARVARARGS;
+  if (fntype && (lookup_attribute ("linearvarargs", TYPE_ATTRIBUTES (fntype))))
+    cum->call_cookie |= CALL_LINEARVARARGS;
+
   if (TARGET_DEBUG_ARG)
     {
       fprintf (stderr, "\ninit_cumulative_args:");
@@ -1274,6 +1280,15 @@ rs6000_function_arg_advance_1 (CUMULATIVE_ARGS *cum, machine_mode mode,
 	  fprintf (stderr, "named = %d, align = %d, depth = %d\n",
 		   named, align_words - start_words, depth);
 	}
+    }
+
+  /*  If the function has the linearvarargs attribute and this argument
+   to advance over is the last non-vararg argument, then advance over
+   all registers, so that the overflow area is hit immediately. */
+  if (cum->call_cookie & CALL_LINEARVARARGS && cum->nargs_prototype <= 0)
+    {
+      cum->sysv_gregno = GP_ARG_MAX_REG + 1;
+      cum->fregno = FP_ARG_V4_MAX_REG + 1;
     }
 }
 
@@ -2343,6 +2358,12 @@ setup_incoming_varargs (cumulative_args_t cum,
 	first_reg_offset += rs6000_arg_size (TYPE_MODE (arg.type), arg.type);
     }
 
+#ifdef CALL_LINEARVARARGS
+  /* For AmigaOS: No need to save registers for linearvarargs functions */
+  if (next_cum.call_cookie & CALL_LINEARVARARGS)
+    return;
+#endif
+
   set = get_varargs_alias_set ();
   if (! no_rtl && first_reg_offset < GP_ARG_NUM_REG
       && cfun->va_list_gpr_size)
@@ -2466,7 +2487,7 @@ rs6000_build_builtin_va_list (void)
 /* Implement va_start.  */
 
 void
-rs6000_va_start (tree valist, rtx nextarg)
+rs6000_va_start2 (tree valist, rtx nextarg)
 {
   HOST_WIDE_INT words, n_gpr, n_fpr;
   tree f_gpr, f_fpr, f_res, f_ovf, f_sav;
@@ -2500,6 +2521,15 @@ rs6000_va_start (tree valist, rtx nextarg)
 	       GP_ARG_NUM_REG);
   n_fpr = MIN (crtl->args.info.fregno - FP_ARG_MIN_REG,
 	       FP_ARG_NUM_REG);
+
+  /* For linearvarargs functions, immediately increase the fpr
+     and gpr count to the maximum value, so that va_arg will look
+     only at the stack. */
+  if (crtl->args.info.call_cookie & CALL_LINEARVARARGS)
+    {
+	n_gpr = GP_ARG_NUM_REG;
+	n_fpr = FP_ARG_NUM_REG;
+    }
 
   if (TARGET_DEBUG_ARG)
     fprintf (stderr, "va_start: words = " HOST_WIDE_INT_PRINT_DEC", n_gpr = "
@@ -2550,6 +2580,15 @@ rs6000_va_start (tree valist, rtx nextarg)
   t = build2 (MODIFY_EXPR, TREE_TYPE (sav), sav, t);
   TREE_SIDE_EFFECTS (t) = 1;
   expand_expr (t, const0_rtx, VOIDmode, EXPAND_NORMAL);
+}
+
+/* Wrapper for rs6000_va_start2.  On AmigaOS the EXPAND_BUILTIN_VA_START
+   hook points to amigaos_expand_builtin_va_start instead; on all other
+   SVR4 ELF targets this is what TARGET_EXPAND_BUILTIN_VA_START calls.  */
+void
+rs6000_va_start (tree valist, rtx nextarg)
+{
+  rs6000_va_start2 (valist, nextarg);
 }
 
 /* Implement va_arg.  */
