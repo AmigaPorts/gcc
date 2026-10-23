@@ -47,6 +47,8 @@
 
 #if HAVE_SYS_MMAN_H
 #include <sys/mman.h>
+#else
+#include <stdint.h>
 #endif
 
 #if __CHAR_BIT__ == 8

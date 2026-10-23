@@ -174,6 +174,8 @@ __gcov_dump (void)
 
 #endif /* L_gcov_dump */
 
+#if !defined __amigaos4__ || !defined __NEWLIB__
+
 #ifdef L_gcov_fork
 /* A wrapper for the fork function.  We reset counters in the child
    so that they are not counted twice.  */
@@ -346,5 +348,6 @@ __gcov_execve (const char *path, char *const argv[], char *const envp[])
   __gcov_reset ();
   return ret;
 }
+#endif
 #endif
 #endif /* inhibit_libc */

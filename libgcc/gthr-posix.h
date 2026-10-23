@@ -32,6 +32,10 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #define __GTHREADS 1
 #define __GTHREADS_CXX0X 1
 
+#ifdef __amigaos4__
+#include <exec/types.h>
+#endif
+
 #include <pthread.h>
 
 #if ((defined(_LIBOBJC) || defined(_LIBOBJC_WEAK)) \
@@ -132,7 +136,9 @@ __gthrw(pthread_detach)
 #ifndef __BIONIC__
 __gthrw(pthread_cancel)
 #endif
+#ifndef __amigaos4__
 __gthrw(sched_yield)
+#endif
 
 __gthrw(pthread_mutex_lock)
 __gthrw(pthread_mutex_trylock)
@@ -494,8 +500,10 @@ __gthread_objc_thread_get_priority (void)
 static inline void
 __gthread_objc_thread_yield (void)
 {
+#ifndef __amigaos4__
   if (__gthread_active_p ())
     __gthrw_(sched_yield) ();
+#endif
 }
 
 /* Terminate the current thread.  */
@@ -736,7 +744,11 @@ __gthread_self (void)
 __GTHREAD_INLINE int
 __gthread_yield (void)
 {
+#ifdef __amigaos4__
+  return 1;
+#else
   return __gthrw_(sched_yield) ();
+#endif
 }
 
 __GTHREAD_INLINE int

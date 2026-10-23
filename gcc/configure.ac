@@ -2109,7 +2109,7 @@ case ${enable_threads} in
     # default
     target_thread_file='single'
     ;;
-  aix | dce | lynx | mipssde | posix | rtems | \
+  aix | amigaos | dce | lynx | mipssde | posix | rtems | \
   single | tpf | vxworks | win32 | mcf)
     target_thread_file=${enable_threads}
     ;;
