@@ -129,7 +129,7 @@ scan_arguments ()
 
     case $option in
       --disable-*)
-	enableopt=`echo ${option} | sed 's:^--disable-:enable_:;s:-:_:g'`
+	enableopt=`echo ${option} | sed 's:^--disable-:enable_:;s:-:_:g;s:+:_:g'`
 	eval $enableopt=no
 	;;
       --enable-*)
@@ -137,7 +137,7 @@ scan_arguments ()
 	*=*)	;;
 	*)	optarg=yes ;;
 	esac
-	enableopt=`echo ${option} | sed 's:^--::;s:=.*$::;s:-:_:g'`
+	enableopt=`echo ${option} | sed 's:^--::;s:=.*$::;s:-:_:g;s:+:_:g'`
 	# enable_shared and enable_static are handled by configure.
 	# Don't undo its work.
 	case $enableopt in

@@ -99,7 +99,7 @@ ALLOBJ = fixincl.o fixtests.o fixfixes.o server.o procopen.o \
 TESTOBJ = fixincl.o fixlib.o fixtests.o fixopts.o
 FIXOBJ  = fixfixes.o fixlib.o fixopts.o
 
-HDR = server.h fixlib.h
+HDR = config.h server.h fixlib.h
 FI  = fixincl@EXEEXT@
 AF  = applyfix@EXEEXT@
 
