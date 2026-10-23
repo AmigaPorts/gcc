@@ -40,7 +40,12 @@
 #include <bits/c++config.h>
 
 #if _GLIBCXX_HAVE_FENV_H
-# include <fenv.h>
+# ifdef __amigaos4__
+// Skip an installed libstdc++ fenv.h forwarding header.
+#  include_next <fenv.h>
+# else
+#  include <fenv.h>
+# endif
 #endif
 
 #ifdef _GLIBCXX_USE_C99_FENV

@@ -83,6 +83,32 @@ struct path::_Parser
 
     const size_t len = input.size();
 
+    /* From the MorphOS SDK */
+#ifdef __amigaos4__
+    // look for root name (:)
+    if (input[0] == ':')
+    {
+        // got root directory
+        root.first.str = input.substr(0, 1);
+        root.first.type = _Type::_Root_dir;
+        ++pos;
+    }
+    // look for volume/device designator
+    else if (len > 1)
+    {
+        const auto despos = input.find_first_of(':', 1);
+        if (despos != input.npos)
+        {
+            // got volume/device designator
+            root.first.str = input.substr(0, despos);
+            root.first.type = _Type::_Root_name;
+
+            root.second.str = input.substr(despos, 1);
+            root.second.type = _Type::_Root_dir;
+            pos = despos + 1;
+        }
+    }
+#else
     // look for root name or root directory
     if (len && is_dir_sep(input[0]))
       {
@@ -140,6 +166,7 @@ struct path::_Parser
 	pos = input.find_first_not_of(L"/\\", 2);
       }
 #endif
+#endif // __amigaos4__
 
     if (root.second.valid())
       last_type = root.second.type;
@@ -162,6 +189,45 @@ struct path::_Parser
     cmpt f;
     if (pos != input.npos)
       {
+    /* From the MorphOS SDK */
+#ifdef __amigaos4__
+    // foo/bar////bleh
+    // =>
+    // 1. "foo" 2, "bar///" 3. "bleh"
+    pos = input.find_first_of(sep, pos);
+    if (pos != input.npos)
+    {
+        const auto end = input.find_first_not_of(sep, pos);
+        if (end == input.npos)
+        {
+            if (pos == last_pos)
+                // "work:/[/...]" met, include these chars as is
+                f.str = input.substr(last_pos, input.length() - last_pos);
+            else
+                // Remove last / as the path ends to one
+                f.str = input.substr(last_pos, input.length() - 1 - last_pos);
+        }
+        else
+        {
+            if (pos == last_pos)
+                // "work:/[/...]something" met, include these chars as is
+                f.str = input.substr(last_pos, end - last_pos);
+            else
+                f.str = input.substr(last_pos, end - 1 - last_pos);
+        }
+        f.type = _Type::_Filename;
+        pos = end;
+    }
+    else if (last_type == _Type::_Filename || last_type == _Type::_Root_dir ||
+            (last_pos == 0 && !input.empty()))
+    {
+        if (last_pos < input.length())
+        {
+            f.str = input.substr(last_pos);
+            f.type = _Type::_Filename;
+        }
+    }
+#else
 	pos = input.find_first_not_of(sep, pos);
 	if (pos != input.npos)
 	  {
@@ -179,6 +245,7 @@ struct path::_Parser
 	    f.str = input.substr(input.length(), 0);
 	    f.type = _Type::_Filename;
 	  }
+#endif // __amigaos4__
       }
     last_type = f.type;
     return f;
@@ -1016,9 +1083,11 @@ path::operator+=(const path& p)
 	  ++it;
 	}
     }
+#ifndef __amigaos4__
   else if (is_dir_sep(_M_pathname.back()) && _M_type() == _Type::_Multi
       && _M_cmpts.back()._M_type() == _Type::_Filename)
     orig_filenamelen = 0; // current path has empty filename at end
+#endif // !__amigaos4__
 
   int capacity = 0;
   if (_M_type() == _Type::_Multi)
@@ -1734,18 +1803,33 @@ path::has_filename() const noexcept
 
 namespace
 {
-  inline bool is_dot(fs::path::value_type c) { return c == dot; }
+  inline bool is_dot(fs::path::value_type c)
+  {
+#ifdef __amigaos4__
+      return c == '\0';
+#else
+      return c == dot;
+#endif // __amigaos4__
+  }
 
   inline bool is_dot(const fs::path& path)
   {
     const auto& filename = path.native();
+#ifdef __amigaos4__
+    return filename.size() == 0;
+#else
     return filename.size() == 1 && is_dot(filename[0]);
+#endif // __amigaos4__
   }
 
   inline bool is_dotdot(const fs::path& path)
   {
     const auto& filename = path.native();
+#ifdef __amigaos4__
+    return filename.size() == 1 && filename[0] == '/';
+#else
     return filename.size() == 2 && is_dot(filename[0]) && is_dot(filename[1]);
+#endif // __amigaos4__
   }
 } // namespace
 
@@ -1840,6 +1924,7 @@ path::lexically_normal() const
 	ret /= p;
     }
 
+#ifndef __amigaos4__
   if (ret._M_cmpts.size() >= 2)
     {
       auto back = std::prev(ret.end());
@@ -1851,6 +1936,7 @@ path::lexically_normal() const
   // If the path is empty, add a dot.
   else if (ret.empty())
     ret = ".";
+#endif // !__amigaos4__
 
   return ret;
 }
@@ -1880,7 +1966,11 @@ path::lexically_relative(const path& base) const
 	return ret;
 #endif
   if (a == end() && b == base.end())
+#ifdef __amigaos4__
+    ret = "";
+#else
     ret = ".";
+#endif // __amigaos4__
   else
   {
     int n = 0;
@@ -1893,10 +1983,18 @@ path::lexically_relative(const path& base) const
 	++n;
     }
     if (n == 0 && (a == end() || a->empty()))
+#ifdef __amigaos4__
+    ret = "";
+#else
       ret = ".";
+#endif // __amigaos4__
     else if (n >= 0)
     {
+#ifdef __amigaos4__
+      const path dotdot("/");
+#else
       const path dotdot("..");
+#endif // __amigaos4__
       while (n--)
 	ret /= dotdot;
       for (; a != end(); ++a)

@@ -135,7 +135,14 @@ namespace
 #ifdef _GLIBCXX_FILESYSTEM_IS_WINDOWS
   inline bool is_dot(wchar_t c) { return c == L'.'; }
 #else
-  inline bool is_dot(char c) { return c == '.'; }
+  inline bool is_dot(char c)
+  {
+#ifdef __amigaos4__
+      return c == '\0';
+#else
+      return c == '.';
+#endif
+  }
 #endif
 
   inline bool is_dot(const fs::path& path)
@@ -147,7 +154,11 @@ namespace
   inline bool is_dotdot(const fs::path& path)
   {
     const auto& filename = path.native();
+#ifdef __amigaos4__
+    return filename.size() == 1 && filename[0] == '/';
+#else
     return filename.size() == 2 && is_dot(filename[0]) && is_dot(filename[1]);
+#endif
   }
 
   struct free_as_in_malloc
