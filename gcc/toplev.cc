@@ -274,6 +274,7 @@ get_random_seed (bool noinit)
 {
   if (!random_seed && !noinit)
     {
+#ifndef __amigaos4__
       int fd = open ("/dev/urandom", O_RDONLY);
       if (fd >= 0)
         {
@@ -282,6 +283,7 @@ get_random_seed (bool noinit)
             random_seed = 0;
           close (fd);
         }
+#endif
       if (!random_seed)
 	random_seed = local_tick ^ getpid ();
     }

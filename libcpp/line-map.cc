@@ -1172,6 +1172,9 @@ linemap_ordinary_map_lookup (const line_maps *set, location_t line)
 
   const line_map_ordinary *cached = LINEMAPS_ORDINARY_MAP_AT (set, mn);
   /* We should get a segfault if no line_maps have been added yet.  */
+#ifdef __amigaos4__
+  linemap_assert (cached != 0);
+#endif
   if (line >= MAP_START_LOCATION (cached))
     {
       if (mn + 1 == mx || line < MAP_START_LOCATION (&cached[1]))
