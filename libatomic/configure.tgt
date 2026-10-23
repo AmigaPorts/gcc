@@ -157,6 +157,10 @@ case "${target}" in
 	config_path="${config_path} linux/aarch64 posix"
 	;;
 
+  powerpc*-*-amigaos*)
+	config_path="${config_path} amigaos4"
+	;;
+
   *-*-amiga*)
 	config_path="${config_path} amigaos/loadstore amigaos/lock"
   	;;
