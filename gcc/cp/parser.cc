@@ -161,6 +161,7 @@ enum required_token {
   RT_WHILE, /* while */
   RT_EXTERN, /* extern */
   RT_STATIC_ASSERT, /* static_assert */
+  RT_STATIC_WARNING, /* static_warning */
   RT_DECLTYPE, /* decltype */
   RT_OPERATOR, /* operator */
   RT_CLASS, /* class */
@@ -17964,7 +17965,7 @@ cp_parser_block_declaration (cp_parser *parser,
 	cp_lexer_consume_token (parser->lexer);
     }
   /* If the next token is `static_assert' we have a static assertion.  */
-  else if (token1->keyword == RID_STATIC_ASSERT)
+  else if (token1->keyword == RID_STATIC_ASSERT || token1->keyword == RID_STATIC_WARNING)
     cp_parser_static_assert (parser, /*member_p=*/false);
   else if (cp_parser_next_tokens_are_consteval_block_p (parser))
     cp_parser_consteval_block (parser, /*member_p=*/false);
