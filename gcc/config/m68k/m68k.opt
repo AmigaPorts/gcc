@@ -205,15 +205,15 @@ Support TLS segment larger than 64K.
 
 mregparm=
 Target RejectNegative Var(m68k_regparm) Joined UInteger Init(-1)
-Pass up to <number> arguments of each kind in registers: integers in d0..., pointers in a0..., floating point in fp0... with an FPU; an argument with no register of its kind left takes a free one of the other (data or address) kind.
+Pass up to <number> arguments of each kind in registers: integral arguments in d0..., pointers in a0... and, with an FPU, floating point arguments in fp0...; an integral argument or pointer with no register of its kind left takes a free one of the other kind.
 
 mregparm
 Target RejectNegative Alias(mregparm=, 2)
-Pass up to two integers in d0/d1, two pointers in a0/a1 and two floating point arguments in fp0/fp1 (-mregparm=2).
+Pass up to two integral arguments in d0/d1, two pointers in a0/a1 and, with an FPU, two floating point arguments in fp0/fp1.
 
 msasregparm
 Target RejectNegative Var(sas_regparm,1)
-Pass arguments in registers as SAS/C __regargs does: the first two integers in d0/d1, the first two pointers in a0/a1 and, with an FPU, the first two floating point arguments in fp0/fp1; the rest on the stack.
+Pass arguments in registers as SAS/C __regargs does: the first two integral arguments in d0/d1, the first two pointers in a0/a1 and, with an FPU, the first two floating point arguments in fp0/fp1; the rest on the stack.
 
 fdouble-indirect
 Target Var(flag_double_indirect) Init(1)
