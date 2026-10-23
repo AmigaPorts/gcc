@@ -36,6 +36,7 @@ components will be simplified.  The returned value will be allocated using
 #include "config.h"
 #include "ansidecl.h"
 #include "libiberty.h"
+#include <stdio.h>
 
 #ifdef HAVE_LIMITS_H
 #include <limits.h>
@@ -236,7 +237,8 @@ lrealpath (const char *filename)
      pathconf()) making it impossible to pass a correctly sized buffer
      to realpath() (it could always overflow).  On those systems, we
      skip this.  */
-#if defined (HAVE_REALPATH) && defined (HAVE_UNISTD_H)
+#if defined (HAVE_REALPATH) && defined (HAVE_UNISTD_H) \
+    && !(defined (__amigaos4__) && defined (REALPATH_LIMIT))
   {
     /* Find out the max path size.  */
     long path_max = pathconf ("/", _PC_PATH_MAX);

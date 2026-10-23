@@ -58,6 +58,7 @@ extern int mkstemps (char *, int);
 #ifndef DIR_SEPARATOR
 #define DIR_SEPARATOR '/'
 #endif
+#include "filenames.h"
 
 /* Name of temporary file.
    mktemp requires 6 trailing X's.  */
@@ -127,6 +128,9 @@ choose_tmpdir (void)
 #ifdef VMS
       /* Try VMS standard temp logical.  */
       base = try_dir ("/sys$scratch", base);
+#elif defined(__amigaos4__)
+      /* Use AmigaOS T: assign for temporary files.  */
+      base = try_dir ("T:", base);
 #else
       base = try_dir (getenv ("TMPDIR"), base);
       base = try_dir (getenv ("TMP"), base);
@@ -150,12 +154,15 @@ choose_tmpdir (void)
       if (base == 0)
 	base = ".";
       /* Append DIR_SEPARATOR to the directory we've chosen
-	 and return it.  */
+	 and return it (skip if the path already ends with a separator).  */
       len = strlen (base);
       tmpdir = XNEWVEC (char, len + 2);
       strcpy (tmpdir, base);
-      tmpdir[len] = DIR_SEPARATOR;
-      tmpdir[len+1] = '\0';
+      if (!IS_DIR_SEPARATOR (tmpdir[len - 1]))
+	{
+	  tmpdir[len] = DIR_SEPARATOR;
+	  tmpdir[len + 1] = '\0';
+	}
       memoized_tmpdir = tmpdir;
 #else /* defined(_WIN32) && !defined(__CYGWIN__) */
       DWORD len;

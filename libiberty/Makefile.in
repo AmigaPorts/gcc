@@ -143,12 +143,12 @@ CFILES = alloca.c argv.c asprintf.c atexit.c				\
 	memmem.c memmove.c mempcpy.c memset.c mkstemps.c		\
 	objalloc.c obstack.c						\
 	partition.c pexecute.c						\
-	 pex-amigaos.c pex-common.c pex-djgpp.c pex-msdos.c pex-one.c	\
+	 pex-amigaos.c pex-amigaos4.c pex-common.c pex-djgpp.c pex-msdos.c pex-one.c	\
 	 pex-unix.c pex-win32.c						\
          physmem.c putenv.c						\
 	random.c regex.c rename.c rindex.c				\
 	rust-demangle.c							\
-	safe-ctype.c setenv.c setproctitle.c sha1.c sigsetmask.c        \
+	safe-ctype.c setenv.c setenv-amigaos.c setproctitle.c sha1.c sigsetmask.c        \
 	 simple-object.c simple-object-amiga.c simple-object-coff.c	\
 	 simple-object-elf.c						\
 	 simple-object-mach-o.c simple-object-xcoff.c			\
@@ -218,11 +218,12 @@ CONFIGURED_OFILES = ./asprintf.$(objext) ./atexit.$(objext)		\
 	./memchr.$(objext) ./memrchr.$(objext) ./memcmp.$(objext) 	\
 	./memcpy.$(objext) ./memmem.$(objext) ./memmove.$(objext)	\
 	 ./mempcpy.$(objext) ./memset.$(objext) ./mkstemps.$(objext)	\
-	./pex-djgpp.$(objext) ./pex-msdos.$(objext)			\
+	./pex-amigaos.$(objext) ./pex-amigaos4.$(objext)			\
+	./pex-djgpp.$(objext) ./pex-msdos.$(objext)				\
 	 ./pex-unix.$(objext) ./pex-win32.$(objext)			\
 	 ./putenv.$(objext)						\
 	./random.$(objext) ./rename.$(objext) ./rindex.$(objext)	\
-	./setenv.$(objext) 						\
+	./setenv.$(objext) ./setenv-amigaos.$(objext)			\
 	 ./setproctitle.$(objext)					\
 	 ./sigsetmask.$(objext) ./snprintf.$(objext)			\
 	 ./stpcpy.$(objext) ./stpncpy.$(objext) ./strcasecmp.$(objext)	\
@@ -1138,6 +1139,16 @@ $(CONFIGURED_OFILES): stamp-picdir stamp-noasandir
 	else true; fi
 	$(COMPILE.c) $(srcdir)/partition.c $(OUTPUT_OPTION)
 
+./pex-amigaos4.$(objext): $(srcdir)/pex-amigaos4.c config.h $(INCDIR)/ansidecl.h \
+	$(INCDIR)/libiberty.h $(srcdir)/pex-common.h
+	if [ x"$(PICFLAG)" != x ]; then \
+	  $(COMPILE.c) $(PICFLAG) $(srcdir)/pex-amigaos4.c -o pic/$@; \
+	else true; fi
+	if [ x"$(NOASANFLAG)" != x ]; then \
+	  $(COMPILE.c) $(PICFLAG) $(NOASANFLAG) $(srcdir)/pex-amigaos4.c -o noasan/$@; \
+	else true; fi
+	$(COMPILE.c) $(srcdir)/pex-amigaos4.c $(OUTPUT_OPTION)
+
 ./pex-common.$(objext): $(srcdir)/pex-common.c config.h $(INCDIR)/ansidecl.h \
 	$(INCDIR)/libiberty.h $(srcdir)/pex-common.h
 	if [ x"$(PICFLAG)" != x ]; then \
@@ -1295,6 +1306,15 @@ $(CONFIGURED_OFILES): stamp-picdir stamp-noasandir
 	  $(COMPILE.c) $(PICFLAG) $(NOASANFLAG) $(srcdir)/safe-ctype.c -o noasan/$@; \
 	else true; fi
 	$(COMPILE.c) $(srcdir)/safe-ctype.c $(OUTPUT_OPTION)
+
+./setenv-amigaos.$(objext): $(srcdir)/setenv-amigaos.c
+	if [ x"$(PICFLAG)" != x ]; then \
+	  $(COMPILE.c) $(PICFLAG) $(srcdir)/setenv-amigaos.c -o pic/$@; \
+	else true; fi
+	if [ x"$(NOASANFLAG)" != x ]; then \
+	  $(COMPILE.c) $(PICFLAG) $(NOASANFLAG) $(srcdir)/setenv-amigaos.c -o noasan/$@; \
+	else true; fi
+	$(COMPILE.c) $(srcdir)/setenv-amigaos.c $(OUTPUT_OPTION)
 
 ./setenv.$(objext): $(srcdir)/setenv.c config.h $(INCDIR)/ansidecl.h
 	if [ x"$(PICFLAG)" != x ]; then \
