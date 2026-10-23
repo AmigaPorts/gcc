@@ -1778,10 +1778,12 @@ print_filtered_help (unsigned int include_flags,
 	  else
 	    {
 	      /* For documented options with aliases, mention the aliased
-		 option's name for reference.  */
+		 option's name, and the argument the alias gives it, for
+		 reference.  */
 	      snprintf (new_help, sizeof new_help,
-			_("%s  Same as %s."),
-			help, cl_options [option->alias_target].opt_text);
+			_("%s  Same as %s%s."),
+			help, cl_options [option->alias_target].opt_text,
+			option->alias_arg ? option->alias_arg : "");
 	    }
 
 	  help = new_help;
