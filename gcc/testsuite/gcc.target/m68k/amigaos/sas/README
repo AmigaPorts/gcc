@@ -1,0 +1,63 @@
+SAS/C interoperability of -msasregparm -mmangle-regparm
+=======================================================
+
+Code built with -msasregparm -mmangle-regparm should link and run with
+SAS/C __regargs code, in both directions.  These tests check that against
+SAS/C 6.58 itself.
+
+gen.py writes, for each group of functions:
+  G-callee.c   the functions; each mixes its arguments, in order, into a
+               32-bit value, so a swapped or misread argument shows
+  G-caller.c   run_G(), which calls each one and stores what it returned
+  G-driver.c   main(), which runs run_G() and compares the results with
+               the values gen.py computed
+The callee and caller halves are C89 that both gcc and SAS/C compile
+(sas-abi.h holds the keywords that differ).  The groups:
+  noargs  a function without arguments
+  core    every sequence of long and pointer arguments up to 6, so every
+          way the d0/d1 and a0/a1 slots fill up and spill to the stack
+  narrow  char and short arguments and return values, pointer returns
+  struct  structures passed and returned by value
+  asm     explicit argument registers (SAS/C __asm, gcc __asm ("dN"))
+  fpu     doubles, in fp0/fp1 (68020 and 68881)
+
+sas.sh compiles the SAS/C halves into obj/, which is checked in, since
+SAS/C does not run in CI:
+  ./gen.py && ./sas.sh /path/to/SC
+It runs SAS/C under volamos.  The objects use no globals and no multiply
+or divide, so they need neither sc.lib nor SAS/C's startup code: main()
+is always gcc's.
+
+sas-interop.tcl, sourced by amigaos.exp, links each group's driver with
+a caller and a callee half in every pairing and runs it:
+  gcc->gcc    -msasregparm -mmangle-regparm on both sides
+  gcc->sas    gcc calling SAS/C's @functions
+  sas->gcc    SAS/C calling gcc's
+  sas->sas    SAS/C on both sides: checks gen.py's values, and our ld
+  plain->sas  gcc without either option calling the _functions SAS/C's
+              parameters=both adds for stack callers
+
+Known differences
+-----------------
+- A function without arguments: SAS/C names it @name, -mmangle-regparm
+  leaves _name (noargs gcc->sas and sas->gcc fail to link).
+- Explicit registers: SAS/C names an __asm function _name whatever its
+  registers, -mmangle-regparm _<regs>@name, or @name when the registers
+  happen to be d0/d1/a0/a1 (asm gcc->sas and sas->gcc fail to link).
+- Structures (XFAIL): SAS/C passes them on the stack whatever their size
+  and returns them through a buffer whose address it passes on the
+  stack; gcc passes small ones in registers and returns those of up to 8
+  bytes in d0/d1.  This differs without -msasregparm too.
+
+Our ld and SAS/C objects
+------------------------
+Two things keep sas.sh from building the SAS/C halves with its default
+options, both linker issues rather than calling convention ones:
+- code=near (SAS/C's default) calls with bsr.w.  SAS/C names its code
+  section "text" and gcc ".text", and ld puts them in different hunks, so
+  a bsr.w from SAS/C code to a gcc function is out of range.  sas.sh
+  uses code=far.
+- SAS/C refers to initialized data with HUNK_DREL32 relocations in its
+  objects, which slink resolves as absolute; ld and vlink treat them as
+  a4-relative.  The callers set structure fields one by one, so SAS/C
+  uses immediates instead.
