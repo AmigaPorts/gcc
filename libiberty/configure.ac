@@ -660,6 +660,13 @@ if test -z "${setobjs}"; then
     ac_cv_func_getpagesize=yes
     ;;
 
+  powerpc*-*-amigaos*)
+    # Use our setenv-amigaos fallback only when the host clib lacks unsetenv().
+    # Modern clib2, clib4, and newlib all provide it and handle shell environment
+    # cleanup correctly on exit, so prefer those over our implementation.
+    AC_CHECK_FUNC([unsetenv], [], [AC_LIBOBJ([setenv-amigaos])])
+    ;;
+
   hppa*-*-hpux*)
     # Replace system snprintf and vsnprintf with libiberty implementations.
     AC_LIBOBJ([snprintf])
@@ -764,6 +771,7 @@ fi
 case "${host}" in
      *-*-mingw* | *-*-winnt*)	pexecute=pex-win32  ;;
      *-*-msdosdjgpp*)		pexecute=pex-djgpp  ;;
+     powerpc*-*-amigaos*)	pexecute=pex-amigaos4 ;;
      *-*-amigaos*)		pexecute=pex-amigaos ;;
      *-*-msdos*)		pexecute=pex-msdos  ;;
      *)				pexecute=pex-unix   ;;
