@@ -246,6 +246,33 @@ amigaos_output_labelref (FILE *file, const char *name)
 #endif
 }
 
+/* ASM_DECLARE_FUNCTION_NAME.  With -mmangle-regparm, a public function
+   without arguments that would take them in registers keeps its name, so
+   that calls to it from any code agree, and is also labelled @name, which
+   SAS/C calls a __regargs function without arguments.  A function without
+   arguments is called the same way either way.  */
+
+void
+amigaos_declare_function_name (FILE *file, const char *name, tree decl)
+{
+  if (flag_mangle_regparm && TREE_PUBLIC (decl) && name[0] != '*'
+      && !strchr (name, '@'))
+    {
+      tree fntype = TREE_TYPE (decl);
+      tree args = TYPE_ARG_TYPES (fntype);
+
+      if (args && TREE_VALUE (args) == void_type_node
+	  && m68k_fntype_regparm_p (fntype))
+	{
+	  const char *at = ACONCAT (("@", name, NULL));
+
+	  targetm.asm_out.globalize_label (file, at);
+	  ASM_OUTPUT_LABEL (file, at);
+	}
+    }
+  ASM_OUTPUT_FUNCTION_LABEL (file, name, decl);
+}
+
 void
 amigaos_insert_attribute (tree decl, tree * attr)
 {

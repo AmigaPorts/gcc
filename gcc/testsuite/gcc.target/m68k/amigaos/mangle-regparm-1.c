@@ -34,6 +34,10 @@ NI int labelled (int a, ptr p) { return a - *p; }
 /* { dg-final { scan-assembler "\n_stk:" } } */
 /* { dg-final { scan-assembler "\n_var:" } } */
 /* { dg-final { scan-assembler "\n_none:" } } */
+/* A function without arguments is also @name, as SAS/C names it; the
+   stack function without arguments and the variadic one are not.  */
+/* { dg-final { scan-assembler "\n\"@none\":" } } */
+/* { dg-final { scan-assembler-not "\"@(stk|var)\"" } } */
 /* { dg-final { scan-assembler "\n_labelled_by_user:" } } */
 
 /* Calls use the same names.  */

@@ -121,5 +121,6 @@ extern int m68k_sibcall_target_regno;
 extern bool m68k_fntypes_place_args_alike (const_tree, const_tree,
 					   const_tree, const_tree);
 extern char *m68k_fntype_arg_regs (const_tree, bool *);
+extern bool m68k_fntype_regparm_p (const_tree);
 extern int m68k_hard_regno_rename_ok(unsigned int, unsigned int);
 extern poly_int64 m68k_push_rounding (poly_int64);

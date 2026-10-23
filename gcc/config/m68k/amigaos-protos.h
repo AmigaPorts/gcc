@@ -53,3 +53,6 @@ amigaos_mangle_decl_assembler_name (tree decl, tree id);
 
 extern void
 amigaos_output_labelref (FILE *file, const char *name);
+
+extern void
+amigaos_declare_function_name (FILE *file, const char *name, tree decl);

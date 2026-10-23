@@ -609,6 +609,22 @@ m68k_fntype_arg_regs (const_tree fntype, bool *sas)
   return regs;
 }
 
+/* Whether a function of type FNTYPE takes its arguments in registers:
+   prototyped, not variadic, and with register parameters in effect, as
+   -mregparm, -msasregparm or a regparm attribute make them, whether or
+   not it has any.  */
+
+bool
+m68k_fntype_regparm_p (const_tree fntype)
+{
+  struct m68k_args cum;
+
+  if (!prototype_p (fntype) || stdarg_p (fntype))
+    return false;
+  m68k_init_arg_regs (&cum, fntype);
+  return cum.num_of_regs > 0;
+}
+
 void
 m68k_emit_regparm_clobbers (void)
 {
