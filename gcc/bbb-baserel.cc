@@ -64,13 +64,21 @@ namespace
     virtual bool
     gate (function *)
     {
-      return TARGET_M68K && flag_pic >= 3;
+#ifdef TARGET_M68K
+      return flag_pic >= 3;
+#else
+      return false;
+#endif
     }
 
     virtual unsigned int
     execute (function *)
     {
+#ifdef TARGET_M68K
       return execute_bbb_baserel ();
+#else
+      return 0;
+#endif
     }
 
     opt_pass *
@@ -87,6 +95,9 @@ namespace
   };
 // class pass_bbb_optimizations
 
+  /* The pass rewrites m68k a4-relative addressing; other targets that
+     share this tree (powerpc-amigaos) only get the disabled pass.  */
+#ifdef TARGET_M68K
   static rtx picreg;
   static int cur_tmp_use;
   static rtx cur_symbol[8];
@@ -478,6 +489,7 @@ namespace
 
     return 0;
   }
+#endif /* TARGET_M68K */
 
 }      // anon namespace
 
