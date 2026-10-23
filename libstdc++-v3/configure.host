@@ -227,10 +227,22 @@ case "${host_os}" in
     atomicity_dir="cpu/generic"
     ;;
   amiga*)
-    os_include_dir="os/newlib"
-    tmake_file="os/newlib/t-amigaos"
-    CFLAGS="${TARGET_C_FLAGS}"
-    CXXFLAGS="${TARGET_C_FLAGS}"
+    case "${host_cpu}" in
+      powerpc*)
+        # AmigaOS 4
+        os_include_dir="os/amigaos"
+        if ${CXX} ${CPPFLAGS} ${CXXFLAGS} -dM -E -x c++ /dev/null \
+           | grep -q '__NEWLIB__'; then
+          ac_cv_header_fenv_h=no
+        fi
+        ;;
+      *)
+        os_include_dir="os/newlib"
+        tmake_file="os/newlib/t-amigaos"
+        CFLAGS="${TARGET_C_FLAGS}"
+        CXXFLAGS="${TARGET_C_FLAGS}"
+        ;;
+    esac
   ;;
   bsd*)
     # Plain BSD attempts to share FreeBSD files.
