@@ -4714,14 +4714,17 @@ cp_build_function_call_vec (tree function, vec<tree, va_gc> **params,
     {
       if (TREE_CODE (function) == COMPONENT_REF && lvalue_p (original))
 	{
+	  /* Work on a copy, but do not record it in ALLOCATED: the caller
+	     owns *PARAMS and releases it to the tree vector cache itself, so
+	     releasing it here as well would put the same vector into the
+	     cache twice and hand it out to two users later on.  */
 	  vec<tree, va_gc> *new_params = vec_safe_copy (*params);
 	  vec_safe_insert (new_params, 0,
 			   build1 (ADDR_EXPR,
 				   build_pointer_type (TREE_TYPE
 						       (TREE_OPERAND (original, 0))),
 				   TREE_OPERAND (original, 0)));
-	  allocated = new_params;
-	  *params = allocated;
+	  *params = new_params;
 	}
     }
 #endif
