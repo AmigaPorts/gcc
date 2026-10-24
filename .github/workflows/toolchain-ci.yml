@@ -21,12 +21,9 @@ jobs:
     with:
       checkout_repo: AmigaPorts/m68k-amigaos-gcc
       checkout_ref: master
-      # The labelled head commit merged into the base branch tip, as
-      # merging would build it: not refs/pull/N/merge, which GitHub
-      # recomputes a while after a push and only when the pull request
-      # changes, so a label put on right after a push can build the
-      # previous head.
-      repos: gcc=${{ github.event.pull_request.base.repo.clone_url }}#${{ github.event.pull_request.base.ref }}:${{ github.event.pull_request.head.sha }}
+      # GitHub's merge of the pull request into its base branch, as
+      # merging would build it
+      repos: gcc=${{ github.event.pull_request.base.repo.clone_url }}#refs/pull/${{ github.event.pull_request.number }}/merge
 
   command:
     if: >-
