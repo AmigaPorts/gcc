@@ -3,7 +3,7 @@
    -fbaserel: a wrong multilib match linked this against the absolute
    libgcc and libstdc++, which crashed before reaching the throw.  */
 /* { dg-do run { target m68k-*-amigaos* } } */
-/* { dg-options "-O2 -m68020 -resident -mcrt=nix20" } */
+/* { dg-options "-O2 -resident -mcrt=nix20" } */
 
 __attribute__((noinline)) static void
 raise_value (int value)
