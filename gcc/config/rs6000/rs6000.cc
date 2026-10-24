@@ -11145,6 +11145,12 @@ rs6000_emit_move (rtx dest, rtx source, machine_mode mode)
       operands[1] = tmp;
     }
 
+#ifdef TARGET_BASEREL
+  /* With -mbaserel, writable data is addressed relative to r2.  */
+  if (TARGET_BASEREL && amigaos_baserel_operand (operands[1]))
+    operands[1] = amigaos_legitimize_baserel_address (operands[1]);
+#endif
+
   /* 128-bit constant floating-point values on Darwin should really be loaded
      as two parts.  However, this premature splitting is a problem when DFmode
      values can go into Altivec registers.  */
@@ -11411,6 +11417,15 @@ rs6000_emit_move (rtx dest, rtx source, machine_mode mode)
 	      return;
 	    }
 
+#ifdef TARGET_BASEREL
+	  if (TARGET_BASEREL && amigaos_baserel_operand (operands[1]))
+	    {
+	      emit_insn (gen_elf_base_high (target, gen_rtx_REG (Pmode, 2),
+					    operands[1]));
+	      emit_insn (gen_elf_base_low (operands[0], target, operands[1]));
+	      return;
+	    }
+#endif
 	  emit_insn (gen_elf_high (target, operands[1]));
 	  emit_insn (gen_elf_low (operands[0], target, operands[1]));
 	  return;
@@ -14951,6 +14966,11 @@ print_operand_address (FILE *file, rtx x)
 	   && CONSTANT_P (XEXP (x, 1)))
     {
       output_addr_const (file, XEXP (x, 1));
+#ifdef TARGET_BASEREL
+      if (TARGET_BASEREL && amigaos_baserel_operand (x))
+	fprintf (file, "@brel@l(%s)", reg_names[ REGNO (XEXP (x, 0)) ]);
+      else
+#endif
       fprintf (file, "@l(%s)", reg_names[ REGNO (XEXP (x, 0)) ]);
     }
 #endif
