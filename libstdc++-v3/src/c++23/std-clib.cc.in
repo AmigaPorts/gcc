@@ -92,41 +92,69 @@ export C_LIB_NAMESPACE
 {
   using std::abs;
   using std::acos;
+#ifdef _GLIBCXX_HAVE_ACOSF
   using std::acosf;
+#endif
   using std::acosh;
   using std::acoshf;
   using std::acoshl;
+#ifdef _GLIBCXX_HAVE_ACOSL
   using std::acosl;
+#endif
   using std::asin;
+#ifdef _GLIBCXX_HAVE_ASINF
   using std::asinf;
+#endif
   using std::asinh;
   using std::asinhf;
   using std::asinhl;
+#ifdef _GLIBCXX_HAVE_ASINL
   using std::asinl;
+#endif
   using std::atan;
   using std::atan2;
+#ifdef _GLIBCXX_HAVE_ATAN2F
   using std::atan2f;
+#endif
+#ifdef _GLIBCXX_HAVE_ATAN2L
   using std::atan2l;
+#endif
+#ifdef _GLIBCXX_HAVE_ATANF
   using std::atanf;
+#endif
   using std::atanh;
   using std::atanhf;
   using std::atanhl;
+#ifdef _GLIBCXX_HAVE_ATANL
   using std::atanl;
+#endif
   using std::cbrt;
   using std::cbrtf;
   using std::cbrtl;
   using std::ceil;
+#ifdef _GLIBCXX_HAVE_CEILF
   using std::ceilf;
+#endif
+#ifdef _GLIBCXX_HAVE_CEILL
   using std::ceill;
+#endif
   using std::copysign;
   using std::copysignf;
   using std::copysignl;
   using std::cos;
+#ifdef _GLIBCXX_HAVE_COSF
   using std::cosf;
+#endif
   using std::cosh;
+#ifdef _GLIBCXX_HAVE_COSHF
   using std::coshf;
+#endif
+#ifdef _GLIBCXX_HAVE_COSHL
   using std::coshl;
+#endif
+#ifdef _GLIBCXX_HAVE_COSL
   using std::cosl;
+#endif
   using std::double_t;
   using std::erf;
   using std::erfc;
@@ -138,21 +166,33 @@ export C_LIB_NAMESPACE
   using std::exp2;
   using std::exp2f;
   using std::exp2l;
+#ifdef _GLIBCXX_HAVE_EXPF
   using std::expf;
+#endif
+#ifdef _GLIBCXX_HAVE_EXPL
   using std::expl;
+#endif
   using std::expm1;
   using std::expm1f;
   using std::expm1l;
   using std::fabs;
+#ifdef _GLIBCXX_HAVE_FABSF
   using std::fabsf;
+#endif
+#ifdef _GLIBCXX_HAVE_FABSL
   using std::fabsl;
+#endif
   using std::fdim;
   using std::fdimf;
   using std::fdiml;
   using std::float_t;
   using std::floor;
+#ifdef _GLIBCXX_HAVE_FLOORF
   using std::floorf;
+#endif
+#ifdef _GLIBCXX_HAVE_FLOORL
   using std::floorl;
+#endif
   using std::fma;
   using std::fmaf;
   using std::fmal;
@@ -163,12 +203,20 @@ export C_LIB_NAMESPACE
   using std::fminf;
   using std::fminl;
   using std::fmod;
+#ifdef _GLIBCXX_HAVE_FMODF
   using std::fmodf;
+#endif
+#ifdef _GLIBCXX_HAVE_FMODL
   using std::fmodl;
+#endif
   using std::fpclassify;
   using std::frexp;
+#ifdef _GLIBCXX_HAVE_FREXPF
   using std::frexpf;
+#endif
+#ifdef _GLIBCXX_HAVE_FREXPL
   using std::frexpl;
+#endif
   using std::hypot;
   using std::hypotf;
   using std::hypotl;
@@ -186,8 +234,12 @@ export C_LIB_NAMESPACE
   using std::isnormal;
   using std::isunordered;
   using std::ldexp;
+#ifdef _GLIBCXX_HAVE_LDEXPF
   using std::ldexpf;
+#endif
+#ifdef _GLIBCXX_HAVE_LDEXPL
   using std::ldexpl;
+#endif
 #ifndef STD_COMPAT
   using std::lerp;
 #endif
@@ -202,8 +254,12 @@ export C_LIB_NAMESPACE
   using std::llroundl;
   using std::log;
   using std::log10;
+#ifdef _GLIBCXX_HAVE_LOG10F
   using std::log10f;
+#endif
+#ifdef _GLIBCXX_HAVE_LOG10L
   using std::log10l;
+#endif
   using std::log1p;
   using std::log1pf;
   using std::log1pl;
@@ -213,8 +269,12 @@ export C_LIB_NAMESPACE
   using std::logb;
   using std::logbf;
   using std::logbl;
+#ifdef _GLIBCXX_HAVE_LOGF
   using std::logf;
+#endif
+#ifdef _GLIBCXX_HAVE_LOGL
   using std::logl;
+#endif
   using std::lrint;
   using std::lrintf;
   using std::lrintl;
@@ -222,8 +282,12 @@ export C_LIB_NAMESPACE
   using std::lroundf;
   using std::lroundl;
   using std::modf;
+#ifdef _GLIBCXX_HAVE_MODFF
   using std::modff;
+#endif
+#ifdef _GLIBCXX_HAVE_MODFL
   using std::modfl;
+#endif
   using std::nan;
   using std::nanf;
   using std::nanl;
@@ -237,8 +301,12 @@ export C_LIB_NAMESPACE
   using std::nexttowardf;
   using std::nexttowardl;
   using std::pow;
+#ifdef _GLIBCXX_HAVE_POWF
   using std::powf;
+#endif
+#ifdef _GLIBCXX_HAVE_POWL
   using std::powl;
+#endif
   using std::remainder;
   using std::remainderf;
   using std::remainderl;
@@ -259,20 +327,40 @@ export C_LIB_NAMESPACE
   using std::scalbnl;
   using std::signbit;
   using std::sin;
+#ifdef _GLIBCXX_HAVE_SINF
   using std::sinf;
+#endif
   using std::sinh;
+#ifdef _GLIBCXX_HAVE_SINHF
   using std::sinhf;
+#endif
+#ifdef _GLIBCXX_HAVE_SINHL
   using std::sinhl;
+#endif
+#ifdef _GLIBCXX_HAVE_SINL
   using std::sinl;
+#endif
   using std::sqrt;
+#ifdef _GLIBCXX_HAVE_SQRTF
   using std::sqrtf;
+#endif
+#ifdef _GLIBCXX_HAVE_SQRTL
   using std::sqrtl;
+#endif
   using std::tan;
+#ifdef _GLIBCXX_HAVE_TANF
   using std::tanf;
+#endif
   using std::tanh;
+#ifdef _GLIBCXX_HAVE_TANHF
   using std::tanhf;
+#endif
+#ifdef _GLIBCXX_HAVE_TANHL
   using std::tanhl;
+#endif
+#ifdef _GLIBCXX_HAVE_TANL
   using std::tanl;
+#endif
   using std::tgamma;
   using std::tgammaf;
   using std::tgammal;
@@ -487,7 +575,9 @@ export C_LIB_NAMESPACE
 // 17.2.2 <cstdlib> [cstdlib.syn]
 export C_LIB_NAMESPACE
 {
+#if _GLIBCXX_USE_C99_STDLIB
   using std::_Exit;
+#endif
   using std::abort;
   using std::abs;
 #ifdef _GLIBCXX_HAVE_ALIGNED_ALLOC
@@ -500,7 +590,9 @@ export C_LIB_NAMESPACE
   using std::atof;
   using std::atoi;
   using std::atol;
+#if _GLIBCXX_USE_C99_STDLIB
   using std::atoll;
+#endif
   using std::bsearch;
   using std::calloc;
   using std::div;
@@ -511,9 +603,11 @@ export C_LIB_NAMESPACE
   using std::labs;
   using std::ldiv;
   using std::ldiv_t;
+#if _GLIBCXX_USE_C99_STDLIB
   using std::llabs;
   using std::lldiv;
   using std::lldiv_t;
+#endif
   using std::malloc;
 #ifdef _GLIBCXX_HAVE_MBSTATE_T
   using std::mblen;
@@ -529,12 +623,23 @@ export C_LIB_NAMESPACE
   using std::size_t;
   using std::srand;
   using std::strtod;
+#if _GLIBCXX_USE_C99_STDLIB || _GLIBCXX_HAVE_STRTOF
   using std::strtof;
+#endif
   using std::strtol;
+// As in <cstdlib>, which leaves strtold out on AmigaOS 4 without clib4.
+#if _GLIBCXX_USE_C99_STDLIB \
+    ? !defined (__amigaos4__) || defined (__CLIB4__) \
+    : _GLIBCXX_HAVE_STRTOLD
   using std::strtold;
+#endif
+#if _GLIBCXX_USE_C99_STDLIB
   using std::strtoll;
+#endif
   using std::strtoul;
+#if _GLIBCXX_USE_C99_STDLIB
   using std::strtoull;
+#endif
   using std::system;
 #ifdef _GLIBCXX_USE_WCHAR_T
   using std::wcstombs;

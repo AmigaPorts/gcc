@@ -234,6 +234,12 @@ case "${host_os}" in
         if ${CXX} ${CPPFLAGS} ${CXXFLAGS} -dM -E -x c++ /dev/null \
            | grep -q '__NEWLIB__'; then
           ac_cv_header_fenv_h=no
+          # The SDK's newlib stdint.h has every type and limit except
+          # INTPTR_MIN, INTPTR_MAX and UINTPTR_MAX, which libstdc++ does
+          # not use.  Without this the C99 <stdint.h> check fails and
+          # <atomic> loses std::atomic_int8_t and friends.
+          glibcxx_cv_c99_stdint=yes
+          glibcxx_cv_c99_stdint_tr1=yes
         fi
         ;;
       *)
