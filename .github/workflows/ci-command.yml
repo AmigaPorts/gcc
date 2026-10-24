@@ -1,0 +1,24 @@
+name: CI command
+
+# A /ci comment on a pull request builds the whole m68k-amigaos toolchain
+# with the pull request swapped in for gcc, as AmigaPorts/m68k-amigaos-gcc
+# parses it; a pull request against amiga6 builds gcc 6.  How to use it:
+# https://github.com/AmigaPorts/m68k-amigaos-gcc/blob/master/doc/ci.md
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  command:
+    if: >-
+      github.event.issue.pull_request &&
+      (github.event.comment.body == '/ci' || startsWith(github.event.comment.body, '/ci '))
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+      # the commit status that shows a /ci run in the checks
+      statuses: write
+    uses: AmigaPorts/m68k-amigaos-gcc/.github/workflows/ci-command.yml@master
+    with:
+      module: gcc
