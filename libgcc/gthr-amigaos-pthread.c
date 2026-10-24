@@ -4,7 +4,10 @@
 
 #include "gthr-amigaos.h"
 
+#include <errno.h>
 #include <pthread.h>
+#include <sched.h>
+#include <time.h>
 #include <proto/exec.h>
 
 #ifdef __cplusplus
@@ -14,12 +17,20 @@ extern "C"
 
 /******************************************************************************/
 
+/* Not pthread_once_t: __GTHREAD_ONCE_INIT is all zeros, which is not
+   PTHREAD_ONCE_INIT on clib4, and libstdc++ needs __gthread_once_unlock
+   to reset the flag when the function throws.  Same scheme as the native
+   implementation.  */
 typedef struct
 {
   union
   {
     __gthread_once_t gonce;
-    pthread_once_t ponce;
+    struct
+    {
+      char done;
+      char started;
+    } i;
   } u;
 } __internal_gthread_once_t;
 
@@ -62,10 +73,30 @@ __gthread_once (__gthread_once_t *__once, void (*__func) (void))
 {
   __internal_gthread_once_t *once = (__internal_gthread_once_t *)__once;
 
-  if (__gthread_active_p ())
-    return pthread_once (&once->u.ponce, __func);
-  else
-    return -1;
+  if (__once == NULL || __func == NULL)
+    return EINVAL;
+
+  if (__atomic_load_1 (&once->u.i.done, __ATOMIC_SEQ_CST))
+    return 0;
+
+  while (!__atomic_load_1 (&once->u.i.done, __ATOMIC_SEQ_CST)
+	 && __atomic_load_1 (&once->u.i.started, __ATOMIC_SEQ_CST))
+    sched_yield ();
+
+  if (!__atomic_test_and_set (&once->u.i.started, __ATOMIC_SEQ_CST))
+    {
+      __func ();
+      __atomic_store_1 (&once->u.i.done, 1, __ATOMIC_SEQ_CST);
+    }
+
+  return 0;
+}
+
+void
+__gthread_once_unlock (__gthread_once_t *__once)
+{
+  __internal_gthread_once_t *once = (__internal_gthread_once_t *)__once;
+  __atomic_store_1 (&once->u.i.started, 0, __ATOMIC_SEQ_CST);
 }
 
 int
