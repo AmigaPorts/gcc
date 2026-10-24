@@ -419,6 +419,9 @@ const struct c_common_resword c_common_reswords[] =
   { "_Accum",           RID_ACCUM,     D_CONLY | D_EXT },
   { "_Sat",             RID_SAT,       D_CONLY | D_EXT },
   { "_Static_assert",   RID_STATIC_ASSERT, D_CONLY },
+#ifdef TARGET_AMIGAOS4
+  { "_Static_warning",  RID_STATIC_WARNING, D_CONLY | D_EXT},
+#endif
   { "_Noreturn",        RID_NORETURN,  D_CONLY },
   { "_Generic",         RID_GENERIC,   D_CONLY },
   { "_Thread_local",    RID_THREAD,    D_CONLY },

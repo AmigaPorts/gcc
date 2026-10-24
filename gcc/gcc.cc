@@ -4507,11 +4507,16 @@ driver_handle_option (struct gcc_options *opts,
       if (ENABLE_OFFLOADING)
 	forward_offload_option (opt_index, arg, validated);
 
+#ifdef TARGET_AMIGAOS
+      /* The m68k AmigaOS specs pick the math and pthread libraries for the
+	 selected runtime with %{lm:...} and %{lpthread:...}, so keep these
+	 two as switches.  Other targets have no spec to validate them.  */
       if (0 == strcmp("m", arg)  || 0 == strcmp("pthread", arg))
 	{
 	  save_switch (concat ("-l", arg, NULL), 0, NULL, validated, true);
 	  return true;
 	}
+#endif
       do_save = false;
       break;
 
@@ -8316,6 +8321,19 @@ driver::main (int argc, char **argv)
   bool early_exit;
 
   set_progname (argv[0]);
+#ifdef __amigaos4__
+  /* Expand the command name on AmigaOS using the PROGDIR: assign so that
+     relative paths computed during process_command() are correct.  */
+  {
+    char *expanded_progdir = lrealpath ("/progdir/");
+    if (expanded_progdir)
+      {
+	char *expanded_argv0 = concat (expanded_progdir, "/", progname, NULL);
+	argv[0] = expanded_argv0; /* FIXME: Leak */
+	free (expanded_progdir);
+      }
+  }
+#endif
   expand_at_files (&argc, &argv);
   decode_argv (argc, const_cast <const char **> (argv));
   global_initializations ();
@@ -10853,6 +10871,8 @@ static unsigned HOST_WIDE_INT
 get_random_number (void)
 {
   unsigned HOST_WIDE_INT ret = 0;
+
+#ifndef __amigaos4__
   int fd;
 
   fd = open ("/dev/urandom", O_RDONLY);
@@ -10863,6 +10883,7 @@ get_random_number (void)
       if (ret)
         return ret;
     }
+#endif
 
   /* Get some more or less random data.  */
 #ifdef HAVE_GETTIMEOFDAY

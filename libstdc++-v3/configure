@@ -16383,6 +16383,7 @@ target_thread_file="$gcc_cv_target_thread_file"
 
 case $target_thread_file in
     aix)	thread_header=config/rs6000/gthr-aix.h ;;
+    amigaos)	thread_header=gthr-amigaos.h ;;
     dce)	thread_header=config/pa/gthr-dce.h ;;
     gcn)	thread_header=config/gcn/gthr-gcn.h ;;
     lynx)	thread_header=config/gthr-lynx.h ;;
@@ -16479,7 +16480,7 @@ $as_echo "$glibcxx_cv_atomic_word" >&6; }
     # Fake what AC_TRY_COMPILE does.
 
     cat > conftest.$ac_ext << EOF
-#line 16480 "configure"
+#line 16482 "configure"
 #include "atomic_word.h"
 int main()
 {
@@ -16627,7 +16628,7 @@ $as_echo "mutex" >&6; }
   # unnecessary for this test.
 
     cat > conftest.$ac_ext << EOF
-#line 16628 "configure"
+#line 16630 "configure"
 int main()
 {
   _Decimal32 d1;
@@ -16669,7 +16670,7 @@ ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
   # unnecessary for this test.
 
   cat > conftest.$ac_ext << EOF
-#line 16670 "configure"
+#line 16672 "configure"
 template<typename T1, typename T2>
   struct same
   { typedef T2 type; };
@@ -22981,6 +22982,7 @@ _ACEOF
 fi
 
 done
+
 
 # Only do link tests if native. Else, hardcode.
 if $GLIBCXX_IS_NATIVE; then
@@ -39205,7 +39207,7 @@ $as_echo "#define HAVE_TLS 1" >>confdefs.h
 
   fi
     ;;
-  *-linux* | *-uclinux* | *-gnu* | *-kfreebsd*-gnu | *-cygwin* | *-solaris* | *-amigaos)
+  *-linux* | *-uclinux* | *-gnu* | *-kfreebsd*-gnu | *-cygwin* | *-solaris* | m68k*-*-amigaos*)
 
   # All these tests are for C++; save the language and the compiler flags.
   # The CXXFLAGS thing is suspicious, but based on similar bits previously
@@ -50970,6 +50972,87 @@ _ACEOF
 
 
     ;;
+  *-amigaos*)
+    for ac_header in nan.h ieeefp.h endian.h sys/isa_defs.h \
+      machine/param.h sys/machine.h sys/types.h fp.h locale.h \
+      float.h inttypes.h sys/socket.h
+do :
+  as_ac_Header=`$as_echo "ac_cv_header_$ac_header" | $as_tr_sh`
+ac_fn_c_check_header_mongrel "$LINENO" "$ac_header" "$as_ac_Header" "$ac_includes_default"
+if eval test \"x\$"$as_ac_Header"\" = x"yes"; then :
+  cat >>confdefs.h <<_ACEOF
+#define `$as_echo "HAVE_$ac_header" | $as_tr_cpp` 1
+_ACEOF
+
+fi
+
+done
+
+    $as_echo "#define HAVE_ACOSF 1" >>confdefs.h
+
+    $as_echo "#define HAVE_ASINF 1" >>confdefs.h
+
+    $as_echo "#define HAVE_ATAN2F 1" >>confdefs.h
+
+    $as_echo "#define HAVE_ATANF 1" >>confdefs.h
+
+    $as_echo "#define HAVE_CEILF 1" >>confdefs.h
+
+    $as_echo "#define HAVE_COSF 1" >>confdefs.h
+
+    $as_echo "#define HAVE_COSHF 1" >>confdefs.h
+
+    $as_echo "#define HAVE_EXPF 1" >>confdefs.h
+
+    $as_echo "#define HAVE_FABSF 1" >>confdefs.h
+
+    $as_echo "#define HAVE_FLOORF 1" >>confdefs.h
+
+    $as_echo "#define HAVE_FMODF 1" >>confdefs.h
+
+    $as_echo "#define HAVE_HYPOT 1" >>confdefs.h
+
+    $as_echo "#define HAVE_LOG10F 1" >>confdefs.h
+
+    $as_echo "#define HAVE_LOGF 1" >>confdefs.h
+
+    $as_echo "#define HAVE_POWF 1" >>confdefs.h
+
+    $as_echo "#define HAVE_SINF 1" >>confdefs.h
+
+    $as_echo "#define HAVE_SINHF 1" >>confdefs.h
+
+    $as_echo "#define HAVE_SQRTF 1" >>confdefs.h
+
+    $as_echo "#define HAVE_TANF 1" >>confdefs.h
+
+    $as_echo "#define HAVE_TANHF 1" >>confdefs.h
+
+    $as_echo "#define HAVE_FREXPF 1" >>confdefs.h
+
+    $as_echo "#define HAVE_HYPOTF 1" >>confdefs.h
+
+    $as_echo "#define HAVE_ISINF 1" >>confdefs.h
+
+    $as_echo "#define HAVE_ISNAN 1" >>confdefs.h
+
+    $as_echo "#define HAVE_ISNANF 1" >>confdefs.h
+
+    $as_echo "#define SECTION_FLAGS \"-a\"" >>confdefs.h
+
+    for ac_func in acosf asinf atan2f atanf ceilf cosf coshf expf fabsf floorf fmodf frexpf sqrtf hypotf ldexpf log10f logf modff powf sinf sinhf tanf tanhf fabsl acosl asinl atanl atan2l ceill cosl coshl expl floorl fmodl frexpl sqrtl hypotl ldexpl logl log10l modfl powl sinl sinhl tanl tanhl
+do :
+  as_ac_var=`$as_echo "ac_cv_func_$ac_func" | $as_tr_sh`
+ac_fn_c_check_func "$LINENO" "$ac_func" "$as_ac_var"
+if eval test \"x\$"$as_ac_var"\" = x"yes"; then :
+  cat >>confdefs.h <<_ACEOF
+#define `$as_echo "HAVE_$ac_func" | $as_tr_cpp` 1
+_ACEOF
+
+fi
+done
+
+    ;;
   *)
     as_fn_error $? "No support for this host/target combination." "$LINENO" 5
    ;;
@@ -54157,7 +54240,7 @@ $as_echo "$glibcxx_cv_libbacktrace_atomics" >&6; }
     CXXFLAGS='-O0 -S'
 
     cat > conftest.$ac_ext << EOF
-#line 54159 "configure"
+#line 54242 "configure"
 #include <stddef.h>
 int main()
 {

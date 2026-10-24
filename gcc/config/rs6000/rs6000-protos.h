@@ -269,6 +269,7 @@ extern unsigned int darwin_rs6000_special_round_type_align (tree, unsigned int,
 extern tree altivec_resolve_overloaded_builtin (location_t, tree, void *,
 						bool = true);
 extern rtx rs6000_libcall_value (machine_mode);
+extern void rs6000_va_start (tree valist, rtx nextarg);
 extern rtx rs6000_va_arg (tree, tree);
 extern int function_ok_for_sibcall (tree);
 extern int rs6000_reg_parm_stack_space (tree, bool);

@@ -255,6 +255,13 @@ case ${host} in
     out_host_hook_obj="${out_host_hook_obj} host-i386-darwin.o"
     host_xmake_file="${host_xmake_file} i386/x-darwin"
     ;;
+  powerpc-*-amigaos*) # AmigaOS 4
+    prefix=/gcc
+    local_prefix=/gcc
+    host_can_use_collect2=no
+    host_xm_defines=HOST_LACKS_INODE_NUMBERS
+    host_xmake_file="${host_xmake_file} rs6000/x-amigaos"
+    ;;
   powerpc-*-darwin*)
     out_host_hook_obj="${out_host_hook_obj} host-ppc-darwin.o"
     host_xmake_file="${host_xmake_file} rs6000/x-darwin"

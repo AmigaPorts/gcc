@@ -5699,6 +5699,7 @@ The default for the attribute is controlled by @option{-fzero-call-used-regs}.
 @menu
 * AArch64 Attributes::
 * AMD GCN Attributes::
+* AmigaOS PowerPC Attributes::
 * ARC Attributes::
 * ARM Attributes::
 * AVR Attributes::
@@ -6045,6 +6046,202 @@ Set @code{enable_vgpr_workitem_id} parameter.  Always on (required to use
 OpenACC/OpenMP).
 
 @end table
+@end table
+
+@node AmigaOS PowerPC Attributes
+@anchor{AmigaOS PowerPC Function Attributes}
+@subsubsection AmigaOS PowerPC Attributes
+
+These attributes are supported by the PowerPC AmigaOS 4 back end:
+
+@table @code
+@item libcall
+@cindex AmigaOS specific function attributes
+On AmigaOS, the @code{libcall} attribute is used to declare function
+pointers in an AmigaOS @emph{Interface}.  When such a function pointer
+is invoked, a pointer to the Interface itself is passed as a hidden
+first argument, similar to @code{this} in C++.
+
+ISO/IEC 9899:1999 Edits for Libcall functions
+
+The following are a set of changes to ISO/IEC 9899:1999 (aka C99)
+that document the exact semantics of the language extension.
+
+@itemize @bullet
+@item
+@cite{6.5.2.2  Function calls}
+
+Change paragraph 3 to
+
+@quotation
+[...] denotes the called function.  The arguments to the function
+are specified by the implicit argument, if any, followed by the list
+of expressions.
+@end quotation
+
+Add new paragraph before paragraph 4
+
+@quotation
+If the expression that denotes the called function is a structure or union
+member expression as defined in (6.5.2.3) (or such an expression enclosed
+in any number of parentheses expressions), is an lvalue, and has a type
+that includes the attribute @code{libcall}, then the function call has an
+implicit argument.  In other cases there is no implicit argument.  If there
+is an implicit argument, then this will be the first argument to the function,
+and the list of expressions will follow it.  The type of the implicit
+argument is that of a pointer to the structure or union object of which the
+function expression designates a member.  The value of the implicit argument
+is the address of this structure or union object.
+@end quotation
+@end itemize
+
+@item linearvarargs
+@cindex AmigaOS specific function attributes
+On AmigaOS, the @code{linearvarargs} attribute causes all unprototyped
+arguments to a varargs function to be passed on the stack, and not in
+registers as the SVR4 ABI defines.  Please note that @code{libcall} also
+implies @code{linearvarargs}.
+
+@item baserel_restore
+@cindex AmigaOS specific function attributes
+On AmigaOS, when compiling with @option{-mbaserel} causes the compiler
+to create a call to @code{baserel_get_addr} function in the function prologue
+to set up register @code{r2}. The previous contents of register @code{r2}
+are restored in the function epilogue. See @option{-mbaserel} option for
+more details.
+
+@item check68kfuncptr
+@cindex AmigaOS specific function attributes
+On AmigaOS, when calling a function using a function pointer causes
+the compiler to emit additional code to allow for function pointers
+to m68k functions. This is currently available only in the C front end.
+
+The generated code will call @code{__amigaos4_check68k_check} function
+which expects one function pointer argument and returns an integer
+value. If the return value is non-zero, the function pointer will be
+used to perform the function call in the usual way, otherwise
+@code{__amigaos4_check68k_trampoline} function will be called to perform
+the call. The @code{__amigaos4_check68k_check} function should be provided
+by the user and will usually just return the result of
+@code{exec.library} @code{IsNative} call on its argument.
+
+The @code{__amigaos4_check68k_trampoline} function is a @code{linearvarargs}
+function and should also be provided by the user. It will receive at
+least two arguments: the number of arguments to the function pointer and
+the function pointer itself. Additionally, the arguments to the function
+pointer will follow on the stack, each having one zero longword in front
+of it with one final zero longword after all the arguments. This makes it
+possible to create tag pairs and a terminating @code{TAG_DONE} for a
+call to @code{EmulateTags} in @code{exec.library}. The return code of
+@code{__amigaos4_check68k_trampoline} function will be used as a return
+code of the function pointer call.
+
+The following example can be used for functions that have no more than
+13 arguments:
+
+@smallexample
+static const UWORD trampoline_code[][6] =
+@{
+    /* @r{JMP (A5)} */
+    @{0X4ED5, 0, 0, 0, 0, 0@},
+    /* @r{MOVEM.L D0, -(A7); JSR (A5); ADDQ.L #4,A7; RTS} */
+    @{0X48E7, 0X8000, 0X4E95, 0X588F, 0X4E75, 0@},
+    /* @r{MOVEM.L D0-D1, -(A7); JSR (A5); ADDQ.L #8, A7; RTS} */
+    @{0X48E7, 0XC000, 0X4E95, 0X508F, 0X4E75, 0@},
+    /* @r{MOVEM.L D0-D2, -(A7); JSR (A5); ADDA.W #0X000C, A7; RTS} */
+    @{0X48E7, 0XE000, 0X4E95, 0XDEFC, 0X000C, 0X4E75@},
+    /* @r{MOVEM.L D0-D3, -(A7); JSR (A5); ADDA.W #0X0010, A7; RTS} */
+    @{0X48E7, 0XF000, 0X4E95, 0XDEFC, 0X0010, 0X4E75@},
+    /* @r{MOVEM.L D0-D4, -(A7); JSR (A5); ADDA.W #0X0014, A7; RTS} */
+    @{0X48E7, 0XF800, 0X4E95, 0XDEFC, 0X0014, 0X4E75@},
+    /* @r{MOVEM.L D0-D5, -(A7); JSR (A5); ADDA.W #0X0018, A7; RTS} */
+    @{0X48E7, 0XFC00, 0X4E95, 0XDEFC, 0X0018, 0X4E75@},
+    /* @r{MOVEM.L D0-D6, -(A7); JSR (A5); ADDA.W #0X001C, A7; RTS} */
+    @{0X48E7, 0XFE00, 0X4E95, 0XDEFC, 0X001C, 0X4E75@},
+    /* @r{MOVEM.L D0-D7, -(A7); JSR (A5); ADDA.W #0X0020, A7; RTS} */
+    @{0X48E7, 0XFF00, 0X4E95, 0XDEFC, 0X0020, 0X4E75@},
+    /* @r{MOVEM.L D0-D7/A0, -(A7); JSR (A5); ADDA.W #0X0024, A7; RTS} */
+    @{0X48E7, 0XFF80, 0X4E95, 0XDEFC, 0X0024, 0X4E75@},
+    /* @r{MOVEM.L D0-D7/A0-A1, -(A7); JSR (A5); ADDA.W #0X0028, A7; RTS} */
+    @{0X48E7, 0XFFC0, 0X4E95, 0XDEFC, 0X0028, 0X4E75@},
+    /* @r{MOVEM.L D0-D7/A0-A2, -(A7); JSR (A5); ADDA.W #0X002C, A7; RTS} */
+    @{0X48E7, 0XFFE0, 0X4E95, 0XDEFC, 0X002C, 0X4E75@},
+    /* @r{MOVEM.L D0-D7/A0-A3, -(A7); JSR (A5); ADDA.W #0X0030, A7; RTS} */
+    @{0X48E7, 0XFFF0, 0X4E95, 0XDEFC, 0X0030, 0X4E75@},
+    /* @r{MOVEM.L D0-D7/A0-A3, -(A7); JSR (A5); ADDA.W #0X0034, A7; RTS} */
+    @{0X48E7, 0XFFF8, 0X4E95, 0XDEFC, 0X0034, 0X4E75@}
+@};
+
+int VARARGS68K __amigaos4_check68k_trampoline(int num_args,
+                                              int func,
+                                              ...)
+@{
+    int result, i;
+    va_list args;
+    long *stack;
+
+    va_startlinear(args, func);
+    stack = va_getlinearva(args, long *);
+
+    /* @r{Replace 0's with tag id's} */
+    for(i = 0; i < 8 && i < num_args; i++)
+        stack[i * 2] = ET_RegisterD0 + i;
+
+    while(i < num_args)
+    @{
+        stack[i * 2] = ET_RegisterA0 + i - 8;
+        i++;
+    @}
+
+    if (num_args < sizeof(trampoline_code)
+                   / sizeof(trampoline_code[0]))
+        result = IExec->EmulateTags(trampoline_code[num_args],
+                                    ET_SaveRegs, TRUE,
+                                    ET_RegisterA5, func,
+                                    TAG_MORE, stack);
+
+    va_end(args);
+
+    return(result);
+@}
+@end smallexample
+
+@anchor{checktags}
+@item checktags
+@cindex @code{checktags} function attribute
+The @code{checktags} tells the some parameters of the function are
+taglists. In turn it will enable tag-type checking at compile-time, by
+leveraging the extra information provded to enum-defined tags to which
+a @code{tagtype} attribute is associated. The check assumes that if a
+parameter is an integer constant to which a type is associated, then
+it must be followed by an argument of that type. If that is not the
+case, the usual compiling warning about mismatched types will be
+emitted.
+
+@item force_no_baserel
+@cindex forcing a variable not to be addressed base relative
+
+This attribute forces access to a variable in code compiled with
+@option{-mbaserel} option not to be base relative. If necessary, the
+access should be protected with some sort of arbitration. See
+documentation on @option{-mbaserel} option for more details about this
+attribute.
+
+@item tagtype
+@cindex @code{tagtype} enumerator attribute
+The @code{tagtype} attribute will associate an additional type to the
+enumerator constant that is leveraged by the compiler for
+@code{checktags}-attributed functions. For example, to define
+@code{WA_CustomScreen} and to teach that it it should be followed by a
+@code{struct Screen *} in that class of functions use:
+
+@smallexample
+enum @{
+  WA_CustomScreen __attribute__((tagtype(struct Screen *)))
+@};
+@end smallexample
+
+For more information, @pxref{checktags}.
 @end table
 
 @node ARC Attributes

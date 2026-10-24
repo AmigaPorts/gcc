@@ -134,8 +134,12 @@ lang_specific_driver (struct cl_decoded_option **in_decoded_options,
   /* Whether to also compile module std.  */
   bool std_module = false;
 
-  /* True if we saw -static.  */
+  /* True if we saw -static.  Default to static on AmigaOS 4.  */
+#ifdef __amigaos4__
+  int static_link = 1;
+#else
   int static_link = 0;
+#endif
 
   /* True if we should add -shared-libgcc to the command-line.  */
   int shared_libgcc = 1;
@@ -229,6 +233,10 @@ lang_specific_driver (struct cl_decoded_option **in_decoded_options,
 
 	case OPT_static:
 	  static_link = 1;
+	  break;
+
+	case OPT_shared:
+	  static_link = 0;
 	  break;
 
 	case OPT_static_libgcc:

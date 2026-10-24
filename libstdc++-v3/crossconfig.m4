@@ -174,7 +174,7 @@ case "${host}" in
 
     GCC_CHECK_TLS
     ;;
-  *-linux* | *-uclinux* | *-gnu* | *-kfreebsd*-gnu | *-cygwin* | *-solaris*)
+  *-linux* | *-uclinux* | *-gnu* | *-kfreebsd*-gnu | *-cygwin* | *-solaris* | m68k*-*-amigaos*)
     GLIBCXX_CHECK_COMPILER_FEATURES
     GLIBCXX_CHECK_LINKER_FEATURES
     GLIBCXX_CHECK_MATH_SUPPORT
@@ -298,6 +298,38 @@ dnl # sincosl is the only one missing here, compared with the *l
 dnl # functions in the list guarded by
 dnl # long_double_math_on_this_cpu in configure.ac, right after
 dnl # the expansion of the present macro.
+    ;;
+  *-amigaos*)
+    AC_CHECK_HEADERS([nan.h ieeefp.h endian.h sys/isa_defs.h \
+      machine/param.h sys/machine.h sys/types.h fp.h locale.h \
+      float.h inttypes.h sys/socket.h])
+    AC_DEFINE(HAVE_ACOSF)
+    AC_DEFINE(HAVE_ASINF)
+    AC_DEFINE(HAVE_ATAN2F)
+    AC_DEFINE(HAVE_ATANF)
+    AC_DEFINE(HAVE_CEILF)
+    AC_DEFINE(HAVE_COSF)
+    AC_DEFINE(HAVE_COSHF)
+    AC_DEFINE(HAVE_EXPF)
+    AC_DEFINE(HAVE_FABSF)
+    AC_DEFINE(HAVE_FLOORF)
+    AC_DEFINE(HAVE_FMODF)
+    AC_DEFINE(HAVE_HYPOT)
+    AC_DEFINE(HAVE_LOG10F)
+    AC_DEFINE(HAVE_LOGF)
+    AC_DEFINE(HAVE_POWF)
+    AC_DEFINE(HAVE_SINF)
+    AC_DEFINE(HAVE_SINHF)
+    AC_DEFINE(HAVE_SQRTF)
+    AC_DEFINE(HAVE_TANF)
+    AC_DEFINE(HAVE_TANHF)
+    AC_DEFINE(HAVE_FREXPF)
+    AC_DEFINE(HAVE_HYPOTF)
+    AC_DEFINE(HAVE_ISINF)
+    AC_DEFINE(HAVE_ISNAN)
+    AC_DEFINE(HAVE_ISNANF)
+    AC_DEFINE(SECTION_FLAGS,"-a")
+    AC_CHECK_FUNCS(acosf asinf atan2f atanf ceilf cosf coshf expf fabsf floorf fmodf frexpf sqrtf hypotf ldexpf log10f logf modff powf sinf sinhf tanf tanhf fabsl acosl asinl atanl atan2l ceill cosl coshl expl floorl fmodl frexpl sqrtl hypotl ldexpl logl log10l modfl powl sinl sinhl tanl tanhl)
     ;;
   *)
     AC_MSG_ERROR([No support for this host/target combination.])

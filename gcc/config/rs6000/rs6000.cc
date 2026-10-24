@@ -1389,6 +1389,12 @@ static const scoped_attribute_specs *const rs6000_attribute_table[] =
 #undef TARGET_ASM_FUNCTION_EPILOGUE
 #define TARGET_ASM_FUNCTION_EPILOGUE rs6000_output_function_epilogue
 
+#ifdef TARGET_BASEREL
+extern void amigaos_function_end_prologue (FILE *);
+#undef TARGET_ASM_FUNCTION_END_PROLOGUE
+#define TARGET_ASM_FUNCTION_END_PROLOGUE amigaos_function_end_prologue
+#endif
+
 #undef TARGET_ASM_OUTPUT_ADDR_CONST_EXTRA
 #define TARGET_ASM_OUTPUT_ADDR_CONST_EXTRA rs6000_output_addr_const_extra
 
@@ -6095,7 +6101,9 @@ rs6000_file_start (void)
 
 #ifdef USING_ELFOS_H
   rs6000_machine = rs6000_machine_from_flags ();
+#ifndef TARGET_AMIGAOS4
   emit_asm_machine ();
+#endif
 #endif
 
   if (DEFAULT_ABI == ABI_ELFv2)
@@ -9265,6 +9273,11 @@ rs6000_legitimize_address (rtx x, rtx oldx ATTRIBUTE_UNUSED,
 	return rs6000_legitimize_tls_address (x, model);
     }
 
+#ifdef TARGET_BASEREL
+  if (TARGET_BASEREL && amigaos_baserel_operand (x))
+    return amigaos_legitimize_baserel_address (x);
+#endif
+
   extra = 0;
   switch (mode)
     {
@@ -11132,6 +11145,12 @@ rs6000_emit_move (rtx dest, rtx source, machine_mode mode)
       operands[1] = tmp;
     }
 
+#ifdef TARGET_BASEREL
+  /* With -mbaserel, writable data is addressed relative to r2.  */
+  if (TARGET_BASEREL && amigaos_baserel_operand (operands[1]))
+    operands[1] = amigaos_legitimize_baserel_address (operands[1]);
+#endif
+
   /* 128-bit constant floating-point values on Darwin should really be loaded
      as two parts.  However, this premature splitting is a problem when DFmode
      values can go into Altivec registers.  */
@@ -11398,6 +11417,15 @@ rs6000_emit_move (rtx dest, rtx source, machine_mode mode)
 	      return;
 	    }
 
+#ifdef TARGET_BASEREL
+	  if (TARGET_BASEREL && amigaos_baserel_operand (operands[1]))
+	    {
+	      emit_insn (gen_elf_base_high (target, gen_rtx_REG (Pmode, 2),
+					    operands[1]));
+	      emit_insn (gen_elf_base_low (operands[0], target, operands[1]));
+	      return;
+	    }
+#endif
 	  emit_insn (gen_elf_high (target, operands[1]));
 	  emit_insn (gen_elf_low (operands[0], target, operands[1]));
 	  return;
@@ -14938,6 +14966,11 @@ print_operand_address (FILE *file, rtx x)
 	   && CONSTANT_P (XEXP (x, 1)))
     {
       output_addr_const (file, XEXP (x, 1));
+#ifdef TARGET_BASEREL
+      if (TARGET_BASEREL && amigaos_baserel_operand (x))
+	fprintf (file, "@brel@l(%s)", reg_names[ REGNO (XEXP (x, 0)) ]);
+      else
+#endif
       fprintf (file, "@l(%s)", reg_names[ REGNO (XEXP (x, 0)) ]);
     }
 #endif

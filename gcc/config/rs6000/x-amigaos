@@ -1,0 +1,17 @@
+# AmigaOS-specific makefile fragment that is included when building a compiler
+# that runs on AmigaOS
+
+ALL_EXECUTABLES=\
+	$(COMPILERS) \
+	gcov$(exeext) \
+	gcov-dump$(exeext) \
+	gcov-tool$(exeext) \
+	lto-dump$(exeext) \
+	lto-wrapper$(exeext) \
+	cpp$(exeext) \
+	xgcc$(exeext) \
+	xg++$(exeext)
+
+# We use the native amiga thread implementation and additionally remove all
+# unneeded sections
+$(ALL_EXECUTABLES) : override LDFLAGS += -athread=native -Wl,--gc-sections

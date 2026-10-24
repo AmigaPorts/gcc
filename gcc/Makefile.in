@@ -2659,6 +2659,7 @@ default-rust.o: config/default-rust.cc
 # Language-independent files.
 
 DRIVER_DEFINES = \
+  -DEXEC_PREFIX=\"$(exec_prefix)/\" \
   -DSTANDARD_STARTFILE_PREFIX=\"$(unlibsubdir)/\" \
   -DSTANDARD_EXEC_PREFIX=\"$(libdir)/gcc/\" \
   -DSTANDARD_LIBEXEC_PREFIX=\"$(libexecdir)/gcc/\" \

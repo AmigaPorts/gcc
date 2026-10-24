@@ -148,6 +148,9 @@ static tree handle_cleanup_attribute (tree *, tree, tree, int, bool *);
 static tree handle_warn_unused_result_attribute (tree *, tree, tree, int,
 						 bool *);
 static tree handle_access_attribute (tree *, tree, tree, int, bool *);
+#ifdef TARGET_AMIGAOS4
+static tree handle_libcall_attribute (tree *, tree, tree, int, bool *);
+#endif
 
 static tree handle_sentinel_attribute (tree *, tree, tree, int, bool *);
 static tree handle_type_generic_attribute (tree *, tree, tree, int, bool *);
@@ -525,6 +528,13 @@ const struct attribute_spec c_common_gnu_attributes[] =
   { "warn_unused_result",     0, 0, false, true, true, false,
 			      handle_warn_unused_result_attribute,
 	                      attr_warn_unused_result_exclusions },
+#ifdef TARGET_AMIGAOS4
+  { "libcall",                0, 0, false, true, true, false,
+                              handle_libcall_attribute, NULL },
+  /* Similiar to libcall but doesn't imply linearvarargs. Can be handled as libcall here. */
+  { "libcall2",               0, 0, false, true, true, false,
+                              handle_libcall_attribute, NULL },
+#endif
   { "sentinel",               0, 1, false, true, true, false,
 			      handle_sentinel_attribute, NULL },
   /* For internal use (marking of builtins) only.  The name contains space
@@ -6281,6 +6291,28 @@ handle_warn_unused_result_attribute (tree *node, tree name,
 
   return NULL_TREE;
 }
+
+#ifdef TARGET_AMIGAOS4
+/* Handle a "libcall" attribute.  No special handling.  */
+
+static tree
+handle_libcall_attribute (tree *node, tree name,
+       tree ARG_UNUSED (args), int ARG_UNUSED (flags),
+       bool *no_add_attrs)
+{
+  if (TREE_CODE (*node) != FUNCTION_TYPE
+      && TREE_CODE (*node) != METHOD_TYPE
+      && TREE_CODE (*node) != FIELD_DECL
+      && TREE_CODE (*node) != TYPE_DECL)
+    {
+      warning (OPT_Wattributes,"%qs attribute only applies to functions",
+              IDENTIFIER_POINTER (name));
+      *no_add_attrs = true;
+    }
+
+   return NULL_TREE;
+}
+#endif
 
 /* Handle a "sentinel" attribute.  */
 

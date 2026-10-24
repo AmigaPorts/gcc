@@ -33,6 +33,7 @@ AC_DEFUN([GCC_AC_THREAD_HEADER],
 [
 case $1 in
     aix)	thread_header=config/rs6000/gthr-aix.h ;;
+    amigaos)	thread_header=gthr-amigaos.h ;;
     dce)	thread_header=config/pa/gthr-dce.h ;;
     gcn)	thread_header=config/gcn/gthr-gcn.h ;;
     lynx)	thread_header=config/gthr-lynx.h ;;

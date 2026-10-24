@@ -4567,6 +4567,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
   }
 #endif
 
+#ifndef __amigaos4__
 #if _GLIBCXX_HAVE_STRTOLD && ! _GLIBCXX_HAVE_BROKEN_STRTOLD
   inline long double
   stold(const string& __str, size_t* __idx = 0)
@@ -4576,6 +4577,7 @@ _GLIBCXX_BEGIN_NAMESPACE_CXX11
   stold(const string& __str, size_t* __idx = 0)
   { return std::stod(__str, __idx); }
 #endif
+#endif // __amigaos4__
 
   // _GLIBCXX_RESOLVE_LIB_DEFECTS
   // DR 1261. Insufficent overloads for to_string / to_wstring

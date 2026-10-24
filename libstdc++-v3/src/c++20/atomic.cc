@@ -291,7 +291,7 @@ namespace
   {
     // Don't use std::hardware_destructive_interference_size here because we
     // don't want the layout of library types to depend on compiler options.
-#ifdef __amigaos__
+#if defined(__amigaos__) && !defined(__amigaos4__)
     // Amiga hunk/a.out objects cannot align beyond 8 bytes (MAX_OFILE_ALIGNMENT).
     static constexpr auto _S_align = 8;
 #else
