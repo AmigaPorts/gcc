@@ -44,7 +44,12 @@ SHLIB_INSTALL = \
 	$(INSTALL_DATA) $(SHLIB_DIR)/$(SHLIB_SONAME) \
 	  $(DESTDIR)$(inst_libdir)/libgcc$(SHLIB_EXT);
 
-EXTRA_PARTS += gthr-amigaos-native.o gthr-amigaos-single.o gthr-amigaos-pthread.o
+EXTRA_PARTS += gthr-amigaos-native.o gthr-amigaos-single.o
+
+# Only clib4 has pthreads, so -athread=pthread is a clib4-only option.
+ifeq ($(MULTISUBDIR),/clib4)
+EXTRA_PARTS += gthr-amigaos-pthread.o
+endif
 
 gthr-amigaos-%.o: $(srcdir)/gthr-amigaos-%.c $(srcdir)/gthr-amigaos.h
 	$(gcc_compile) -c $<

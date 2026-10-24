@@ -26,7 +26,9 @@ typedef struct { long unsigned int id; } __gthread_key_t;
 typedef struct { char data[48]; } __gthread_mutex_t;
 typedef struct { char data[48]; } __gthread_recursive_mutex_t;
 
-typedef struct { char data[8]; } __gthread_cond_t;
+/* Large enough for the native condition and clib4's pthread_cond_t
+   (12 or 20 bytes, depending on the clib4 version).  */
+typedef struct { char data[24]; } __gthread_cond_t;
 
 typedef int __gthread_t;
 typedef struct { int seconds; long nanoseconds;} __gthread_time_t;

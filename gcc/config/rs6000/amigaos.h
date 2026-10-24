@@ -366,7 +366,7 @@ mcrt=default|!mcrt=*: %(link_amiga_default); \
 %{shared:-shared -dy --defsym __dynld_version__=1} %{!shared: %{static:-static}} %{use-dynld: -dy}"
 
 #define LINK_THREAD "\
-%s%{athread=native:gthr-amigaos-native.o;athread=single:gthr-amigaos-single.o;athread=pthread:gthr-amigaos-pthread.o}"
+%s%{athread=native:gthr-amigaos-native.o;athread=single:gthr-amigaos-single.o;athread=pthread:%{mcrt=clib4:gthr-amigaos-pthread.o;:%e-athread=pthread requires -mcrt=clib4}}"
 
 #undef STARTFILE_SPEC
 #define STARTFILE_SPEC "\
@@ -391,7 +391,7 @@ mcrt=default|!mcrt=*: %(endfile_amiga_default); \
 /* patch 0039: pthread support in LIB_SPEC */
 #undef LIB_SPEC
 #define LIB_SPEC "\
---start-group %{pthread:-lpthread} -lc --end-group"
+--start-group %{pthread|athread=pthread:-lpthread} -lc --end-group"
 
 #undef TARGET_DEFAULT
 #define TARGET_DEFAULT 0
