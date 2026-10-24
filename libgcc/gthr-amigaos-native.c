@@ -490,6 +490,37 @@ __gthread_recursive_mutex_destroy (__gthread_recursive_mutex_t *__mutex)
   return __gthread_mutex_destroy ((__gthread_mutex_t*)__mutex);
 }
 
+/* exec semaphores have no timed obtain, so poll until the deadline,
+   sleeping a tick (1/50 s) between attempts.  */
+int
+__gthread_mutex_timedlock (__gthread_mutex_t *__mutex,
+			   const __gthread_time_t *abs_timeout)
+{
+  struct timeval now;
+
+  /* Initialize libs */
+  __gthread_once (&libs_once, init_libs);
+
+  for (;;)
+    {
+      if (!__gthread_mutex_trylock (__mutex))
+	return 0;
+      gettimeofday (&now, 0);
+      if (now.tv_sec > abs_timeout->seconds
+	  || (now.tv_sec == abs_timeout->seconds
+	      && now.tv_usec * 1000L >= abs_timeout->nanoseconds))
+	return ETIMEDOUT;
+      idos->Delay (1);
+    }
+}
+
+int
+__gthread_recursive_mutex_timedlock (__gthread_recursive_mutex_t *__mutex,
+				     const __gthread_time_t *abs_timeout)
+{
+  return __gthread_mutex_timedlock ((__gthread_mutex_t *)__mutex, abs_timeout);
+}
+
 /******************************************************************************/
 
 static threadstore_t *threadstore;
@@ -1009,6 +1040,14 @@ __gthread_cond_timedwait (__gthread_cond_t *__cond,
       iexec->ReleaseSemaphore (&threadstore->sem);
     }
   return err;
+}
+
+int
+__gthread_cond_wait_recursive (__gthread_cond_t *__cond,
+			       __gthread_recursive_mutex_t *__mutex)
+{
+  /* Recursive and plain mutexes share the representation.  */
+  return __gthread_cond_wait (__cond, (__gthread_mutex_t *)__mutex);
 }
 
 int

@@ -4,6 +4,9 @@
 
 #include "gthr-amigaos.h"
 
+#include <errno.h>
+#include <stddef.h>
+
 #define UNUSED __attribute__((__unused__))
 
 #ifdef __cplusplus
@@ -17,10 +20,27 @@ __gthread_active_p (void)
   return 0;
 }
 
+/* __GTHREADS is defined for every amigaos thread model, so libstdc++'s
+   std::call_once relies on this to run the function.  data1 is the done
+   flag, data2 set while the function runs.  */
 int
-__gthread_once (__gthread_once_t *__once UNUSED, void (*__func) (void) UNUSED)
+__gthread_once (__gthread_once_t *__once, void (*__func) (void))
 {
+  if (__once == NULL || __func == NULL)
+    return EINVAL;
+  if (!__once->data1 && !__once->data2)
+    {
+      __once->data2 = 1;
+      __func ();
+      __once->data1 = 1;
+    }
   return 0;
+}
+
+void
+__gthread_once_unlock (__gthread_once_t *__once)
+{
+  __once->data2 = 0;
 }
 
 int UNUSED
@@ -132,6 +152,74 @@ __gthread_equal (__gthread_t t1, __gthread_t t2)
 }
 
 __gthread_t __gthread_self (void)
+{
+  return 0;
+}
+
+int
+__gthread_yield (void)
+{
+  return 0;
+}
+
+int
+__gthread_mutex_timedlock (__gthread_mutex_t *__mutex UNUSED,
+			   const __gthread_time_t *abs_timeout UNUSED)
+{
+  return 0;
+}
+
+int
+__gthread_recursive_mutex_timedlock (__gthread_recursive_mutex_t *__mutex UNUSED,
+				     const __gthread_time_t *abs_timeout UNUSED)
+{
+  return 0;
+}
+
+/* With a single thread nobody can signal a condition, so a wait returns at
+   once, which callers must already handle as a spurious wakeup.  */
+int
+__gthread_cond_init (__gthread_cond_t *__cond UNUSED)
+{
+  return 0;
+}
+
+int
+__gthread_cond_signal (__gthread_cond_t *__cond UNUSED)
+{
+  return 0;
+}
+
+int
+__gthread_cond_broadcast (__gthread_cond_t *__cond UNUSED)
+{
+  return 0;
+}
+
+int
+__gthread_cond_wait (__gthread_cond_t *__cond UNUSED,
+		     __gthread_mutex_t *__mutex UNUSED)
+{
+  return 0;
+}
+
+int
+__gthread_cond_wait_recursive (__gthread_cond_t *__cond UNUSED,
+			       __gthread_recursive_mutex_t *__mutex UNUSED)
+{
+  return 0;
+}
+
+int
+__gthread_cond_timedwait (__gthread_cond_t *__cond UNUSED,
+			  __gthread_mutex_t *__mutex UNUSED,
+			  const __gthread_time_t *abs_timeout UNUSED)
+{
+  return 0;
+}
+
+int
+__gthread_cond_destroy (__gthread_cond_t *__cond UNUSED)
 {
   return 0;
 }
