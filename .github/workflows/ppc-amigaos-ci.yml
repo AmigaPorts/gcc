@@ -1,0 +1,205 @@
+name: ppc-amigaos toolchain
+
+# Builds the AmigaOS 4 (PowerPC) cross toolchain from this tree: binutils
+# from AmigaPorts/binutils-gdb, the AmigaOS SDK, clib2 and clib4 (both built
+# with the new compiler, as adtools does), then gcc with its runtime
+# libraries, and links test programs for each C runtime.
+#
+# Like the m68k toolchain build, it runs when a pull request gets a ci*
+# label (re-add the label to rebuild), or by hand from the Actions tab.
+on:
+  pull_request:
+    types: [labeled]
+  workflow_dispatch:
+    inputs:
+      binutils_ref:
+        description: AmigaPorts/binutils-gdb ref with ppc-amigaos support
+        default: stefan/ppc-amigaos-2.46
+
+env:
+  TARGET: ppc-amigaos
+  PREFIX: /opt/amiga-ppc
+  BINUTILS_REPO: https://github.com/AmigaPorts/binutils-gdb.git
+  BINUTILS_REF: ${{ inputs.binutils_ref || 'stefan/ppc-amigaos-2.46' }}
+  # clib2 as pinned by adtools; clib4 2.5, the first with gcc 15+ fixes.
+  CLIB2_REPO: https://github.com/sodero/clib2.git
+  CLIB2_REF: 1a42c693e03881f6f969c43ab36ce20d2569751d
+  CLIB4_REPO: https://github.com/AmigaLabs/clib4.git
+  CLIB4_REF: c640af22a7eea76260ac6ab631fb01ca96870576
+  SDK_VERSION: "54.16"
+  SDK_URL: https://www.hyperion-entertainment.com/index.php?option=com_registration&view=download&format=raw&file=127
+  # Under the amigaos thread model __gthread_cond_t is not a pthread object.
+  glibcxx_cv_PTHREAD_COND_CLOCKWAIT: "no"
+
+jobs:
+  ppc-amigaos:
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.event.label.name, 'ci')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 300
+    steps:
+      - name: Check out gcc
+        uses: actions/checkout@v4
+        with:
+          path: gcc
+          # For a pull request, GitHub's merge of it into its base branch.
+          ref: ${{ github.event_name == 'pull_request' && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.ref }}
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get -y update
+          sudo apt-get -y install --no-install-recommends \
+            autoconf automake bison flex g++ gcc libgmp-dev libisl-dev \
+            libmpc-dev libmpfr-dev libtool m4 make texinfo wget
+          echo "${PREFIX}/bin" >> "$GITHUB_PATH"
+          echo "JOBS=$(nproc)" >> "$GITHUB_ENV"
+          sudo mkdir -p "$PREFIX"
+          sudo chown "$(id -u):$(id -g)" "$PREFIX"
+
+      - name: Build lha
+        run: |
+          git clone --depth 1 https://github.com/jca02266/lha.git "$RUNNER_TEMP/lha"
+          cd "$RUNNER_TEMP/lha"
+          autoreconf -vfi
+          ./configure --prefix=/usr/local
+          make
+          sudo make install
+
+      - name: Cache the AmigaOS SDK
+        uses: actions/cache@v4
+        with:
+          path: SDK_${{ env.SDK_VERSION }}.lha
+          key: amigaos-sdk-${{ env.SDK_VERSION }}
+
+      - name: Build binutils
+        run: |
+          git clone --depth 1 --branch "$BINUTILS_REF" "$BINUTILS_REPO" binutils-gdb
+          mkdir binutils-build
+          cd binutils-build
+          ../binutils-gdb/configure --target="$TARGET" --prefix="$PREFIX" \
+            --disable-werror --disable-nls --without-msgpack \
+            --disable-gdb --disable-gdbserver --disable-sim --disable-gprofng
+          make -j "$JOBS"
+          make install
+
+      - name: Install the AmigaOS SDK
+        run: |
+          [ -f "SDK_${SDK_VERSION}.lha" ] || wget -q -O "SDK_${SDK_VERSION}.lha" "$SDK_URL"
+          sdk="${PREFIX}/${TARGET}/SDK"
+          mkdir -p sdk-extract "${sdk}/include"
+          cd sdk-extract
+          lha xqf "../SDK_${SDK_VERSION}.lha"
+          cd SDK_Install
+          lha xqf newlib*.lha
+          lha xqf base.lha
+          lha xqf execsg*.lha
+          rm -f ./*.lha
+          mv newlib* "$sdk/"
+          mv Include/* "${sdk}/include/"
+
+      - name: Configure gcc and build the bootstrap compiler
+        run: |
+          mkdir gcc-build
+          cd gcc-build
+          ../gcc/configure --target="$TARGET" --prefix="$PREFIX" \
+            --enable-languages=c,c++ --enable-threads=amigaos --enable-lto \
+            --with-dwarf2 --disable-tls --disable-libstdcxx-pch \
+            --disable-c++tools --disable-nls --disable-bootstrap
+          make -j "$JOBS" all-gcc
+
+      - name: Build clib2 and clib4
+        run: |
+          xgcc="$PWD/gcc-build/gcc/xgcc -B$PWD/gcc-build/gcc/"
+          sdk="${PREFIX}/${TARGET}/SDK"
+          fetch() {
+            git init -q "$2"
+            git -C "$2" fetch -q --depth 1 "$1" "$3"
+            git -C "$2" checkout -q FETCH_HEAD
+          }
+          fetch "$CLIB2_REPO" clib2 "$CLIB2_REF"
+          make -C clib2/library -f GNUmakefile.os4 -j "$JOBS" \
+            CC="$xgcc -Wno-error=int-conversion -Wno-error=incompatible-pointer-types -Wno-error=implicit-function-declaration" \
+            AR="${TARGET}-ar -q" RANLIB="${TARGET}-ranlib"
+          mkdir -p "${sdk}/clib2"
+          cp -Rp clib2/library/include clib2/library/lib "${sdk}/clib2/"
+          fetch "$CLIB4_REPO" clib4 "$CLIB4_REF"
+          make -C clib4 -f GNUmakefile.os4 -j "$JOBS" \
+            CC="$xgcc" AR="${TARGET}-ar -q" RANLIB="${TARGET}-ranlib" \
+            STRIP="${TARGET}-strip" INSTALL_PREFIX="${sdk}/clib4" \
+            SDK_INCLUDE="${sdk}/include"
+          mkdir -p "${sdk}/clib4/include" "${sdk}/clib4/lib"
+          make -C clib4 -f GNUmakefile.os4 install INSTALL_PREFIX="${sdk}/clib4"
+
+      - name: Build gcc and its runtime libraries
+        run: |
+          make -C gcc-build -j "$JOBS"
+          make -C gcc-build install
+
+      - name: Link test programs
+        run: |
+          mkdir tests
+          cd tests
+          cat > hello.c <<'EOF'
+          #include <stdio.h>
+          #include <proto/exec.h>
+          #include <proto/dos.h>
+          int main(void)
+          {
+            APTR m = IExec->AllocVecTags(64, AVT_Type, MEMF_SHARED, TAG_DONE);
+            IDOS->Printf("hello %ld\n", 42);
+            IExec->FreeVec(m);
+            printf("%f\n", 1.5);
+            return 0;
+          }
+          EOF
+          cat > hello.cc <<'EOF'
+          #include <chrono>
+          #include <condition_variable>
+          #include <iostream>
+          #include <mutex>
+          #include <stdexcept>
+          #include <thread>
+          static std::mutex mtx;
+          static std::timed_mutex tmtx;
+          static std::once_flag once;
+          static std::condition_variable cv;
+          int main()
+          {
+            try { throw std::runtime_error("boom"); }
+            catch (const std::exception &e) { std::cout << e.what() << '\n'; }
+            std::call_once(once, [] { std::cout << "once\n"; });
+            std::thread t([] { std::lock_guard<std::mutex> l(mtx); cv.notify_one(); });
+            {
+              std::unique_lock<std::mutex> l(mtx);
+              cv.wait_for(l, std::chrono::milliseconds(10));
+            }
+            t.join();
+            if (tmtx.try_lock_for(std::chrono::milliseconds(1)))
+              tmtx.unlock();
+            return 0;
+          }
+          EOF
+          printf 'import std;\nint main() { std::println("{}", 42); }\n' > modules.cc
+          printf 'int g; int f(void) { return g; }\n' > baserel.c
+          set -x
+          for crt in newlib clib2 clib4; do
+            ${TARGET}-gcc -O2 -mcrt=$crt hello.c -o c-$crt
+            ${TARGET}-gcc -O2 -mcrt=$crt -mbaserel hello.c -o c-baserel-$crt
+            for thread in native single; do
+              ${TARGET}-g++ -O2 -mcrt=$crt -athread=$thread hello.cc -o cc-$thread-$crt
+            done
+            # import std: the std module is built once per C runtime.
+            mkdir modules-$crt
+            (cd modules-$crt &&
+             ${TARGET}-g++ -std=c++23 -fmodules -fsearch-include-path -mcrt=$crt -c bits/std.cc &&
+             ${TARGET}-g++ -O2 -std=c++23 -fmodules -mcrt=$crt -athread=native ../modules.cc -o modules)
+          done
+          ${TARGET}-g++ -O2 -mcrt=clib4 -athread=pthread hello.cc -o cc-pthread
+          ${TARGET}-gcc -O2 -msdata=sysv hello.c -o c-sdata
+          ${TARGET}-gcc -O2 -use-dynld -athread=native hello.c -o c-dynld
+          # -mbaserel must address g relative to r2.
+          for o in -O0 -O2; do
+            ${TARGET}-gcc $o -mbaserel -S baserel.c -o - | grep -q 'g@brel@'
+          done
+          # clib4 has no small-data libraries; the driver must say so.
+          ! ${TARGET}-gcc -mcrt=clib4 -msdata=sysv hello.c -o c-sdata-clib4
+          ${TARGET}-readelf -h c-newlib cc-native-clib4
