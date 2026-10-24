@@ -2529,3 +2529,15 @@ while (0)
    issues have been resolved.  */
 #define RS6000_DISABLE_SCALAR_MODULO 1
 
+
+/* AmigaOS 4 -mbaserel addresses writable data relative to r2.  Only the
+   AmigaOS target has the option, so give rs6000.md something that is
+   false everywhere else.  */
+#ifdef TARGET_BASEREL
+#define RS6000_BASEREL TARGET_BASEREL
+#define RS6000_BASEREL_OPERAND_P(X) \
+  (TARGET_BASEREL && amigaos_baserel_operand (X))
+#else
+#define RS6000_BASEREL 0
+#define RS6000_BASEREL_OPERAND_P(X) 0
+#endif
