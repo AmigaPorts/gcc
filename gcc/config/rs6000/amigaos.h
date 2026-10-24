@@ -235,7 +235,10 @@ ASM_OPT_ANY
 
 #define LIB_SUBDIR_CLIB4_SPEC "lib%(lib_subdir_type)"
 
+/* clib4 has baserel libraries but no small-data ones.  */
 #define LINK_CLIB4_SPEC "\
+%{msdata|msdata=default|msdata=sysv: \
+%e-msdata is not supported with -mcrt=clib4, which has no small-data libraries} \
 -L%(base_sdk)clib4/%(lib_subdir_clib4) \
 -L%(base_gcc)lib/gcc/ppc-amigaos/%(version)/clib4/lib%(lib_subdir_type) \
 -L%(base_sdk)local/clib4/%(lib_subdir_clib4)"
