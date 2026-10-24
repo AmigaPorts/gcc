@@ -284,17 +284,38 @@ ASM_OPT_ANY
 
 #define LIB_SUBDIR_NEWLIB_SPEC "lib%(lib_subdir_type)"
 
+/* The newlib baserel, small-data and soft-float directories of the SDK
+   only hold the files that differ (baserel has just crtbegin.o,
+   small-data just libc.a), so fall back to the plain lib directory for
+   everything else.  */
 #define LINK_NEWLIB_SPEC "\
 -L%(base_sdk)newlib/%(lib_subdir_newlib) \
 -L%(base_gcc)lib/gcc/ppc-amigaos/%(version)/newlib/%(lib_subdir_newlib) \
--L%(base_sdk)local/newlib/%(lib_subdir_newlib)"
+-L%(base_sdk)local/newlib/%(lib_subdir_newlib) \
+%{mbaserel|msdata|msdata=default|msdata=sysv|msoft-float: \
+-L%(base_sdk)newlib/lib -L%(base_sdk)local/newlib/lib}"
+
+/* Spec function arguments do not expand %(...), hence BASE_SDK_SPEC and
+   the variant directories spelled out.  */
+#define NEWLIB_CRT_VARIANT_SPEC(dir, f) \
+"%:if-exists-else(" BASE_SDK_SPEC "newlib/lib/" dir "/" f \
+" " BASE_SDK_SPEC "newlib/lib/" f ")"
+
+#define NEWLIB_CRT_SPEC(f) \
+"%{mbaserel:" NEWLIB_CRT_VARIANT_SPEC ("baserel", f) ";" \
+" msdata|msdata=default|msdata=sysv:" \
+NEWLIB_CRT_VARIANT_SPEC ("small-data", f) ";" \
+" msoft-float:" NEWLIB_CRT_VARIANT_SPEC ("soft-float", f) ";" \
+" :" BASE_SDK_SPEC "newlib/lib/" f "}"
 
 /* newlib startfile should work for all library flavours */
-#define STARTFILE_NEWLIB_SPEC "\
-%{shared: %(base_sdk)newlib/%(lib_subdir_newlib)/shcrtbegin.o} %{!shared: %(base_sdk)newlib/%(lib_subdir_newlib)/crtbegin.o}"
+#define STARTFILE_NEWLIB_SPEC \
+"%{shared: " NEWLIB_CRT_SPEC ("shcrtbegin.o") "} " \
+"%{!shared: " NEWLIB_CRT_SPEC ("crtbegin.o") "}"
 
-#define ENDFILE_NEWLIB_SPEC "\
-%{shared: %(base_sdk)newlib/%(lib_subdir_newlib)/shcrtend.o} %{!shared: %(base_sdk)newlib/%(lib_subdir_newlib)/crtend.o}"
+#define ENDFILE_NEWLIB_SPEC \
+"%{shared: " NEWLIB_CRT_SPEC ("shcrtend.o") "} " \
+"%{!shared: " NEWLIB_CRT_SPEC ("crtend.o") "}"
 
 /* End clib specific */
 
