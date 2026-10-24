@@ -1,0 +1,20 @@
+name: CI label
+
+# A ci-* label on a pull request builds the whole m68k-amigaos toolchain,
+# from AmigaPorts/m68k-amigaos-gcc, with the pull request swapped in for
+# gcc; ci-command.yml does the same for a /ci comment.  How to use them:
+# https://github.com/AmigaPorts/m68k-amigaos-gcc/blob/master/doc/ci.md
+on:
+  pull_request:
+    types: [labeled]
+
+jobs:
+  toolchain:
+    if: startsWith(github.event.label.name, 'ci')
+    uses: AmigaPorts/m68k-amigaos-gcc/.github/workflows/toolchain.yml@master
+    with:
+      checkout_repo: AmigaPorts/m68k-amigaos-gcc
+      checkout_ref: master
+      # GitHub's merge of the pull request into its base branch, as
+      # merging would build it
+      repos: gcc=${{ github.event.pull_request.base.repo.clone_url }}#refs/pull/${{ github.event.pull_request.number }}/merge
