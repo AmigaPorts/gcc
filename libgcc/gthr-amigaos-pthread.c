@@ -217,6 +217,90 @@ __gthread_recursive_mutex_destroy (__gthread_recursive_mutex_t *__mutex)
   return pthread_mutex_destroy (&mx->u.pmutex);
 }
 
+static void
+__gthread_to_timespec (const __gthread_time_t *t, struct timespec *ts)
+{
+  ts->tv_sec = t->seconds;
+  ts->tv_nsec = t->nanoseconds;
+}
+
+int
+__gthread_mutex_timedlock (__gthread_mutex_t *__mutex,
+			   const __gthread_time_t *abs_timeout)
+{
+  __internal_gthread_mutex_t *mx = (__internal_gthread_mutex_t *)__mutex;
+  struct timespec ts;
+
+  __gthread_to_timespec (abs_timeout, &ts);
+  return pthread_mutex_timedlock (&mx->u.pmutex, &ts);
+}
+
+int
+__gthread_recursive_mutex_timedlock (__gthread_recursive_mutex_t *__mutex,
+				     const __gthread_time_t *abs_timeout)
+{
+  return __gthread_mutex_timedlock ((__gthread_mutex_t *)__mutex, abs_timeout);
+}
+
+/******************************************************************************/
+
+int
+__gthread_cond_init (__gthread_cond_t *__cond)
+{
+  __internal_gthread_cond_t *cond = (__internal_gthread_cond_t *)__cond;
+  return pthread_cond_init (&cond->u.pcond, NULL);
+}
+
+int
+__gthread_cond_signal (__gthread_cond_t *__cond)
+{
+  __internal_gthread_cond_t *cond = (__internal_gthread_cond_t *)__cond;
+  return pthread_cond_signal (&cond->u.pcond);
+}
+
+int
+__gthread_cond_broadcast (__gthread_cond_t *__cond)
+{
+  __internal_gthread_cond_t *cond = (__internal_gthread_cond_t *)__cond;
+  return pthread_cond_broadcast (&cond->u.pcond);
+}
+
+int
+__gthread_cond_wait (__gthread_cond_t *__cond, __gthread_mutex_t *__mutex)
+{
+  __internal_gthread_cond_t *cond = (__internal_gthread_cond_t *)__cond;
+  __internal_gthread_mutex_t *mx = (__internal_gthread_mutex_t *)__mutex;
+  return pthread_cond_wait (&cond->u.pcond, &mx->u.pmutex);
+}
+
+int
+__gthread_cond_wait_recursive (__gthread_cond_t *__cond,
+			       __gthread_recursive_mutex_t *__mutex)
+{
+  return __gthread_cond_wait (__cond, (__gthread_mutex_t *)__mutex);
+}
+
+int
+__gthread_cond_timedwait (__gthread_cond_t *__cond, __gthread_mutex_t *__mutex,
+			  const __gthread_time_t *abs_timeout)
+{
+  __internal_gthread_cond_t *cond = (__internal_gthread_cond_t *)__cond;
+  __internal_gthread_mutex_t *mx = (__internal_gthread_mutex_t *)__mutex;
+  struct timespec ts;
+
+  __gthread_to_timespec (abs_timeout, &ts);
+  return pthread_cond_timedwait (&cond->u.pcond, &mx->u.pmutex, &ts);
+}
+
+int
+__gthread_cond_destroy (__gthread_cond_t *__cond)
+{
+  __internal_gthread_cond_t *cond = (__internal_gthread_cond_t *)__cond;
+  return pthread_cond_destroy (&cond->u.pcond);
+}
+
+/******************************************************************************/
+
 int
 __gthread_create (__gthread_t *thread, void *(*func) (void*), void *args)
 {
