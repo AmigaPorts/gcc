@@ -111,7 +111,10 @@ amigaos_expand_builtin (tree exp, rtx target, rtx subtarget ATTRIBUTE_UNUSED,
 
   arg0 = CALL_EXPR_ARG (exp, 0);
   if (arg0 == error_mark_node)
-    return const0_rtx;
+    {
+      *success = 1;
+      return const0_rtx;
+    }
 
   f_gpr = TYPE_FIELDS (TREE_TYPE (va_list_type_node));
   f_fpr = TREE_CHAIN (f_gpr);
