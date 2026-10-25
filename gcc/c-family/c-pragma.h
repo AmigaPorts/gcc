@@ -281,6 +281,11 @@ extern tree maybe_apply_renaming_pragma (tree, tree);
 extern void maybe_apply_pragma_scalar_storage_order (tree);
 extern void add_to_renaming_pragma_list (tree, tree);
 
+#ifdef TARGET_AMIGAOS4
+/* Set by the handler of "#pragma amigaos tagtype".  */
+extern bool was_tagtypepragma;
+#endif
+
 /* These are to be implemented in each frontend that needs them.  */
 extern enum cpp_ttype pragma_lex (tree *, location_t *loc = NULL);
 extern void pragma_lex_discard_to_eol ();

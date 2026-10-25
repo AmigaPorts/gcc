@@ -16417,42 +16417,42 @@ c_parser_pragma (c_parser *parser, enum pragma_context context, bool *if_p,
    * which, at the moment, cannot easily handled outside of this
    * file.
    */
-  extern int was_tagtypepragma;
   if (was_tagtypepragma)
-  {
-    c_token *tok = c_parser_peek_token (the_parser);
-    c_parser_consume_token(parser);
+    {
+      /* Reset the variable that is set in the pragma handler */
+      was_tagtypepragma = 0;
 
-    c_type_name *ctype = c_parser_type_name(parser);
-    tree ctypetree = groktypename (ctype, NULL, NULL);
+      c_type_name *ctype = NULL;
+      matching_parens parens;
+      if (parens.require_open (parser))
+	{
+	  ctype = c_parser_type_name (parser);
+	  if (ctype && !parens.require_close (parser))
+	    ctype = NULL;
+	}
+      c_parser_skip_to_pragma_eol (parser);
+      if (!ctype)
+	return false;
 
-    /* Make the parsed type available to all functions called from here on */
-    amigaos_current_tagtype = ctypetree;
+      /* Make the parsed type available to all functions called from here on */
+      amigaos_current_tagtype = groktypename (ctype, NULL, NULL);
 
-    tok = c_parser_peek_token (the_parser);
-    c_parser_consume_token(parser);
-    c_parser_skip_to_pragma_eol(parser);
-
-    tok = c_parser_peek_token (the_parser);
-
-    /* Parse the line that follows. We will register for a PLUGIN_FINISH_DECL event
-     * to minimize contermination
-     */
-    bool old_flag_plugin_added = flag_plugin_added;
-    register_callback ("amigaos-tagtype", PLUGIN_FINISH_DECL,
-                       amigaos_tagtype_finish_decl_callback,
-                       ctype);
-    flag_plugin_added = 1;
-    c_parser_declaration_or_fndef (parser, false, false, true, false, true,
-                                   false, NULL);
-    unregister_callback ("amigaos-tagtype", PLUGIN_FINISH_DECL);
-    flag_plugin_added = old_flag_plugin_added;
-    /* Reset the variable that is set in the pragma handler */
-    was_tagtypepragma = 0;
-    /* The tagtype has been processed */
-    amigaos_current_tagtype = NULL_TREE;
-    return false;
-  }
+      /* Parse the line that follows. We will register for a PLUGIN_FINISH_DECL event
+       * to minimize contermination
+       */
+      bool old_flag_plugin_added = flag_plugin_added;
+      register_callback ("amigaos-tagtype", PLUGIN_FINISH_DECL,
+			 amigaos_tagtype_finish_decl_callback,
+			 ctype);
+      flag_plugin_added = 1;
+      c_parser_declaration_or_fndef (parser, false, false, true, false, true,
+				     false, NULL);
+      unregister_callback ("amigaos-tagtype", PLUGIN_FINISH_DECL);
+      flag_plugin_added = old_flag_plugin_added;
+      /* The tagtype has been processed */
+      amigaos_current_tagtype = NULL_TREE;
+      return false;
+    }
 #endif
 
   /* Skip to EOL, but suppress any error message.  Those will have been

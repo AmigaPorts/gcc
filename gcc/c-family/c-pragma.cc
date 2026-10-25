@@ -1372,12 +1372,12 @@ handle_pragma_message (cpp_reader *)
 
 #ifdef TARGET_AMIGAOS4
 /* This is queried by the invoker of the handler */
-int was_tagtypepragma;
+bool was_tagtypepragma;
 /* Tagtype pragma */
 static void
 handle_pragma_tagtype (cpp_reader *)
 {
-  was_tagtypepragma = 1;
+  was_tagtypepragma = true;
 }
 #endif
 
