@@ -2242,6 +2242,9 @@ m68k_illegitimate_symbolic_constant_p (rtx x)
       && !(GET_CODE (XEXP (XEXP (x, 0), 0)) == LABEL_REF
 	   && GET_CODE (XEXP (XEXP (x, 0), 1)) == LABEL_REF))
     return true;
+  /* The same for (const (neg (symbol_ref))), which is 0 minus it.  */
+  if (GET_CODE (x) == CONST && GET_CODE (XEXP (x, 0)) == NEG)
+    return true;
 
   return m68k_tls_reference_p (x, false);
 }
