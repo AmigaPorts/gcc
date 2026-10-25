@@ -531,7 +531,7 @@ const struct attribute_spec c_common_gnu_attributes[] =
 #ifdef TARGET_AMIGAOS4
   { "libcall",                0, 0, false, true, true, false,
                               handle_libcall_attribute, NULL },
-  /* Similiar to libcall but doesn't imply linearvarargs. Can be handled as libcall here. */
+  /* Similar to libcall but doesn't imply linearvarargs. Can be handled as libcall here. */
   { "libcall2",               0, 0, false, true, true, false,
                               handle_libcall_attribute, NULL },
 #endif
