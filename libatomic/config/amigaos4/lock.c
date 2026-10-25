@@ -46,16 +46,20 @@
 #define WATCH_SIZE	CACHLINE_SIZE
 #endif
 
+/* States of struct lock's init field.  */
+#define LOCK_UNINITIALIZED	0
+#define LOCK_INITIALIZING	1
+#define LOCK_READY		2
+
 struct lock
 {
   struct SignalSemaphore sem;
-  char initialized;
+  char init;
   char pad[sizeof(struct SignalSemaphore) + 1 < CACHLINE_SIZE
 	   ? CACHLINE_SIZE - sizeof(struct SignalSemaphore) - 1
 	   : 0];
 };
 
-/* TODO: Use a constructor to initialize the semaphore */
 #define NLOCKS		(PAGE_SIZE / WATCH_SIZE)
 static struct lock locks[NLOCKS];
 
@@ -68,13 +72,22 @@ addr_hash (void *ptr)
 static void
 libat_lock (struct lock *l)
 {
-  IExec->Forbid();
-  if (!l->initialized)
-  {
-    IExec->InitSemaphore (&l->sem);
-    l->initialized = 1;
-  }
-  IExec->Permit();
+  /* Initialize the semaphore on first use.  The task that moves init out
+     of LOCK_UNINITIALIZED does it; any other waits until it is done.  */
+  if (__atomic_load_n (&l->init, __ATOMIC_ACQUIRE) != LOCK_READY)
+    {
+      char expected = LOCK_UNINITIALIZED;
+      if (__atomic_compare_exchange_n (&l->init, &expected, LOCK_INITIALIZING,
+				       false, __ATOMIC_ACQUIRE,
+				       __ATOMIC_ACQUIRE))
+	{
+	  IExec->InitSemaphore (&l->sem);
+	  __atomic_store_n (&l->init, LOCK_READY, __ATOMIC_RELEASE);
+	}
+      else
+	while (__atomic_load_n (&l->init, __ATOMIC_ACQUIRE) != LOCK_READY)
+	  IExec->Reschedule ();
+    }
   IExec->ObtainSemaphore (&l->sem);
 }
 
