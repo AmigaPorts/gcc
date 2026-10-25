@@ -491,11 +491,6 @@ do                                   \
   { "force_no_baserel", 0, 0, true, false, false, false, amigaos_handle_force_no_baserel_attribute, NULL }, \
   { "check68kfuncptr", 0, 0, false, true, true, false, amigaos_handle_check68kfuncptr_attribute, NULL }
 
-/* Overrides */
-#undef EXPAND_BUILTIN_VA_START
-#define EXPAND_BUILTIN_VA_START(VALIST, NEXTARG) \
-  amigaos_expand_builtin_va_start (VALIST, NEXTARG)
-
 /* Disable section anchors in baserel mode (patch 0017).  */
 #undef TARGET_USE_ANCHORS_FOR_SYMBOL_P
 #define TARGET_USE_ANCHORS_FOR_SYMBOL_P amigaos_use_anchors_for_symbol_p

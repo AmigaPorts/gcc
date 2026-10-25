@@ -2487,7 +2487,7 @@ rs6000_build_builtin_va_list (void)
 /* Implement va_start.  */
 
 void
-rs6000_va_start2 (tree valist, rtx nextarg)
+rs6000_va_start (tree valist, rtx nextarg)
 {
   HOST_WIDE_INT words, n_gpr, n_fpr;
   tree f_gpr, f_fpr, f_res, f_ovf, f_sav;
@@ -2580,15 +2580,6 @@ rs6000_va_start2 (tree valist, rtx nextarg)
   t = build2 (MODIFY_EXPR, TREE_TYPE (sav), sav, t);
   TREE_SIDE_EFFECTS (t) = 1;
   expand_expr (t, const0_rtx, VOIDmode, EXPAND_NORMAL);
-}
-
-/* Wrapper for rs6000_va_start2.  On AmigaOS the EXPAND_BUILTIN_VA_START
-   hook points to amigaos_expand_builtin_va_start instead; on all other
-   SVR4 ELF targets this is what TARGET_EXPAND_BUILTIN_VA_START calls.  */
-void
-rs6000_va_start (tree valist, rtx nextarg)
-{
-  rs6000_va_start2 (valist, nextarg);
 }
 
 /* Implement va_arg.  */
