@@ -1661,7 +1661,8 @@ instantiate_virtual_regs_in_insn (rtx_insn *insn)
     }
 
   /* In the general case, we expect virtual registers to appear only in
-     operands, and then only as either bare registers or inside memories.  */
+     operands, and then only as either bare registers or inside memories
+     or addresses.  */
   for (i = 0; i < recog_data.n_operands; ++i)
     {
       x = recog_data.operand[i];
@@ -1738,7 +1739,26 @@ instantiate_virtual_regs_in_insn (rtx_insn *insn)
 	  break;
 
 	default:
-	  continue;
+	  /* An address operand (address_operand, a "p" constraint), such
+	     as the source of m68k's lea: the virtual registers are inside
+	     the address expression.  Instantiate them there, and if the
+	     insn does not take the new address, compute it into a
+	     register.  Operators are skipped: their operands are operands
+	     of their own.  */
+	  if (recog_data.is_operator[i])
+	    continue;
+	  x = copy_rtx (x);
+	  if (!instantiate_virtual_regs_in_rtx (&x))
+	    continue;
+	  if (!safe_insn_predicate (insn_code, i, x))
+	    {
+	      start_sequence ();
+	      x = force_operand (x, NULL_RTX);
+	      seq = end_sequence ();
+	      if (seq)
+		emit_insn_before (seq, insn);
+	    }
+	  break;
 	}
 
       /* At this point, X contains the new value for the operand.
