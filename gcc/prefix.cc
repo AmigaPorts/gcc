@@ -336,7 +336,7 @@ update_path (const char *path, const char *key)
     tr (result, DIR_SEPARATOR_2, DIR_SEPARATOR);
 #endif
 
-#if defined (DIR_SEPARATOR) && !defined (DIR_SEPARATOR_2) && !defined (__amigaos__)
+#if defined (DIR_SEPARATOR) && !defined (DIR_SEPARATOR_2) && !defined (__amigaos4__)
   if (DIR_SEPARATOR != '/')
     tr (result, '/', DIR_SEPARATOR);
 #endif
