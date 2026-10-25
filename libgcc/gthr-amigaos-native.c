@@ -167,27 +167,29 @@ __gthread_once (__gthread_once_t *__once, void (*__func) (void))
   if (__once == NULL || __func == NULL)
     return EINVAL;
 
-  if (__atomic_load_1(&once->u.i.done, __ATOMIC_SEQ_CST))
-    return 0;
-
-  while (!__atomic_load_1(&once->u.i.done, __ATOMIC_SEQ_CST) && __atomic_load_1(&once->u.i.started, __ATOMIC_SEQ_CST))
+  /* Return only once __func has completed, also when another thread runs
+   * it.  If __func throws, __gthread_once_unlock clears the started flag
+   * and a waiting thread takes over.
+   */
+  while (!__atomic_load_1(&once->u.i.done, __ATOMIC_SEQ_CST))
     {
+      if (!__atomic_test_and_set(&once->u.i.started, __ATOMIC_SEQ_CST))
+        {
+          /* Started flag was not set so call func now */
+          __func();
+
+          /* Remember that we are done now. And make all effects prior to this
+           * store visible to all the other clients that will read that we are
+           * actually done.
+           */
+          __atomic_store_1(&once->u.i.done, 1, __ATOMIC_SEQ_CST);
+          break;
+        }
+
       /* Allow the other thread to progress quickly but iexec may be not available */
       struct ExecBase *SysBase = *(struct ExecBase **)4;
       struct ExecIFace *ie = (struct ExecIFace *)SysBase->MainInterface;
       ie->Reschedule();
-    }
-
-  if (!__atomic_test_and_set(&once->u.i.started, __ATOMIC_SEQ_CST))
-    {
-      /* Started flag was not set so call func now */
-      __func();
-
-      /* Remember that we are done now. And make all effects prior to this
-       * store visible to all the other clients that will read that we are
-       * actually done.
-       */
-      __atomic_store_1(&once->u.i.done, 1, __ATOMIC_SEQ_CST);
     }
 
   return 0;
