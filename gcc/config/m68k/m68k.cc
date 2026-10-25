@@ -3355,7 +3355,10 @@ valid_mov3q_const (HOST_WIDE_INT i)
    In particular, if SRC is a MEM with auto-inc/dec addressing and
    its REG is mentioned in DST, it's invalid.  See PR123853.
    The check does not depend on the mode: the HI, QI and SF move insns
-   use it too, since late-combine produces the same shape for them.  */
+   use it too, since late-combine produces the same shape for them.
+   So do the DI, DF and XF move insns, whose two or three moves
+   (output_move_double) all address the destination after the source's
+   increment or decrement.  */
 
 bool
 check_move_simode (const rtx *operands)
