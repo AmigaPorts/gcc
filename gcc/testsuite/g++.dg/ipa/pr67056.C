@@ -36,4 +36,6 @@ int main(int, char **) {
     return 0;
 }
 
-/* { dg-final { scan-ipa-dump "Speculative outer type:struct CompositeClass" "cp"  } } */
+/* Without -fPIC EmptyClass::EmptyClass is not interposable, so it is
+   inlined and the dynamic type is known exactly rather than speculatively.  */
+/* { dg-final { scan-ipa-dump "Speculative outer type:struct CompositeClass" "cp" { target fpic } } } */
