@@ -596,9 +596,12 @@ static int __gthread_entry(STRPTR args UNUSED, int32 length UNUSED, APTR execbas
 
   thr->result = thr->entry(thr->args);
 
-  /* Invoke destructors of all non-NULL thread specifics */
-  iexec->ObtainSemaphore (&keystore->sem);
-  for (i = 0; i < keystore->num_key_entries; i++)
+  /* Invoke destructors of all non-NULL thread specifics.  There is no
+   * keystore if no key was ever created.
+   */
+  if (keystore)
+    iexec->ObtainSemaphore (&keystore->sem);
+  for (i = 0; keystore && i < keystore->num_key_entries; i++)
     {
       void (*destroy)(void *);
       keyentry_t *key;
@@ -612,7 +615,8 @@ static int __gthread_entry(STRPTR args UNUSED, int32 length UNUSED, APTR execbas
       if (key->data)
         destroy ((void *)key->data);
     }
-  iexec->ReleaseSemaphore (&keystore->sem);
+  if (keystore)
+    iexec->ReleaseSemaphore (&keystore->sem);
 
   __gthread_close_timer (thr);
 
@@ -793,6 +797,14 @@ __gthread_open_timer(threadentry_t **thr_p)
   /* Initialize libs */
   __gthread_once (&libs_once, init_libs);
 
+  /* Initialize our private threadstore, but only once.  This may be the
+   * first gthread call of the process.
+   */
+  __gthread_once (&threadstore_once, init_threadstore);
+
+  if (!threadstore)
+    return ENOMEM;
+
   task = iexec->FindTask(NULL);
 
   iexec->ObtainSemaphoreShared (&threadstore->sem);
@@ -800,7 +812,7 @@ __gthread_open_timer(threadentry_t **thr_p)
     {
       /* This is not our thread */
       iexec->ReleaseSemaphore (&threadstore->sem);
-      return -1;
+      return EPERM;
     }
   iexec->ReleaseSemaphore (&threadstore->sem);
 
@@ -824,7 +836,7 @@ __gthread_open_timer(threadentry_t **thr_p)
   return 0;
 bailout:
   __gthread_close_timer(thr);
-  return -1;
+  return ENOMEM;
 }
 
 /******************************************************************************/
@@ -870,6 +882,12 @@ __gthread_cond_signal (__gthread_cond_t *__cond)
 
   /* Initialize libs */
   __gthread_once (&libs_once, init_libs);
+
+  /* Initialize our private threadstore, but only once */
+  __gthread_once (&threadstore_once, init_threadstore);
+
+  if (!threadstore)
+    return ENOMEM;
 
   /* Most of the time, we are called with the same mutex being locked that is
    * supplied to __gthread_cond_wait(). However,  most of the time is not always,
