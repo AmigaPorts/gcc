@@ -49,11 +49,14 @@ struct X {
   int x = undef(0);
 
   X() = default; // { dg-error {'consteval int undef\(int\)' used before its definition} }
+// Without comdat groups the complete constructor is not an alias of the base
+// one and gets its own body, so the note can point at the escalating call.
+// { dg-message "promoted to an immediate function" "" { target { ! comdat_group } } .-3 }
 };
 
 void
 test ()
 {
   [[maybe_unused]] X x; // { dg-error "call to consteval function" }
-// { dg-message "promoted to an immediate function" "" { target *-*-* } .-1 }
+// { dg-message "promoted to an immediate function" "" { target comdat_group } .-1 }
 }
