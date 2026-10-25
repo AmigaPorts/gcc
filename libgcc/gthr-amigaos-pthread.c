@@ -76,17 +76,18 @@ __gthread_once (__gthread_once_t *__once, void (*__func) (void))
   if (__once == NULL || __func == NULL)
     return EINVAL;
 
-  if (__atomic_load_1 (&once->u.i.done, __ATOMIC_SEQ_CST))
-    return 0;
-
-  while (!__atomic_load_1 (&once->u.i.done, __ATOMIC_SEQ_CST)
-	 && __atomic_load_1 (&once->u.i.started, __ATOMIC_SEQ_CST))
-    sched_yield ();
-
-  if (!__atomic_test_and_set (&once->u.i.started, __ATOMIC_SEQ_CST))
+  /* Return only once __func has completed, also when another thread runs
+     it.  If __func throws, __gthread_once_unlock clears the started flag
+     and a waiting thread takes over.  */
+  while (!__atomic_load_1 (&once->u.i.done, __ATOMIC_SEQ_CST))
     {
-      __func ();
-      __atomic_store_1 (&once->u.i.done, 1, __ATOMIC_SEQ_CST);
+      if (!__atomic_test_and_set (&once->u.i.started, __ATOMIC_SEQ_CST))
+	{
+	  __func ();
+	  __atomic_store_1 (&once->u.i.done, 1, __ATOMIC_SEQ_CST);
+	  break;
+	}
+      sched_yield ();
     }
 
   return 0;
