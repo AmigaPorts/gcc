@@ -923,7 +923,7 @@ Objective-C and Objective-C++ Dialects}.
 
 @emph{AmigaOS PowerPC Options} (@ref{AmigaOS PowerPC Options})
 @gccoptlist{-mcrt=@var{crt}  -mbaserel  -mno-baserel
--mcheck68kfuncptr}
+-mcheck68kfuncptr  -athread=@var{model}  -pthread  -use-dynld}
 
 @emph{ARC Options} (@ref{ARC Options})
 @gccoptlist{-mbarrel-shifter  -mjli-always
@@ -22335,7 +22335,8 @@ Control warnings about invalid OpenACC dimensions.
 
 Select the C runtime library to use. The same option must be used for
 both compiling and linking. Some of the possible values are @samp{default},
-@samp{clib2}, @samp{clib2-ts} (thread-safe variant of clib2) and @samp{newlib}.
+@samp{clib2}, @samp{clib2-ts} (thread-safe variant of clib2), @samp{clib4}
+and @samp{newlib}.
 Each option makes available an appropriate define, for example
 @code{__CLIB2__}, @code{__NEWLIB__} etc. Additionally, @samp{clib2-ts} option
 provides the @code{__THREAD_SAFE} define.
@@ -22452,6 +22453,32 @@ Generate absolute data access. This is the default.
 Causes each function call through a function pointer to be performed as
 if the function pointer was declared with the @samp{check68kfuncptr}
 function attribute. @xref{Function Attributes}.
+
+@item -athread=@var{model}
+@opindex athread
+
+Select the thread implementation that is linked into the executable for
+the @code{__gthread} functions that libstdc++ and other runtime libraries
+call.  @samp{native} uses AmigaOS processes and semaphores, @samp{pthread}
+uses the pthread library of clib4 and requires @option{-mcrt=clib4}, and
+@samp{single} supports no threads, which is enough for single-threaded
+programs.  When @command{g++} links a program and no @option{-athread} is
+given, it uses @samp{native}.  Programs that use libstdc++ but are linked
+with @command{gcc} must specify this option.
+
+@item -pthread
+@opindex pthread
+
+Link with the pthread library.  This requires @option{-mcrt=clib4}, the
+only C runtime library that provides one.  It does not select the thread
+implementation used by libstdc++; use @option{-athread=pthread} for that.
+
+@item -use-dynld
+@opindex use-dynld
+
+Link the executable dynamically, so that the dynamic linker loads the
+shared objects it uses at run time.  Without this option, executables are
+linked statically.
 
 @end table
 
