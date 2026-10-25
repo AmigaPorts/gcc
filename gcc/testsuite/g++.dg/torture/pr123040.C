@@ -1,4 +1,8 @@
 // { dg-do compile }
+// Where the vectorizer peels And() for alignment (m68k cannot raise the
+// stack's), -ftracer copies the epilogue onto a path that cannot run, and
+// -Wstringop-overflow warns about its store to raw[16].
+// { dg-prune-output "-Wstringop-overflow" }
 
 template <int kBytes, typename From, typename To>
 void CopyBytes(From from, To to) {
