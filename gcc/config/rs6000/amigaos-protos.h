@@ -18,7 +18,6 @@
    Free Software Foundation, 59 Temple Place - Suite 330, Boston,
    MA 02111-1307, USA.  */
 
-extern void amigaos_expand_builtin_va_start (tree valist, rtx nextarg);
 extern void amigaos_init_builtins (void);
 extern rtx amigaos_expand_builtin (tree, rtx, rtx, machine_mode, int, bool *);
 extern tree amigaos_handle_linearvarargs_attribute (tree *, tree, tree, int, bool *);

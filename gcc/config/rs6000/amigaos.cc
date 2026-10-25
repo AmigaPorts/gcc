@@ -50,16 +50,6 @@
 #include "emit-rtl.h"
 #include "stringpool.h"
 #include "attribs.h"
-#include "output.h"
-
-#undef DEBUG
-#ifdef DEBUG
-#define dprintf(...)      			\
-printf("%s: ", __PRETTY_FUNCTION__);		\
-printf(__VA_ARGS__)
-#else
-#define dprintf(...) /* __VA_ARGS__ */
-#endif
 
 #ifdef __amigaos4__
 static const char * __attribute__((used)) amigaos_stack_cookie = "$STACK:768000";
@@ -262,16 +252,6 @@ amigaos_handle_check68kfuncptr_attribute (tree *node, tree name,
     }
 
   return NULL_TREE;
-}
-
-/* va_start for linearvarargs is handled by the standard rs6000 path;
-   this stub exists to satisfy the EXPAND_BUILTIN_VA_START hook.  */
-void
-amigaos_expand_builtin_va_start (tree valist ATTRIBUTE_UNUSED,
-				 rtx nextarg ATTRIBUTE_UNUSED)
-{
-  /* Intentionally empty: rs6000_va_start() handles the linear case
-     via the CALL_LINEARVARARGS cookie already.  */
 }
 
 /* Disable section anchors in baserel mode to avoid r2-relative
