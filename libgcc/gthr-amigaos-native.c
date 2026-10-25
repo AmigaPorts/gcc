@@ -839,6 +839,26 @@ bailout:
   return ENOMEM;
 }
 
+/**
+ * Close the timer of the main task at exit.  __gthread_entry closes the
+ * timers of the threads it runs, but the main task does not go through it.
+ */
+static void __attribute__((destructor))
+__gthread_close_main_timer (void)
+{
+  threadentry_t *thr;
+
+  if (!threadstore)
+    return;
+
+  iexec->ObtainSemaphoreShared (&threadstore->sem);
+  thr = find_threadentry_by_process ((struct Process *)iexec->FindTask (NULL));
+  iexec->ReleaseSemaphore (&threadstore->sem);
+
+  if (thr)
+    __gthread_close_timer (thr);
+}
+
 /******************************************************************************/
 
 /**
