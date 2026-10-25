@@ -47,11 +47,10 @@
    lacks the C99 functions.  */
 #include <sys/types.h>
 #if defined(__amigaos__)
-/* m68k-amigaos: the compiler assumes the C99 functions.  Its newlib has
-   them all, "l" variants included; libnix lacks exp2, exp2f, log2f and
-   several "l" functions.  libnix and clib2 ship a newlib.h of their own,
-   so test the macro newlib's sys/types.h defines, not the header.  */
-#if defined(_NEWLIB_VERSION) && !defined(__libnix__) && !defined(__CLIB2__)
+/* m68k-amigaos: the compiler assumes the C99 functions.  newlib and
+   libnix have them all, "l" variants included; clib2 lacks the "l"
+   functions, and its lgamma and tgamma do not link.  */
+#if defined(_NEWLIB_VERSION) || defined(__libnix__)
 #define HAVE_C99_RUNTIME
 #endif
 #elif defined(_NEWLIB_VERSION) || defined(__UCLIBC__)
