@@ -369,6 +369,7 @@ mcrt=default|!mcrt=*: %(link_amiga_default); \
 %{shared:-shared -dy --defsym __dynld_version__=1} %{!shared: %{static:-static}} %{use-dynld: -dy}"
 
 #define LINK_THREAD "\
+%{pthread:%{!mcrt=clib4:%e-pthread requires -mcrt=clib4}} \
 %s%{athread=native:gthr-amigaos-native.o;athread=single:gthr-amigaos-single.o;athread=pthread:%{mcrt=clib4:gthr-amigaos-pthread.o;:%e-athread=pthread requires -mcrt=clib4}}"
 
 #undef STARTFILE_SPEC
