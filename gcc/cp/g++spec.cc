@@ -326,6 +326,10 @@ lang_specific_driver (struct cl_decoded_option **in_decoded_options,
      should be set to NULL to signal that it need not be appended.  */
   if (which_library == USE_LIBCXX && LIBCXXABI != NULL)
     num_args += 4;
+#ifdef TARGET_AMIGAOS4
+  /* For the -athread=native added below.  */
+  num_args++;
+#endif
   new_decoded_options = XNEWVEC (struct cl_decoded_option, num_args);
 
   i = 0;
@@ -461,6 +465,24 @@ lang_specific_driver (struct cl_decoded_option **in_decoded_options,
 			     &new_decoded_options[j]);
 	    j++;
 	    added_libraries++;
+	  }
+      }
+#endif
+
+#ifdef TARGET_AMIGAOS4
+      /* gthr-amigaos.h declares the __gthread functions extern, so every
+	 program using libstdc++ needs a thread runtime object, which the
+	 driver links only for -athread=.  Default to the native one.  */
+      {
+	bool saw_athread = false;
+	for (i = 0; i < argc; i++)
+	  if (decoded_options[i].opt_index == OPT_athread_)
+	    saw_athread = true;
+	if (!saw_athread)
+	  {
+	    generate_option (OPT_athread_, "native", 1, CL_DRIVER,
+			     &new_decoded_options[j]);
+	    j++;
 	  }
       }
 #endif
