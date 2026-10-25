@@ -3632,7 +3632,15 @@ c_parser_static_assert_declaration_no_semi (c_parser *parser)
   constant_expression_warning (value);
   if (integer_zerop (value))
     {
-      if (string)
+      if (warning)
+	{
+	  if (string)
+	    warning_at (assert_loc, 0,
+			"static warn-only assertion failed: %E", string);
+	  else
+	    warning_at (assert_loc, 0, "static warn-only assertion failed");
+	}
+      else if (string)
 	error_at (assert_loc, "static assertion failed: %E", string);
       else
 	error_at (assert_loc, "static assertion failed");
