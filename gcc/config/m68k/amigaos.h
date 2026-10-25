@@ -201,6 +201,11 @@ do									\
 		 "this target and are ignored, use %'-fbaserel%' instead"); \
 	flag_pic = flag_pie = 0;					\
       }								\
+    /* finish_options sets flag_shlib for any flag_pic, which makes	\
+       every global symbol interposable, so global functions are not	\
+       inlined.  A4-relative, resident and pc-relative code has no	\
+       symbol interposition.  */					\
+    flag_shlib = 0;							\
     if (flag_sanitize)							\
       error ("%<-fsanitize%> is not supported on this target");		\
     /* Low memory is real here: address 4 holds SysBase, so reading	\
