@@ -9,8 +9,8 @@ Target Var(flag_pic,4)
 data is addressed relative to a4 with 32 bit offsets
 
 malways-restore-a4
-Restore a4 in all functions
 Target Common Mask(ALWAYS_RESTORE_A4)
+Restore a4 in all functions
 
 mcrt=
 Target RejectNegative Var(amigaos_crt) Joined
@@ -21,8 +21,8 @@ Target Var(flag_mangle_regparm)
 Name functions that take arguments in registers after their registers, SAS/C style.
 
 mrestore-a4
-Restore a4 in public functions
 Target Common Mask(RESTORE_A4)
+Restore a4 in public functions
 
 msmall-code
 Target RejectNegative Var(flag_smallcode,1)

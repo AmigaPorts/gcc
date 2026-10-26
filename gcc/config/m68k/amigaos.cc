@@ -436,7 +436,7 @@ amigaos_restore_a4 (void)
       {
 	tree attrs = TYPE_ATTRIBUTES (TREE_TYPE (current_function_decl));
 	tree attr = lookup_attribute ("saveds", attrs);
-	if (attr || TARGET_RESTORE_A4 || TARGET_ALWAYS_RESTORE_A4)
+	if (attr || AMIGAOS_RESTORE_A4)
 	  {
 	    rtx a4 = gen_rtx_ASM_INPUT_loc(VOIDmode, "\tjsr ___restore_a4", DECL_SOURCE_LOCATION (current_function_decl));
 	    a4->volatil = 1;
