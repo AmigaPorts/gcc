@@ -92,8 +92,11 @@ enum m68k_cost_idx {
 static int cost_speed_68000_10[IDX_COUNT];
 static int cost_size_68000_10[IDX_COUNT];
 
-static int cost_speed_68020_30[IDX_COUNT];
-static int cost_size_68020_30[IDX_COUNT];
+static int cost_speed_68020[IDX_COUNT];
+static int cost_size_68020[IDX_COUNT];
+
+static int cost_speed_68030[IDX_COUNT];
+static int cost_size_68030[IDX_COUNT];
 
 static int cost_speed_68040[IDX_COUNT];
 static int cost_size_68040[IDX_COUNT];
@@ -210,12 +213,12 @@ init_cost_size_68000_10 (int t[IDX_COUNT])
 }
 
 /* ============================================
-   68020/030 - SPEED / SIZE
+   68020 - SPEED / SIZE
    Winner: m68k-costs-speed.68020.winner.txt (0.988126)
    (identical to 68030 winner - Volamos doesn't model 68030 caches)
    ============================================ */
 static void
-init_cost_speed_68020_30 (int t[IDX_COUNT])
+init_cost_speed_68020 (int t[IDX_COUNT])
 {
     for (int i = 0; i < IDX_COUNT; ++i) t[i] = 0;
 
@@ -263,7 +266,109 @@ init_cost_speed_68020_30 (int t[IDX_COUNT])
 }
 
 static void
-init_cost_size_68020_30 (int t[IDX_COUNT])
+init_cost_size_68020 (int t[IDX_COUNT])
+{
+    for (int i = 0; i < IDX_COUNT; ++i) t[i] = 0;
+
+    /* Size not tuned; SBF baseline. */
+    set_cost (t, IDX_REG_SRC,                4);
+    set_cost (t, IDX_REG_DST,                0);
+    set_cost (t, IDX_MEM_PLUS_REG_DISP,      1);
+    set_cost (t, IDX_MEM_OTHER,              1);
+    set_cost (t, IDX_CONST_INT_Q,           20);
+    set_cost (t, IDX_CONST_INT_W,            1);
+    set_cost (t, IDX_CONST_INT_L_1,          0);
+    set_cost (t, IDX_CONST_INT_L_2,          0);
+    set_cost (t, IDX_SYMBOL,                12);
+    set_cost (t, IDX_PLUS_REG_REG,           5);
+    set_cost (t, IDX_PLUS_REG_CONSTQ,       20);
+    set_cost (t, IDX_PLUS_REG_CONSTL,        1);
+    set_cost (t, IDX_PLUS_OTHER,            12);
+    set_cost (t, IDX_LOGIC_REG_CONST,        8);
+    set_cost (t, IDX_SHIFT_CONST,            2);
+    set_cost (t, IDX_SET_REG_REG,            1);
+    set_cost (t, IDX_CALL_OTHER,            11);
+    set_cost (t, IDX_DIV_L,                 43);
+    set_cost (t, IDX_DIV_W,                 27);
+    set_cost (t, IDX_ADD_L,                  2);
+    set_cost (t, IDX_SUB_L,                  2);
+    set_cost (t, IDX_MOVEQ,                  2);
+    set_cost (t, IDX_LSL_SHIFT,              2);
+    set_cost (t, IDX_LSL_SHIFT_STEP,         2);
+
+    set_cost (t, IDX_MEM_LONG_EXTRA,         2);
+    set_cost (t, IDX_MEM_PREDEC_EXTRA,       2);
+    set_cost (t, IDX_CLR_LONG_PENALTY,       8);
+    set_cost (t, IDX_CLR_WORD_PENALTY,       4);
+    set_cost (t, IDX_PLUS_LEA_OFFSET,        8);
+    set_cost (t, IDX_PLUS_LONG_EXTRA,        4);
+    set_cost (t, IDX_PLUS_SHORT_EXTRA,       4);
+    set_cost (t, IDX_LOGIC_LONG_EXTRA,       4);
+    set_cost (t, IDX_LOGIC_WORD_EXTRA,       4);
+    set_cost (t, IDX_MULT_68000_BASE,       24);
+    set_cost (t, IDX_MULT_68000_BITS,        6);
+    set_cost (t, IDX_MULT_68000_TRANS,       7);
+    set_cost (t, IDX_MULT_68000_WORD_BASE,  38);
+    set_cost (t, IDX_MULT_68000_LONG_MUL,   43);
+    set_cost (t, IDX_MULT_68000_WORD_MUL,   27);
+    set_cost (t, IDX_EXTEND_EXTRA,           8);
+}
+
+/* ============================================
+   68030 - SPEED / SIZE
+   Winner: m68k-costs-speed.68020.winner.txt (0.988126)
+   (identical to 68020 winner - Volamos doesn't model 68030 caches)
+   ============================================ */
+static void
+init_cost_speed_68030 (int t[IDX_COUNT])
+{
+    for (int i = 0; i < IDX_COUNT; ++i) t[i] = 0;
+
+    set_cost (t, IDX_REG_SRC,               10);
+    set_cost (t, IDX_REG_DST,               36);
+    set_cost (t, IDX_MEM_PLUS_REG_DISP,     10);
+    set_cost (t, IDX_MEM_PLUS_REG_REG,      33);
+    set_cost (t, IDX_MEM_OTHER,              0);
+    set_cost (t, IDX_CONST_INT_Q,            3);
+    set_cost (t, IDX_CONST_INT_W,            9);
+    set_cost (t, IDX_CONST_INT_L_1,          4);
+    set_cost (t, IDX_CONST_INT_L_2,          4);
+    set_cost (t, IDX_SYMBOL,                10);
+    set_cost (t, IDX_PLUS_REG_REG,          14);
+    set_cost (t, IDX_PLUS_REG_CONSTQ,        0);
+    set_cost (t, IDX_PLUS_REG_CONSTW,       33);
+    set_cost (t, IDX_PLUS_REG_CONSTL,       18);
+    set_cost (t, IDX_PLUS_OTHER,             9);
+    set_cost (t, IDX_LOGIC_REG_CONST,       15);
+    set_cost (t, IDX_SHIFT_CONST,            6);
+    set_cost (t, IDX_SHIFT_CONST_W,         16);
+    set_cost (t, IDX_SET_REG_REG,            0);
+    set_cost (t, IDX_CALL_OTHER,            18);
+    set_cost (t, IDX_DIV_L,                 39);
+    set_cost (t, IDX_DIV_W,                  9);
+    set_cost (t, IDX_LSL_SHIFT,             27);
+    set_cost (t, IDX_LSL_SHIFT_STEP,         3);
+
+    set_cost (t, IDX_MEM_LONG_EXTRA,        12);
+    set_cost (t, IDX_MEM_PREDEC_EXTRA,      10);
+    set_cost (t, IDX_CLR_LONG_PENALTY,      31);
+    set_cost (t, IDX_CLR_WORD_PENALTY,       0);
+    set_cost (t, IDX_PLUS_LEA_OFFSET,       22);
+    set_cost (t, IDX_PLUS_LONG_EXTRA,        1);
+    set_cost (t, IDX_PLUS_SHORT_EXTRA,       2);
+    set_cost (t, IDX_LOGIC_LONG_EXTRA,       7);
+    set_cost (t, IDX_LOGIC_WORD_EXTRA,      11);
+    set_cost (t, IDX_MULT_68000_BASE,        6);
+    set_cost (t, IDX_MULT_68000_BITS,       28);
+    set_cost (t, IDX_MULT_68000_TRANS,      23);
+    set_cost (t, IDX_MULT_68000_WORD_BASE,   4);
+    set_cost (t, IDX_MULT_68000_LONG_MUL,   32);
+    set_cost (t, IDX_MULT_68000_WORD_MUL,    0);
+    set_cost (t, IDX_EXTEND_EXTRA,           8);
+}
+
+static void
+init_cost_size_68030 (int t[IDX_COUNT])
 {
     for (int i = 0; i < IDX_COUNT; ++i) t[i] = 0;
 
@@ -595,7 +700,8 @@ static int *active_size;
    The tables are grouped by architectural family:
 
      68000/010      -> 68000_10   (distinct: 2-cycle shifts, emulated mul/div)
-     68020, 68030   -> 68020_30   (shared: Volamos does not model 68030 caches)
+     68020          -> 68020
+     68030          -> 68030
      68040, 68060   -> 68040_60   (shared: 68060 superscalar needs a similar mix)
      u68020_40      -> 68040_60   (tune for 68040; the target is the 68040)
      u68020_60      -> 68040_60   (tune for 68060; the target is the 68060)
@@ -611,12 +717,19 @@ m68k_select_cost_tables (void)
         active_speed = cost_speed_68000_10;
         active_size  = cost_size_68000_10;
       }
-    else if (m68k_tune == u68020 || m68k_tune == u68030)
+    else if (m68k_tune == u68020 || m68k_tune == u68020_40)
       {
-        init_cost_speed_68020_30 (cost_speed_68020_30);
-        init_cost_size_68020_30  (cost_size_68020_30);
-        active_speed = cost_speed_68020_30;
-        active_size  = cost_size_68020_30;
+        init_cost_speed_68020 (cost_speed_68020);
+        init_cost_size_68020  (cost_size_68020);
+        active_speed = cost_speed_68020;
+        active_size  = cost_size_68020;
+      }
+    else if (m68k_tune == u68030)
+      {
+        init_cost_speed_68030 (cost_speed_68030);
+        init_cost_size_68030  (cost_size_68030);
+        active_speed = cost_speed_68030;
+        active_size  = cost_size_68030;
       }
     else if (m68k_tune == u68040  || m68k_tune == u68020_40)
       {
@@ -645,10 +758,10 @@ m68k_select_cost_tables (void)
       {
         /* Unreachable given all current m68k_tune values, but keeps
            active_speed / active_size valid if a future GCC adds one. */
-        init_cost_speed_68020_30 (cost_speed_68020_30);
-        init_cost_size_68020_30  (cost_size_68020_30);
-        active_speed = cost_speed_68020_30;
-        active_size  = cost_size_68020_30;
+        init_cost_speed_68030 (cost_speed_68030);
+        init_cost_size_68030  (cost_size_68030);
+        active_speed = cost_speed_68030;
+        active_size  = cost_size_68030;
       }
 }
 
