@@ -6,8 +6,9 @@ name: ppc-amigaos toolchain
 # libraries, and links test programs for each C runtime.  The steps are in
 # .github/ppc-amigaos/ci.sh, the test programs in .github/ppc-amigaos/tests.
 #
-# Like the m68k toolchain build, it runs when a pull request gets a ci*
-# label (re-add the label to rebuild), or by hand from the Actions tab.
+# It runs when a pull request gets the ci-linux-ppc label (re-add the label
+# to rebuild), or by hand from the Actions tab.  The m68k toolchain build
+# ignores that label.
 on:
   pull_request:
     types: [labeled]
@@ -34,7 +35,7 @@ env:
 
 jobs:
   ppc-amigaos:
-    if: github.event_name == 'workflow_dispatch' || startsWith(github.event.label.name, 'ci')
+    if: github.event_name == 'workflow_dispatch' || github.event.label.name == 'ci-linux-ppc'
     runs-on: ubuntu-24.04
     timeout-minutes: 300
     steps:
