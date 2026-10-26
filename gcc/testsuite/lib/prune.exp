@@ -96,6 +96,10 @@ proc prune_gcc_output { text } {
     # Ignore harmless warnings from Xcode 4.0.
     regsub -all "(^|\n)\[^\n\]*ld: warning: could not create compact unwind for\[^\n\]*" $text "" text
 
+    # Ignore the AmigaOS 4 SDK's notes on the newlib.library version that a
+    # newlib function needs.
+    regsub -all "(^|\n)\[^\n\]*: warning: newlib.library \[0-9.\]+ required for \[^\n\]*" $text "" text
+
     # Ignore dsymutil warning (tool bug is actually linker)
     regsub -all "(^|\n)\[^\n\]*could not find object file symbol for symbol\[^\n\]*" $text "" text
 
