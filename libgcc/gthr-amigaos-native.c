@@ -246,17 +246,22 @@ static __gthread_once_t keystore_once = __GTHREAD_ONCE_INIT;
  */
 static void init_keystore(void)
 {
-  if (!(keystore = (keystore_t *)iexec->AllocVec (sizeof(*keystore), MEMF_CLEAR)))
-    return;
-  iexec->InitSemaphore(&keystore->sem);
+  keystore_t *ks;
 
-  if (!(keystore->keyentry_pool = iexec->AllocSysObjectTags (ASOT_ITEMPOOL, ASOITEM_ItemSize, sizeof(keyentry_t), TAG_DONE)))
-    goto bailout;
-  return;
-bailout:
-  if (keystore)
-    iexec->FreeVec (keystore);
-  keystore = NULL;
+  if (!(ks = (keystore_t *)iexec->AllocVec (sizeof(*ks), MEMF_CLEAR)))
+    return;
+  iexec->InitSemaphore(&ks->sem);
+
+  if (!(ks->keyentry_pool = iexec->AllocSysObjectTags (ASOT_ITEMPOOL, ASOITEM_ItemSize, sizeof(keyentry_t), TAG_DONE)))
+    {
+      iexec->FreeVec (ks);
+      return;
+    }
+
+  /* Publish it only when it is complete: __gthread_entry reads keystore
+   * without going through keystore_once.
+   */
+  __atomic_store_n(&keystore, ks, __ATOMIC_RELEASE);
 }
 
 int __gthread_key_create (__gthread_key_t *__key, void (*destroy) (void *))
@@ -583,6 +588,7 @@ static int __gthread_entry(STRPTR args UNUSED, int32 length UNUSED, APTR execbas
 {
   struct Task *task;
   threadentry_t *thr;
+  keystore_t *ks;
   int i;
 
   /* Initialize libs */
@@ -597,26 +603,29 @@ static int __gthread_entry(STRPTR args UNUSED, int32 length UNUSED, APTR execbas
   thr->result = thr->entry(thr->args);
 
   /* Invoke destructors of all non-NULL thread specifics.  There is no
-   * keystore if no key was ever created.
+   * keystore if no key was ever created.  Read it once: another thread
+   * can create the first key meanwhile.
    */
-  if (keystore)
-    iexec->ObtainSemaphore (&keystore->sem);
-  for (i = 0; keystore && i < keystore->num_key_entries; i++)
+  ks = __atomic_load_n(&keystore, __ATOMIC_ACQUIRE);
+  if (ks)
     {
-      void (*destroy)(void *);
-      keyentry_t *key;
+      iexec->ObtainSemaphore (&ks->sem);
+      for (i = 0; i < ks->num_key_entries; i++)
+        {
+          void (*destroy)(void *);
+          keyentry_t *key;
 
-      if (!(destroy = keystore->keys[i].destroy))
-        continue;
+          if (!(destroy = ks->keys[i].destroy))
+            continue;
 
-      if (!(key = find_keyentry (i, task)))
-        continue;
+          if (!(key = find_keyentry (i, task)))
+            continue;
 
-      if (key->data)
-        destroy ((void *)key->data);
+          if (key->data)
+            destroy ((void *)key->data);
+        }
+      iexec->ReleaseSemaphore (&ks->sem);
     }
-  if (keystore)
-    iexec->ReleaseSemaphore (&keystore->sem);
 
   __gthread_close_timer (thr);
 
