@@ -1,0 +1,43 @@
+# DejaGnu board for testing a ppc-amigaos cross compiler, as in
+#
+#   DEJAGNU=.../.github/ppc-amigaos/dejagnu-site.exp \
+#   make -C GCC-BUILD-DIR check-gcc-c \
+#     RUNTESTFLAGS="--target_board=ppc-amigaos gcc.target/powerpc/amigaos/amigaos.exp"
+#
+# The C runtime is newlib unless a multilib variant picks another, as in
+# --target_board=ppc-amigaos/-mcrt=clib4, or all three with
+# --target_board=ppc-amigaos/\{-mcrt=newlib,-mcrt=clib2,-mcrt=clib4\}.
+#
+# Nothing on the build machine runs AmigaOS 4 programs, so a test that
+# would run its program only links it, and the run is reported as
+# UNSUPPORTED.  runtest SIM=PROGRAM names a program that does run one: it
+# is called as "PROGRAM FILE" and must exit with the program's status.
+
+set_board_info target_install {ppc-amigaos}
+
+load_generic_config "sim"
+if {[info exists SIM]} {
+    setup_sim amigaos
+    set_board_info sim_time_limit 120
+} else {
+    unset_board_info protocol
+    set_board_info protocol "amigaos_nosim"
+    proc amigaos_nosim_load { dest prog args } {
+	return [list "unsupported" ""]
+    }
+}
+
+# No multilib options needed by default.
+process_multilib_options ""
+
+set_board_info compiler "[find_gcc]"
+set_board_info cflags ""
+set_board_info ldflags ""
+set_board_info ldscript ""
+
+set_board_info isremote 0
+
+set_board_info gdb,nosignals 1
+set_board_info gdb,cannot_call_functions 1
+
+set timeout 60

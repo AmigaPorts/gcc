@@ -1,0 +1,61 @@
+# Copyright (C) 2026 Free Software Foundation, Inc.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with GCC; see the file COPYING3.  If not see
+# <http://www.gnu.org/licenses/>.
+
+# Tests for the AmigaOS 4 (PowerPC) port: programs for each C runtime,
+# -mbaserel, the driver's checks of runtime-specific options, and the
+# C extensions (checktags, "#pragma amigaos tagtype", _Static_warning).
+# These exist only on powerpc-*-amigaos*.
+#
+# The C runtime is the board's choice, normally as a multilib variant such
+# as --target_board=ppc-amigaos/-mcrt=clib4, so that the testsuite also
+# uses that runtime's libraries.  A board that cannot run AmigaOS 4
+# programs links the dg-do run tests and reports their execution as
+# UNSUPPORTED.
+
+# Whether the C runtime is clib4, the only one with pthreads and the only
+# one without small-data libraries.
+proc check_effective_target_amigaos_clib4 { } {
+    return [check_no_compiler_messages amigaos_clib4 assembly {
+	#ifndef __CLIB4__
+	#error not clib4
+	#endif
+    }]
+}
+
+load_lib gcc-dg.exp
+
+if { ![istarget powerpc*-*-amigaos*] } {
+    return
+}
+
+dg-init
+
+# Tests that set their own options.  Run once.
+set once_tests {}
+foreach f [lsort [glob -nocomplain $srcdir/$subdir/*.c]] {
+    if { ![string match "*-run.c" $f] } {
+	lappend once_tests $f
+    }
+}
+dg-runtest $once_tests "" ""
+
+# Programs built with and without -mbaserel.
+set run_tests [lsort [glob -nocomplain $srcdir/$subdir/*-run.c]]
+foreach flags { "-O2" "-O2 -mbaserel" } {
+    dg-runtest $run_tests $flags ""
+}
+
+dg-finish
