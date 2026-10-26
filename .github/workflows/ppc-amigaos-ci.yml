@@ -3,8 +3,11 @@ name: ppc-amigaos toolchain
 # Builds the AmigaOS 4 (PowerPC) cross toolchain from this tree: binutils
 # from AmigaPorts/binutils-gdb, the AmigaOS SDK, clib2 and clib4 (both built
 # with the new compiler, as adtools does), then gcc with its runtime
-# libraries, and links test programs for each C runtime.  The steps are in
-# .github/ppc-amigaos/ci.sh, the test programs in .github/ppc-amigaos/tests.
+# libraries, and runs gcc's AmigaOS tests (gcc.target/powerpc/amigaos and
+# g++.target/powerpc/amigaos) for each C runtime.  Nothing on the runner
+# can run AmigaOS programs, so those tests are compiled and linked only.
+# The steps are in .github/ppc-amigaos/ci.sh, the DejaGnu board in
+# .github/ppc-amigaos/baseboards.
 #
 # It runs when a pull request gets the ci-linux-ppc label (re-add the label
 # to rebuild), or by hand from the Actions tab.  The m68k toolchain build
@@ -73,5 +76,17 @@ jobs:
       - name: Build gcc and its runtime libraries
         run: gcc/.github/ppc-amigaos/ci.sh gcc
 
-      - name: Link test programs
+      - name: Run the AmigaOS testsuite
         run: gcc/.github/ppc-amigaos/ci.sh test
+
+      - name: Upload the testsuite results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ppc-amigaos-testsuite
+          path: |
+            gcc-build/gcc/testsuite/gcc/gcc.sum
+            gcc-build/gcc/testsuite/gcc/gcc.log
+            gcc-build/gcc/testsuite/g++/g++.sum
+            gcc-build/gcc/testsuite/g++/g++.log
+          if-no-files-found: ignore

@@ -36,8 +36,8 @@ fetch() {
 step_deps() {
   sudo apt-get -y update
   sudo apt-get -y install --no-install-recommends \
-    autoconf automake bison curl flex g++ gcc libgmp-dev libisl-dev \
-    libmpc-dev libmpfr-dev libtool m4 make
+    autoconf automake bison curl dejagnu flex g++ gcc libgmp-dev \
+    libisl-dev libmpc-dev libmpfr-dev libtool m4 make
   mkdir -p "$PREFIX"
 }
 
@@ -109,71 +109,27 @@ step_gcc() {
   make -C gcc-build install MAKEINFO=true
 }
 
-# fails MESSAGE COMMAND...: COMMAND must fail with an error that contains
-# MESSAGE.  The driver exits with status 1 for an internal compiler error
-# as well, so that is checked for separately.
-fails() {
-  local msg=$1 status=0
-  shift
-  "$@" > out.txt 2>&1 || status=$?
-  cat out.txt
-  if [ "$status" -ne 1 ] || ! grep -qF -- "$msg" out.txt; then
-    echo "expected exit status 1 and \"$msg\", got status $status" >&2
-    return 1
-  fi
-  if grep -q "internal compiler error" out.txt; then
-    echo "expected an error, got an internal compiler error" >&2
-    return 1
-  fi
-}
-
+# gcc's AmigaOS tests (gcc.target/powerpc/amigaos and
+# g++.target/powerpc/amigaos) for each C runtime, with the board in
+# baseboards/.  Nothing here runs AmigaOS programs, so the tests that would
+# run one only link it.
 step_test() {
-  local t="$CI_DIR/tests" crt thread o
-  rm -rf tests
-  mkdir tests
-  cd tests
-  set -x
-  for crt in newlib clib2 clib4; do
-    "$TARGET-gcc" -O2 -mcrt=$crt "$t/hello.c" -o c-$crt
-    "$TARGET-gcc" -O2 -mcrt=$crt -mbaserel "$t/hello.c" -o c-baserel-$crt
-    for thread in native single; do
-      "$TARGET-g++" -O2 -mcrt=$crt -athread=$thread "$t/hello.cc" -o cc-$thread-$crt
-    done
-    # Without -athread, g++ links the native thread implementation.
-    "$TARGET-g++" -O2 -mcrt=$crt "$t/hello.cc" -o cc-default-$crt
-    # import std: the std module is built once per C runtime.
-    mkdir modules-$crt
-    (cd modules-$crt &&
-     "$TARGET-g++" -std=c++23 -fmodules -fsearch-include-path -mcrt=$crt -c bits/std.cc &&
-     "$TARGET-g++" -O2 -std=c++23 -fmodules -mcrt=$crt "$t/modules.cc" -o modules)
+  local boards='ppc-amigaos/\{-mcrt=newlib,-mcrt=clib2,-mcrt=clib4\}'
+  local sums="gcc-build/gcc/testsuite/gcc/gcc.sum gcc-build/gcc/testsuite/g++/g++.sum"
+  local sum
+  export DEJAGNU="$CI_DIR/dejagnu-site.exp"
+  make -C gcc-build check-gcc-c \
+    RUNTESTFLAGS="--target_board=$boards gcc.target/powerpc/amigaos/amigaos.exp"
+  make -C gcc-build check-gcc-c++ \
+    RUNTESTFLAGS="--target_board=$boards g++.target/powerpc/amigaos/amigaos.exp"
+  # make check succeeds whatever the results, so look at them.
+  for sum in $sums; do
+    grep -E '^([[:space:]]+=== .* Summary|# of )' "$sum"
+    grep -q '^# of expected passes' "$sum"
   done
-  "$TARGET-g++" -O2 -mcrt=clib4 -athread=pthread "$t/hello.cc" -o cc-pthread
-  "$TARGET-gcc" -O2 -mcrt=clib4 -pthread "$t/hello.c" -o c-pthread
-  "$TARGET-gcc" -O2 -msdata=sysv "$t/hello.c" -o c-sdata
-  "$TARGET-gcc" -O2 -use-dynld -athread=native "$t/hello.c" -o c-dynld
-  # -mbaserel must address g relative to r2.
-  for o in -O0 -O2; do
-    "$TARGET-gcc" $o -mbaserel -S "$t/baserel.c" -o - | grep -q 'g@brel@'
-  done
-  # clib4 has no small-data libraries, and only clib4 has pthreads; the
-  # driver must say so rather than leave it to the linker.
-  fails "-msdata is not supported with -mcrt=clib4" \
-    "$TARGET-gcc" -mcrt=clib4 -msdata=sysv "$t/hello.c" -o c-sdata-clib4
-  fails "-pthread requires -mcrt=clib4" \
-    "$TARGET-gcc" -pthread "$t/hello.c" -o c-pthread-newlib
-  fails "-athread=pthread requires -mcrt=clib4" \
-    "$TARGET-g++" -mcrt=clib2 -athread=pthread "$t/hello.cc" -o cc-pthread-clib2
-  # A failing _Static_warning warns rather than fails.
-  "$TARGET-gcc" -c "$t/static-warning.c" -o static-warning.o 2> out.txt
-  cat out.txt
-  [ "$(grep -c "warning: static warn-only assertion failed" out.txt)" -eq 1 ]
-  grep -q "static warn-only assertion failed: \"deprecated\"" out.txt
-  # checktags: the argument after a tag is checked against its tagtype.
-  fails "checktags.c:19:28: error: passing argument 3 of 'TestTags' from incompatible pointer type" \
-    "$TARGET-gcc" -c "$t/checktags.c" -o checktags.o
-  [ "$(grep -c "error:" out.txt)" -eq 1 ]
-  fails "error:" "$TARGET-gcc" -c "$t/tagtype-bad.c" -o tagtype-bad.o
-  "$TARGET-readelf" -h c-newlib cc-native-clib4
+  if grep -E '^(FAIL|XPASS|UNRESOLVED|ERROR):' $sums; then
+    return 1
+  fi
 }
 
 [ $# -eq 1 ] || { echo "usage: $0 STEP" >&2; exit 2; }
