@@ -224,7 +224,9 @@ ASM_OPT_ANY
 %(base_sdk)clib2/%{mcrt=clib2-ts:lib.threadsafe; :lib}" \
                  "%{!msoft-float:%(lib_subdir_type)}/crt0.o"
 
+/* crtehend.o: see LINK_EH_BEGIN.  */
 #define ENDFILE_CLIB2_SPEC "\
+crtehend.o%s \
 %(base_sdk)clib2/%{mcrt=clib2-ts:lib.threadsafe; :lib}" \
                  "%{!msoft-float:%(lib_subdir_type)}/crtend.o"
 
@@ -316,9 +318,10 @@ NEWLIB_CRT_VARIANT_SPEC ("small-data", f) ";" \
 "%{shared: " NEWLIB_CRT_SPEC ("shcrtbegin.o") "} " \
 "%{!shared: " NEWLIB_CRT_SPEC ("crtbegin.o") "}"
 
+/* crtehend.o: see LINK_EH_BEGIN.  */
 #define ENDFILE_NEWLIB_SPEC \
 "%{shared: " NEWLIB_CRT_SPEC ("shcrtend.o") "} " \
-"%{!shared: " NEWLIB_CRT_SPEC ("crtend.o") "}"
+"%{!shared: crtehend.o%s " NEWLIB_CRT_SPEC ("crtend.o") "}"
 
 /* End clib specific */
 
@@ -345,7 +348,7 @@ mcrt=default|!mcrt=*: %{mcrt=default|!nostdinc: %(cpp_amiga_default)}; \
 -q -d %{h*} %{v:-V} %{G*} \
 %{Wl,*:%*} %{YP,*} %{R*} \
 %{Qy:} %{!Qn:-Qy} \
-%(link_thread) %(link_shlib) %(link_text) \
+%(link_eh_begin) %(link_thread) %(link_shlib) %(link_text) \
 %{mbaserel: %{msdata|msdata=default|msdata=sysv: %e-mbaserel and -msdata options are incompatible}} \
 %{mcrt=clib2|mcrt=clib2-ts: %(link_clib2); \
 mcrt=clib4: %(link_clib4); \
@@ -367,6 +370,15 @@ mcrt=default|!mcrt=*: %(link_amiga_default); \
 
 #define LINK_SHLIB "\
 %{shared:-shared -dy --defsym __dynld_version__=1} %{!shared: %{static:-static}} %{use-dynld: -dy}"
+
+/* newlib's and clib2's startup code does not register the program's
+   .eh_frame with the unwinder, so libgcc's crtehbegin.o and crtehend.o
+   do (clib4's does).  crtehbegin.o marks the start of .eh_frame, so it
+   comes first, ahead of the thread object; crtehend.o ends it, after
+   every library.  */
+#define LINK_EH_BEGIN "\
+%{!shared:%{!r:%{!nostdlib:%{!nostartfiles:\
+%{mcrt=newlib|mcrt=clib2|mcrt=clib2-ts|mcrt=default|!mcrt=*:crtehbegin.o%s}}}}}"
 
 #define LINK_THREAD "\
 %{pthread:%{!mcrt=clib4:%e-pthread requires -mcrt=clib4}} \
@@ -444,6 +456,7 @@ mcrt=default|!mcrt=*: %(endfile_amiga_default); \
   /* used in link spec  */ \
   {"link_text", LINK_TEXT}, \
   {"link_shlib", LINK_SHLIB}, \
+  {"link_eh_begin", LINK_EH_BEGIN}, \
   {"link_thread", LINK_THREAD},
 
 #undef DEFAULT_VTABLE_THUNKS

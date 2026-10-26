@@ -53,3 +53,17 @@ endif
 
 gthr-amigaos-%.o: $(srcdir)/gthr-amigaos-%.c $(srcdir)/gthr-amigaos.h
 	$(gcc_compile) -c $<
+
+# clib4's startup code registers the program's .eh_frame with the
+# unwinder, newlib's and clib2's do not; see amigaos-crteh.c.
+ifneq ($(MULTISUBDIR),/clib4)
+EXTRA_PARTS += crtehbegin.o crtehend.o
+endif
+
+crteh_compile = $(gcc_compile) -fno-exceptions -fno-asynchronous-unwind-tables
+
+crtehbegin.o: $(srcdir)/config/rs6000/amigaos-crteh.c
+	$(crteh_compile) -DCRT_BEGIN -c $<
+
+crtehend.o: $(srcdir)/config/rs6000/amigaos-crteh.c
+	$(crteh_compile) -DCRT_END -c $<
