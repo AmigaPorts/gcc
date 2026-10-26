@@ -241,6 +241,11 @@ typedef struct
 static keystore_t *keystore;
 static __gthread_once_t keystore_once = __GTHREAD_ONCE_INIT;
 
+/* How often a thread's key destructors are run while they set new values,
+ * as PTHREAD_DESTRUCTOR_ITERATIONS.
+ */
+#define GTHREAD_DESTRUCTOR_ITERATIONS 4
+
 /**
  * Initialize our keystore.
  */
@@ -609,21 +614,61 @@ static int __gthread_entry(STRPTR args UNUSED, int32 length UNUSED, APTR execbas
   ks = __atomic_load_n(&keystore, __ATOMIC_ACQUIRE);
   if (ks)
     {
+      int iter, again;
+
       iexec->ObtainSemaphore (&ks->sem);
+
+      /* As with pthread keys, clear each value before passing it to its
+       * destructor, call the destructor without holding the semaphore, and
+       * repeat a few times while destructors set new values.
+       */
+      for (iter = 0; iter < GTHREAD_DESTRUCTOR_ITERATIONS; iter++)
+        {
+          again = 0;
+          for (i = 0; i < ks->num_key_entries; i++)
+            {
+              void (*destroy)(void *);
+              keyentry_t *key;
+              void *data;
+
+              if (!(destroy = ks->keys[i].destroy))
+                continue;
+
+              if (!(key = find_keyentry (i, task)) || !key->data)
+                continue;
+
+              data = (void *)key->data;
+              key->data = NULL;
+              iexec->ReleaseSemaphore (&ks->sem);
+              destroy (data);
+              iexec->ObtainSemaphore (&ks->sem);
+              again = 1;
+            }
+          if (!again)
+            break;
+        }
+
+      /* Free this task's entries.  Left in place, they would be found by
+       * a later thread that gets the same Task address.
+       */
       for (i = 0; i < ks->num_key_entries; i++)
         {
-          void (*destroy)(void *);
-          keyentry_t *key;
+          keyentry_t **link = &ks->keys[i].first;
 
-          if (!(destroy = ks->keys[i].destroy))
-            continue;
+          while (*link)
+            {
+              keyentry_t *key = *link;
 
-          if (!(key = find_keyentry (i, task)))
-            continue;
-
-          if (key->data)
-            destroy ((void *)key->data);
+              if (key->task == task)
+                {
+                  *link = key->next;
+                  iexec->ItemPoolFree (ks->keyentry_pool, key);
+                }
+              else
+                link = &key->next;
+            }
         }
+
       iexec->ReleaseSemaphore (&ks->sem);
     }
 
