@@ -16,6 +16,10 @@ WORK=$PWD
 JOBS=${JOBS:-$(nproc)}
 SDK_DIR="$PREFIX/$TARGET/SDK"
 export PATH="$PREFIX/bin:$PATH"
+# Build without texinfo and install no info files.  configure replaces a
+# makeinfo it can't get a version from, so it goes on the make command
+# line as well.
+export MAKEINFO=true
 
 # The bootstrap compiler, which builds clib2 and clib4 before gcc's
 # runtime libraries can be built against them.
@@ -32,8 +36,8 @@ fetch() {
 step_deps() {
   sudo apt-get -y update
   sudo apt-get -y install --no-install-recommends \
-    autoconf automake bison flex g++ gcc libgmp-dev libisl-dev \
-    libmpc-dev libmpfr-dev libtool m4 make texinfo wget
+    autoconf automake bison curl flex g++ gcc libgmp-dev libisl-dev \
+    libmpc-dev libmpfr-dev libtool m4 make
   mkdir -p "$PREFIX"
 }
 
@@ -53,13 +57,13 @@ step_binutils() {
   ../binutils-gdb/configure --target="$TARGET" --prefix="$PREFIX" \
     --disable-werror --disable-nls --without-msgpack \
     --disable-gdb --disable-gdbserver --disable-sim --disable-gprofng
-  make -j "$JOBS"
-  make install
+  make -j "$JOBS" MAKEINFO=true
+  make install MAKEINFO=true
 }
 
 step_sdk() {
   local archive="$WORK/SDK_${SDK_VERSION}.lha"
-  [ -f "$archive" ] || wget -q -O "$archive" "$SDK_URL"
+  [ -f "$archive" ] || curl -fsSL -o "$archive" "$SDK_URL"
   rm -rf sdk-extract
   mkdir -p sdk-extract "$SDK_DIR/include"
   cd sdk-extract
@@ -80,7 +84,7 @@ step_bootstrap() {
     --enable-languages=c,c++ --enable-threads=amigaos --enable-lto \
     --with-dwarf2 --disable-tls --disable-libstdcxx-pch \
     --disable-c++tools --disable-nls --disable-bootstrap
-  make -j "$JOBS" all-gcc
+  make -j "$JOBS" all-gcc MAKEINFO=true
 }
 
 step_clibs() {
@@ -101,12 +105,13 @@ step_clibs() {
 }
 
 step_gcc() {
-  make -C gcc-build -j "$JOBS"
-  make -C gcc-build install
+  make -C gcc-build -j "$JOBS" MAKEINFO=true
+  make -C gcc-build install MAKEINFO=true
 }
 
-# fails MESSAGE COMMAND...: COMMAND must fail with an error (exit status
-# 1, not an internal compiler error) that contains MESSAGE.
+# fails MESSAGE COMMAND...: COMMAND must fail with an error that contains
+# MESSAGE.  The driver exits with status 1 for an internal compiler error
+# as well, so that is checked for separately.
 fails() {
   local msg=$1 status=0
   shift
@@ -114,6 +119,10 @@ fails() {
   cat out.txt
   if [ "$status" -ne 1 ] || ! grep -qF -- "$msg" out.txt; then
     echo "expected exit status 1 and \"$msg\", got status $status" >&2
+    return 1
+  fi
+  if grep -q "internal compiler error" out.txt; then
+    echo "expected an error, got an internal compiler error" >&2
     return 1
   fi
 }
