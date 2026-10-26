@@ -66,14 +66,11 @@ along with GCC; see the file COPYING3.  If not see
     && frame_pointer_needed) ? \
     M68K_FP_REG_NAME : reg_names[(r)])
 
-/* Compile with a4 restoring in public functions.  */
-#define MASK_RESTORE_A4 0x10000000 /* 1 << 28 */
-#define TARGET_RESTORE_A4 \
-  ((target_flags & MASK_RESTORE_A4) && TREE_PUBLIC (current_function_decl))
-
-/* Compile with a4 restoring in all functions.  */
-#define MASK_ALWAYS_RESTORE_A4 0x8000000 /* 1 << 27 */
-#define TARGET_ALWAYS_RESTORE_A4 (target_flags & MASK_ALWAYS_RESTORE_A4)
+/* Whether the current function restores a4: -mrestore-a4 in public functions,
+   -malways-restore-a4 in all of them.  */
+#define AMIGAOS_RESTORE_A4 \
+  ((TARGET_RESTORE_A4 && TREE_PUBLIC (current_function_decl)) \
+   || TARGET_ALWAYS_RESTORE_A4)
 
 /* config/m68k.md has an explicit reference to the program counter,
    prefix this by the register prefix.  */

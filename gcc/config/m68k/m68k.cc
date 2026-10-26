@@ -1017,6 +1017,13 @@ m68k_save_reg (unsigned int regno, bool interrupt_handler)
     {
       if (crtl->saves_all_registers)
 	return true;
+#if defined(TARGET_AMIGAOS)
+      /* __saveds, -mrestore-a4 and -malways-restore-a4 load a4 in the
+	 prologue (amigaos_restore_a4): save the caller's.  */
+      if (flag_pic >= 3 && !flag_resident
+	  && (lookup_attribute ("saveds", attrs) || AMIGAOS_RESTORE_A4))
+	return true;
+#endif
       if (crtl->uses_pic_offset_table)
 	return true;
       /* Reload may introduce constant pool references into a function
@@ -1281,6 +1288,10 @@ m68k_expand_prologue (void)
   if (!TARGET_SEP_DATA && !TARGET_AMIGA
       && crtl->uses_pic_offset_table)
     emit_insn (gen_load_got (pic_offset_table_rtx));
+
+#if defined(TARGET_AMIGAOS)
+  amigaos_restore_a4 ();
+#endif
 }
 
 /* Return true if a simple (return) instruction is sufficient for this
