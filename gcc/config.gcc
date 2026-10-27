@@ -2510,8 +2510,11 @@ m68k*-*-amigaos*)
 	gnu_ld=yes
 	CFLAGS="-Os"
   	case ${enable_threads} in
-	    yes | posix) thread_file='posix' ;;
-  	esac	
+	    yes | posix)
+		thread_file='posix'
+		tm_defines="${tm_defines} AMIGAOS_GTHREADS_POSIX=1"
+		;;
+  	esac
 	;;
 m68k*-*-netbsdelf*)
 	default_m68k_cpu=68020
