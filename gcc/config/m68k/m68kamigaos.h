@@ -475,8 +475,13 @@ extern const char *amigaos_crt_check (int argc, const char **argv);
   "-lc " \
   "-lstubs "
 
-#if __POSIX_THREADS__
-#define __LPTHREAD__ "-lpthread "
+/* With --enable-threads=posix, libgcc and libstdc++ call libpthread
+   directly: the hunk format has no weak undefined symbols, so every link
+   needs it. A program that makes no such call links nothing from it. The
+   empty %{pthread:} and %{lpthread:} keep accepting those options, which
+   would otherwise be unrecognized. */
+#if __POSIX_THREADS__ || defined (AMIGAOS_GTHREADS_POSIX)
+#define __LPTHREAD__ "%{pthread:} %{lpthread:} -lpthread "
 #else
 #define __LPTHREAD__   "%{pthread:-lpthread} %{lpthread:-lpthread } "
 #endif
