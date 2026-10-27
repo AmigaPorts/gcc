@@ -19,13 +19,13 @@ on:
     inputs:
       binutils_ref:
         description: AmigaPorts/binutils-gdb ref with ppc-amigaos support
-        default: stefan/ppc-amigaos-2.46
+        default: amiga-2.46
 
 env:
   TARGET: ppc-amigaos
   PREFIX: ${{ github.workspace }}/prefix
   BINUTILS_REPO: https://github.com/AmigaPorts/binutils-gdb.git
-  BINUTILS_REF: ${{ inputs.binutils_ref || 'stefan/ppc-amigaos-2.46' }}
+  BINUTILS_REF: ${{ inputs.binutils_ref || 'amiga-2.46' }}
   # clib2 as pinned by adtools; clib4 2.5, the first with gcc 15+ fixes.
   CLIB2_REPO: https://github.com/sodero/clib2.git
   CLIB2_REF: 1a42c693e03881f6f969c43ab36ce20d2569751d
