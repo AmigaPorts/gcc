@@ -23,10 +23,6 @@ along with GCC; see the file COPYING3.  If not see
 
 /* Control the assembler format that we output.  */
 
-#ifndef __POSIX_THREADS__
-#define __POSIX_THREADS__ 0
-#endif
-
 #define DWARF2_DEBUGGING_INFO 1
 
 #undef  PREFERRED_DEBUGGING_TYPE
@@ -258,7 +254,11 @@ amiga_declare_object = 0
     } \
       if (flag_resident) \
     builtin_define ("__resident__"); \
-      if (__POSIX_THREADS__) \
+      /* __posix_threads__ selects libnix's thread-safe variant, both when \
+	 libnix is built and in programs: a __thread errno, locked stdio and \
+	 another FILE layout.  Off until it is wanted for the posix thread \
+	 model, see AmigaPorts/m68k-amigaos-gcc#224.  */ \
+      if (0 && AMIGAOS_GTHREADS_POSIX) \
     builtin_define ("__posix_threads__"); \
     } \
   while (0)
@@ -480,7 +480,7 @@ extern const char *amigaos_crt_check (int argc, const char **argv);
    needs it. A program that makes no such call links nothing from it. The
    empty %{pthread:} and %{lpthread:} keep accepting those options, which
    would otherwise be unrecognized. */
-#if __POSIX_THREADS__ || defined (AMIGAOS_GTHREADS_POSIX)
+#if AMIGAOS_GTHREADS_POSIX
 #define __LPTHREAD__ "%{pthread:} %{lpthread:} -lpthread "
 #else
 #define __LPTHREAD__   "%{pthread:-lpthread} %{lpthread:-lpthread } "
