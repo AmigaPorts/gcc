@@ -17,6 +17,8 @@ set_board_info target_install {ppc-amigaos}
 
 load_generic_config "sim"
 if {[info exists SIM]} {
+    # basic-sim's setup_sim makes SIM the board's simulator.
+    load_base_board_description "basic-sim"
     setup_sim amigaos
     set_board_info sim_time_limit 120
 } else {
