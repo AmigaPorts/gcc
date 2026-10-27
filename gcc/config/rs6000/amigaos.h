@@ -226,7 +226,7 @@ ASM_OPT_ANY
 
 /* crtehend.o: see LINK_EH_BEGIN.  */
 #define ENDFILE_CLIB2_SPEC "\
-crtehend.o%s \
+%{!shared:crtehend.o%s} \
 %(base_sdk)clib2/%{mcrt=clib2-ts:lib.threadsafe; :lib}" \
                  "%{!msoft-float:%(lib_subdir_type)}/crtend.o"
 
