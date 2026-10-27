@@ -2509,12 +2509,15 @@ m68k*-*-amigaos*)
 	extra_gcc_objs="driver-amigaos.o"
 	gnu_ld=yes
 	CFLAGS="-Os"
-  	case ${enable_threads} in
-	    yes | posix)
+	case ${enable_threads} in
+	yes | posix)
 		thread_file='posix'
 		tm_defines="${tm_defines} AMIGAOS_GTHREADS_POSIX=1"
 		;;
-  	esac
+	*)
+		tm_defines="${tm_defines} AMIGAOS_GTHREADS_POSIX=0"
+		;;
+	esac
 	;;
 m68k*-*-netbsdelf*)
 	default_m68k_cpu=68020
