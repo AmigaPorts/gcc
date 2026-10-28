@@ -12,6 +12,7 @@
 # would run its program only links it, and the run is reported as
 # UNSUPPORTED.  runtest SIM=PROGRAM names a program that does run one: it
 # is called as "PROGRAM FILE" and must exit with the program's status.
+# ../winuae/amigaos-sim is one, for AmigaOS 4 in WinUAE; see its README.md.
 
 set_board_info target_install {ppc-amigaos}
 

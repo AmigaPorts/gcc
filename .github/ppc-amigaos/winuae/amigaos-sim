@@ -1,0 +1,284 @@
+#!/usr/bin/env python3
+"""Run AmigaOS 4 programs in WinUAE, for DejaGnu's SIM.
+
+    amigaos-sim PROGRAM [ARGS...]   run PROGRAM, print its output and exit
+                                    with its return code
+    amigaos-sim --start             boot WinUAE and wait for simagent
+    amigaos-sim --stop              stop that WinUAE
+    amigaos-sim --status            say whether simagent is running
+    amigaos-sim --prepare IMAGE     add simagent to S:User-Startup on the
+                                    system partition of IMAGE, an AmigaOS 4
+                                    hardfile (use a copy), with amitools'
+                                    xdftool; $AMIGAOS_SIM_PARTITION
+                                    names the partition (default DH0)
+
+A directory on the host, $AMIGAOS_SIM_SHARE, is mounted in the emulator as
+SIMSHARE:, where simagent (simagent.c) runs whatever is queued there.  A job
+is SIMSHARE:jobs/ID/ with the program, prog, and a script, run, that runs
+it and writes its return code to rc; an empty SIMSHARE:queue/ID starts it.
+A program that crashes or hangs only fails its own job, after
+$AMIGAOS_SIM_TIMEOUT seconds.
+
+For --start:
+    AMIGAOS_SIM_CONFIG  a WinUAE configuration that boots AmigaOS 4 with
+                        simagent started from S:User-Startup
+    AMIGAOS_SIM_HDF     optional: a hardfile to boot instead of the one in
+                        the configuration, such as a fresh copy of it
+    AMIGAOS_SIM_AGENT   simagent, built from simagent.c, to copy to
+                        SIMSHARE: (if it is not there already)
+    WINUAE              the WinUAE executable (default: WinUAE.app's on
+                        macOS, otherwise winuae on the PATH)
+
+With DejaGnu:
+    runtest --target_board=ppc-amigaos SIM=/path/to/amigaos-sim ...
+"""
+
+import os
+import random
+import re
+import shutil
+import subprocess
+import sys
+import time
+
+AGENT_STALE = 10        # seconds after which simagent counts as gone
+
+
+def die(message, status=125):
+    sys.stderr.write("amigaos-sim: %s\n" % message)
+    sys.exit(status)
+
+
+def share():
+    path = os.environ.get("AMIGAOS_SIM_SHARE")
+    if not path:
+        die("AMIGAOS_SIM_SHARE is not set")
+    return os.path.abspath(path)
+
+
+def agent_alive(root):
+    try:
+        return time.time() - os.path.getmtime(os.path.join(root, "agent.alive")) < AGENT_STALE
+    except OSError:
+        return False
+
+
+def run(argv):
+    root = share()
+    if not agent_alive(root):
+        die("simagent is not running in the emulator; see amigaos-sim --start")
+
+    program = os.path.abspath(argv[0])
+    if not os.path.isfile(program):
+        die("%s: no such program" % argv[0], 127)
+
+    timeout = float(os.environ.get("AMIGAOS_SIM_TIMEOUT", "60"))
+    job = "%d-%d-%06d" % (os.getpid(), int(time.time() * 1000) % 100000000,
+                          random.randrange(1000000))
+    jobdir = os.path.join(root, "jobs", job)
+    amiga = "SIMSHARE:jobs/%s" % job
+
+    os.makedirs(os.path.join(root, "queue"), exist_ok=True)
+    os.makedirs(jobdir)
+    shutil.copyfile(program, os.path.join(jobdir, "prog"))
+    os.chmod(os.path.join(jobdir, "prog"), 0o755)
+
+    args = " ".join('"%s"' % a.replace('"', '*"') for a in argv[1:])
+    with open(os.path.join(jobdir, "run"), "w") as f:
+        f.write("FailAt 2147483647\n"
+                "Stack 1048576\n"
+                "%s/prog %s >%s/out *>%s/err\n"
+                "Echo >%s/rc \"$RC\"\n" % (amiga, args, amiga, amiga, amiga))
+
+    # The job is complete; now let simagent see it.
+    open(os.path.join(root, "queue", job), "w").close()
+
+    rcfile = os.path.join(jobdir, "rc")
+    deadline = time.time() + timeout
+    rc = None
+    while time.time() < deadline:
+        try:
+            with open(rcfile) as f:
+                text = f.read()
+            if text.endswith("\n"):
+                rc = int(text.strip() or "0")
+                break
+        except (OSError, ValueError):
+            pass
+        time.sleep(0.05)
+
+    for name in ("out", "err"):
+        try:
+            with open(os.path.join(jobdir, name), "rb") as f:
+                sys.stdout.buffer.write(f.read())
+        except OSError:
+            pass
+    sys.stdout.flush()
+
+    if rc is None:
+        if not os.environ.get("AMIGAOS_SIM_KEEP"):
+            shutil.rmtree(jobdir, ignore_errors=True)
+        die("%s did not finish within %g seconds (crashed or hung)" % (argv[0], timeout), 124)
+
+    if not os.environ.get("AMIGAOS_SIM_KEEP"):
+        shutil.rmtree(jobdir, ignore_errors=True)
+    sys.exit(min(rc, 255))
+
+
+def winuae_executable():
+    exe = os.environ.get("WINUAE")
+    if exe:
+        return exe
+    mac = "/Applications/WinUAE.app/Contents/MacOS/WinUAE"
+    if os.path.exists(mac):
+        return mac
+    return shutil.which("winuae") or die("set WINUAE to the WinUAE executable")
+
+
+def start():
+    root = share()
+    if agent_alive(root):
+        print("simagent is already running")
+        return
+
+    base = os.environ.get("AMIGAOS_SIM_CONFIG") or die("AMIGAOS_SIM_CONFIG is not set")
+    with open(base) as f:
+        config = f.read()
+
+    hdf = os.environ.get("AMIGAOS_SIM_HDF")
+    if hdf:
+        old = re.search(r"^hardfile2=[^,]*,[^:]*:([^,]*),", config, re.M)
+        if not old:
+            die("no hardfile2 in %s to replace" % base)
+        config = config.replace(old.group(1), os.path.abspath(hdf))
+
+    # A directory volume for SIMSHARE:, after the configuration's drives.
+    # Boot priority -128: never boot from it instead of the system disk.
+    used = [int(n) for n in re.findall(r"^uaehf(\d+)=", config, re.M)]
+    index = max(used) + 1 if used else 0
+    config = re.sub(r"^use_gui=.*\n", "", config, flags=re.M)
+    config += ("filesystem2=rw,SIMSHARE:SIMSHARE:%s,-128\n"
+               "uaehf%d=dir,rw,SIMSHARE:SIMSHARE:%s,-128\n"
+               "use_gui=no\n" % (root, index, root))
+
+    os.makedirs(os.path.join(root, "queue"), exist_ok=True)
+    os.makedirs(os.path.join(root, "jobs"), exist_ok=True)
+
+    agent = os.environ.get("AMIGAOS_SIM_AGENT")
+    if agent:
+        shutil.copyfile(agent, os.path.join(root, "simagent"))
+        os.chmod(os.path.join(root, "simagent"), 0o755)
+    elif not os.path.exists(os.path.join(root, "simagent")):
+        die("no simagent in %s: build it with ppc-amigaos-gcc -O2 -o simagent "
+            "simagent.c and set AMIGAOS_SIM_AGENT" % root)
+
+    derived = os.path.join(root, "winuae.uae")
+    with open(derived, "w") as f:
+        f.write(config)
+
+    log = open(os.path.join(root, "winuae.log"), "w")
+    process = subprocess.Popen([winuae_executable(), "-f", derived],
+                               stdout=log, stderr=subprocess.STDOUT,
+                               start_new_session=True)
+    with open(os.path.join(root, "winuae.pid"), "w") as f:
+        f.write("%d\n" % process.pid)
+
+    deadline = time.time() + float(os.environ.get("AMIGAOS_SIM_BOOT_TIMEOUT", "300"))
+    while time.time() < deadline:
+        if process.poll() is not None:
+            die("WinUAE exited with status %d; see %s" % (process.returncode, log.name))
+        if agent_alive(root):
+            print("simagent is running (WinUAE pid %d)" % process.pid)
+            return
+        time.sleep(1)
+    die("simagent did not start; is it in S:User-Startup?")
+
+
+def stop():
+    root = share()
+    try:
+        with open(os.path.join(root, "winuae.pid")) as f:
+            pid = int(f.read())
+        os.kill(pid, 15)
+        print("stopped WinUAE pid %d" % pid)
+    except (OSError, ValueError):
+        print("no WinUAE to stop")
+    try:
+        os.remove(os.path.join(root, "agent.alive"))
+    except OSError:
+        pass
+
+
+# Started from S:User-Startup, but only when SIMSHARE: exists, so that the
+# image still boots normally without it.
+USER_STARTUP_BLOCK = """
+;BEGIN amigaos-sim
+Assign >NIL: SIMSHARE: EXISTS
+If NOT WARN
+  Run >NIL: SIMSHARE:simagent
+EndIf
+;END amigaos-sim
+"""
+
+
+def prepare(image):
+    """Add USER_STARTUP_BLOCK to S:User-Startup in image, once."""
+    import tempfile
+    xdftool = os.environ.get("XDFTOOL") or shutil.which("xdftool")
+    if not xdftool:
+        die("xdftool not found; install amitools (pip install amitools) or set XDFTOOL")
+    part = "part=%s" % os.environ.get("AMIGAOS_SIM_PARTITION", "DH0")
+    image = os.path.abspath(image)
+
+    def xdf(*args):
+        result = subprocess.run([xdftool, image, "open", part, "+"] + list(args),
+                                capture_output=True, text=True)
+        if result.returncode != 0:
+            die("xdftool %s failed: %s" % (" ".join(args), result.stderr.strip()))
+
+    with tempfile.TemporaryDirectory() as tmp:
+        old = os.path.join(tmp, "old")
+        new = os.path.join(tmp, "new")
+        xdf("read", "S/User-Startup", old)
+        with open(old, "rb") as f:
+            text = f.read().decode("latin-1")
+        if ";BEGIN amigaos-sim" in text:
+            print("S:User-Startup already starts simagent")
+            return
+        if text and not text.endswith("\n"):
+            text += "\n"
+        with open(new, "wb") as f:
+            f.write((text + USER_STARTUP_BLOCK).encode("latin-1"))
+        # xdftool cannot overwrite a file, and the two steps cannot share
+        # one command line.
+        xdf("delete", "S/User-Startup")
+        xdf("write", new, "S/User-Startup")
+        xdf("read", "S/User-Startup", old)
+        with open(old, "rb") as a, open(new, "rb") as b:
+            if a.read() != b.read():
+                die("S:User-Startup did not come back as written")
+    print("S:User-Startup now starts SIMSHARE:simagent")
+
+
+def main():
+    argv = sys.argv[1:]
+    if not argv or argv[0] in ("-h", "--help"):
+        print(__doc__)
+    elif argv[0] == "--start":
+        start()
+    elif argv[0] == "--stop":
+        stop()
+    elif argv[0] == "--prepare":
+        if len(argv) != 2:
+            die("usage: amigaos-sim --prepare IMAGE", 2)
+        prepare(argv[1])
+    elif argv[0] == "--status":
+        alive = agent_alive(share())
+        print("simagent is running" if alive else "simagent is not running")
+        sys.exit(0 if alive else 1)
+    else:
+        run(argv)
+
+
+if __name__ == "__main__":
+    main()
