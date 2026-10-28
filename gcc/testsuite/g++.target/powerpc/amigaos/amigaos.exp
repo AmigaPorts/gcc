@@ -14,8 +14,9 @@
 # along with GCC; see the file COPYING3.  If not see
 # <http://www.gnu.org/licenses/>.
 
-# C++ tests for the AmigaOS 4 (PowerPC) port: programs for each C runtime
-# and thread model, import std, and the driver's checks of -athread.
+# C++ tests for the AmigaOS 4 (PowerPC) port: programs for each C runtime,
+# thread model and -mbaserel, import std, and the driver's checks of
+# -athread.
 # These exist only on powerpc-*-amigaos*.
 #
 # The C runtime is the board's choice, normally as a multilib variant such
@@ -52,9 +53,14 @@ foreach f [lsort [glob -nocomplain $srcdir/$subdir/*.C]] {
 dg-runtest $once_tests "" ""
 
 # Programs built for each thread model.  Without -athread, g++ links the
-# native one.
+# native one.  And with -mbaserel, except for clib4, which has no baserel
+# startup code.
 set run_tests [lsort [glob -nocomplain $srcdir/$subdir/*-run.C]]
-foreach flags { "-O2" "-O2 -athread=native" "-O2 -athread=single" } {
+set run_flags { "-O2" "-O2 -athread=native" "-O2 -athread=single" }
+if { ![check_effective_target_amigaos_clib4] } {
+    lappend run_flags "-O2 -mbaserel"
+}
+foreach flags $run_flags {
     dg-runtest $run_tests $flags ""
 }
 
