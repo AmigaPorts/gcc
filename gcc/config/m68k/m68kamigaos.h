@@ -337,6 +337,7 @@ extern const char *amigaos_crt_check (int argc, const char **argv);
   "%{m68030:-D__mc68030__ -D__mc68030} " \
   "%{m68040:-D__mc68040__ -D__mc68040} " \
   "%{m68060:-D__mc68060__ -D__mc68060} " \
+  "%{pthread:-D_REENTRANT} " \
   "%{mcrt=nix13:-isystem %:find-file(../ndk13-include)} " \
   "%{noixemul:%(cpp_libnix)} " \
   "%{mcrt=nix*:%(cpp_libnix)} " \
