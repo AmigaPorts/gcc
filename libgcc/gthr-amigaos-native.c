@@ -123,6 +123,12 @@ struct threadentry
   void *(*entry) (void*);
   void *args;
 
+  /* The creator's r2 and r13, which -mbaserel and -msdata code address
+   * data relative to.  A new process starts with neither set up.
+   */
+  void *r2;
+  void *r13;
+
   /* The next thread in the condition wait list. A thread can only be in one
    * cond wait list so we can embed the linking in this structure.
    */
@@ -605,6 +611,12 @@ static int __gthread_entry(STRPTR args UNUSED, int32 length UNUSED, APTR execbas
   /* Wait for the parent task to enqueue the process in the global list */
   while (!(iexec->Wait (SIGBREAKF_CTRL_F) & SIGBREAKF_CTRL_F));
 
+  /* Set up the creator's data base registers for the thread function and
+   * the key destructors.  This file is compiled without -mbaserel and
+   * -msdata, so it does not use them itself.
+   */
+  __asm__ volatile ("mr 2,%0\n\tmr 13,%1" : : "r" (thr->r2), "r" (thr->r13));
+
   thr->result = thr->entry(thr->args);
 
   /* Invoke destructors of all non-NULL thread specifics.  There is no
@@ -697,6 +709,7 @@ __gthread_create (__gthread_t *thread, void *(*func) (void*), void *args)
 
   threadentry->entry = func;
   threadentry->args = args;
+  __asm__ ("mr %0,2\n\tmr %1,13" : "=r" (threadentry->r2), "=r" (threadentry->r13));
 
   threadentry->process = idos->CreateNewProcTags (
                 NP_Entry, __gthread_entry,
