@@ -555,11 +555,11 @@ if (target_flags & (MASK_RESTORE_A4|MASK_ALWAYS_RESTORE_A4)) \
         "%{!S:" \
           "%(linker) " LINK_PLUGIN_SPEC "-Cvbcc %l %X %{o*} %{A} %{d} %{e*} %{m} " \
           "%{N} %{n} %{r} %{s} %{t} %{u*} %{x} %{z} %{Z} " \
-          "%{!A:%{!nostdlib:%{!nostartfiles:%S}}} " \
+          "%{!A:%{!nostdlib:%{!r:%{!nostartfiles:%S}}}} " \
           "%{static:} %{L*} %F %o " \
-          "%{!nostdlib:%{!nodefaultlibs:%L}} " \
-          "%{!A:%{!nostdlib:%{!nostartfiles:%E}}} " \
-          "%{!nostdlib:%{!nodefaultlibs:%G}} " \
+          "%{!nostdlib:%{!r:%{!nodefaultlibs:%L}}} " \
+          "%{!A:%{!nostdlib:%{!r:%{!nostartfiles:%E}}}} " \
+          "%{!nostdlib:%{!r:%{!nodefaultlibs:%G}}} " \
           "%{T*} }}}}}} "
 #else
 #define LINK_COMMAND_SPEC \
