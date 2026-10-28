@@ -37,7 +37,15 @@ along with GCC; see the file COPYING3.  If not see
 
    Repeating the same selector is allowed, both because it is harmless and
    because the driver expands this from the preprocessor and the link spec
-   of a single invocation.  Returns NULL: it adds nothing to the spec.  */
+   of a single invocation.  Returns NULL: it adds nothing to the spec.
+
+   An -mcrt= name the specs don't know would select no runtime at all: no
+   startup file, no libc, and a link failing on hundreds of undefined
+   symbols, so it is rejected here too.  */
+
+static const char *const amigaos_crts[] = {
+  "newlib", "nix20", "nix13", "ixemul", "clib2", "library"
+};
 
 const char *
 amigaos_crt_check (int argc, const char **argv)
@@ -46,6 +54,20 @@ amigaos_crt_check (int argc, const char **argv)
 
   if (argc != 1)
     fatal_error (input_location, "%<%%:amigaos-crt-check%> takes one argument");
+
+  if (startswith (argv[0], "-mcrt="))
+    {
+      const char *name = argv[0] + strlen ("-mcrt=");
+      size_t i;
+
+      for (i = 0; i < ARRAY_SIZE (amigaos_crts); i++)
+	if (strcmp (name, amigaos_crts[i]) == 0)
+	  break;
+      if (i == ARRAY_SIZE (amigaos_crts))
+	fatal_error (input_location,
+		     "unknown C runtime %qs in %qs; valid: newlib, nix20, "
+		     "nix13, ixemul, clib2, library", name, argv[0]);
+    }
 
   if (chosen == NULL)
     chosen = argv[0];
