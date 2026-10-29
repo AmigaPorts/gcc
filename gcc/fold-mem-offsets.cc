@@ -255,6 +255,8 @@ get_uses (rtx_insn *insn, rtx reg, bool *success)
 
 static HOST_WIDE_INT
 fold_offsets (rtx_insn *insn, rtx reg, bool analyze, bitmap foldable_insns);
+bool get_fold_mem_root (rtx_insn *insn, rtx *mem_out, rtx *reg_out,
+			HOST_WIDE_INT *offset_out);
 
 /*  Helper function for fold_offsets.
 
@@ -544,6 +546,16 @@ fold_offsets (rtx_insn *insn, rtx reg, bool analyze, bitmap foldable_insns)
 	     mentions DEST outside of the address calculation.  */
 	  if (use_set && MEM_P (SET_DEST (use_set))
 	      && reg_mentioned_p (dest, SET_SRC (use_set)))
+	    return 0;
+
+	  /* The folded offset goes into the memory operand that
+	     get_fold_mem_root finds, so a use in a memory root must be
+	     that operand's base register.  A memory-to-memory move, which
+	     some targets have, is a root for its source operand only: a
+	     use in its destination address would keep its old offset.  */
+	  rtx use_base;
+	  if (get_fold_mem_root (use, NULL, &use_base, NULL)
+	      && REGNO (use_base) != dest_regno)
 	    return 0;
 	}
 
