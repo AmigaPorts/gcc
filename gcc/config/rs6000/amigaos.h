@@ -484,6 +484,18 @@ do                                   \
     rs6000_altivec_abi = 1;          \
     TARGET_ALTIVEC_VRSAVE = 1;       \
   }                                  \
+  /* Executables keep only the relocations of their input objects   \
+     (-q), and the .got that -fpic code reads has none, so it can't \
+     be relocated when loaded.  -fPIC's .got2 has them.  sysv4.h's  \
+     -fPIC handling has already run, so repeat it here.  */         \
+  if (flag_pic == 1)                 \
+  {                                  \
+    flag_pic = 2;                    \
+    if (flag_pie)                    \
+      flag_pie = 2;                  \
+    rs6000_isa_flags |= OPTION_MASK_MINIMAL_TOC; \
+    TARGET_NO_FP_IN_TOC = 1;         \
+  }                                  \
 } while(0)
 
 #undef SUBTARGET_INIT_BUILTINS
