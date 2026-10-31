@@ -924,11 +924,11 @@ m68k_emit_setmemsi(rtx blkdest, rtx val, rtx length, rtx alignment)
 
   /* Above this size, the generic implementation using MOVEM is faster.
      nloops is -1 below one unrolled iteration; keep the comparison signed.  */
-  /* When optimizing for size, leave anything that needs a loop to the
+  /* When optimizing for size, leave all but the shortest loops to the
      libcall; see m68k_use_by_pieces_infrastructure_p.  */
   if (nloops > (HOST_WIDE_INT) get_env_uint ("M68K_SETMEMSI_MAX_NLOOPS",
-					     optimize_function_for_size_p (cfun)
-					     ? 0 : 63))
+					     optimize_insn_for_size_p ()
+					     ? 2 : 63))
     return false;
 
   int single = size % n;
@@ -1095,7 +1095,7 @@ m68k_emit_movmemsi(rtx blkdest, rtx blksrc, rtx length, rtx alignment,
 
   /* nloops is -1 below one unrolled iteration; keep the comparison signed.  */
   if (nloops > (HOST_WIDE_INT) get_env_uint ("M68K_MOVMEMSI_MAX_NLOOPS",
-					     optimize_function_for_size_p (cfun)
+					     optimize_insn_for_size_p ()
 					     ? 0 : 63))
     return false;
 
