@@ -123,46 +123,46 @@ init_cost_speed_68000 (int t[IDX_COUNT])
 {
     for (int i = 0; i < IDX_COUNT; ++i) t[i] = 0;
 
-    set_cost (t, IDX_REG_SRC,                      1);
-    set_cost (t, IDX_REG_DST,                     34);
-    set_cost (t, IDX_MEM_REG,                      8);
+    set_cost (t, IDX_REG_SRC,                      0);
+    set_cost (t, IDX_REG_DST,                     37);
+    set_cost (t, IDX_MEM_REG,                      6);
     set_cost (t, IDX_MEM_PLUS_REG_DISP,            1);
-    set_cost (t, IDX_MEM_PLUS_REG_REG,            13);
+    set_cost (t, IDX_MEM_PLUS_REG_REG,            16);
     set_cost (t, IDX_MEM_OTHER,                    0);
     set_cost (t, IDX_CONST_INT_Q,                  0);
-    set_cost (t, IDX_CONST_INT_W,                 40);
-    set_cost (t, IDX_CONST_INT_L_1,               24);
-    set_cost (t, IDX_CONST_INT_L_2,                3);
+    set_cost (t, IDX_CONST_INT_W,                 39);
+    set_cost (t, IDX_CONST_INT_L_1,               22);
+    set_cost (t, IDX_CONST_INT_L_2,                2);
     set_cost (t, IDX_SYMBOL,                      36);
-    set_cost (t, IDX_PLUS_REG_REG,                11);
-    set_cost (t, IDX_PLUS_REG_CONSTQ,             10);
-    set_cost (t, IDX_PLUS_REG_CONSTW,             32);
-    set_cost (t, IDX_PLUS_REG_CONSTL,              5);
-    set_cost (t, IDX_PLUS_OTHER,                  11);
+    set_cost (t, IDX_PLUS_REG_REG,                16);
+    set_cost (t, IDX_PLUS_REG_CONSTQ,              8);
+    set_cost (t, IDX_PLUS_REG_CONSTW,             34);
+    set_cost (t, IDX_PLUS_REG_CONSTL,              7);
+    set_cost (t, IDX_PLUS_OTHER,                  18);
     set_cost (t, IDX_LOGIC_REG_CONST,             40);
     set_cost (t, IDX_SHIFT_CONST,                  2);
-    set_cost (t, IDX_SHIFT_CONST_W,                2);
-    set_cost (t, IDX_CALL_OTHER,                  16);
-    set_cost (t, IDX_DIV_L,                       21);
-    set_cost (t, IDX_DIV_W,                       36);
-    set_cost (t, IDX_LSL_SHIFT,                   10);
+    set_cost (t, IDX_SHIFT_CONST_W,                8);
+    set_cost (t, IDX_CALL_OTHER,                  25);
+    set_cost (t, IDX_DIV_L,                       10);
+    set_cost (t, IDX_DIV_W,                       38);
+    set_cost (t, IDX_LSL_SHIFT,                    8);
     set_cost (t, IDX_LSL_SHIFT_STEP,               1);
-    set_cost (t, IDX_MEM_LONG_EXTRA,               2);
-    set_cost (t, IDX_MEM_PREDEC_EXTRA,            14);
-    set_cost (t, IDX_CLR_LONG_PENALTY,            30);
-    set_cost (t, IDX_CLR_WORD_PENALTY,            13);
-    set_cost (t, IDX_PLUS_LEA_OFFSET,             15);
-    set_cost (t, IDX_PLUS_LONG_EXTRA,              0);
-    set_cost (t, IDX_PLUS_SHORT_EXTRA,             8);
-    set_cost (t, IDX_LOGIC_LONG_EXTRA,            14);
-    set_cost (t, IDX_LOGIC_WORD_EXTRA,             6);
-    set_cost (t, IDX_MULT_68000_BASE,              6);
-    set_cost (t, IDX_MULT_68000_BITS,             33);
+    set_cost (t, IDX_MEM_LONG_EXTRA,               0);
+    set_cost (t, IDX_MEM_PREDEC_EXTRA,            11);
+    set_cost (t, IDX_CLR_LONG_PENALTY,            26);
+    set_cost (t, IDX_CLR_WORD_PENALTY,            10);
+    set_cost (t, IDX_PLUS_LEA_OFFSET,             14);
+    set_cost (t, IDX_PLUS_LONG_EXTRA,              1);
+    set_cost (t, IDX_PLUS_SHORT_EXTRA,             1);
+    set_cost (t, IDX_LOGIC_LONG_EXTRA,            17);
+    set_cost (t, IDX_LOGIC_WORD_EXTRA,            12);
+    set_cost (t, IDX_MULT_68000_BASE,              1);
+    set_cost (t, IDX_MULT_68000_BITS,             28);
     set_cost (t, IDX_MULT_68000_TRANS,             9);
     set_cost (t, IDX_MULT_68000_WORD_BASE,        34);
-    set_cost (t, IDX_MULT_68000_LONG_MUL,         39);
-    set_cost (t, IDX_MULT_68000_WORD_MUL,         35);
-    set_cost (t, IDX_EXTEND_EXTRA,                13);
+    set_cost (t, IDX_MULT_68000_LONG_MUL,         40);
+    set_cost (t, IDX_MULT_68000_WORD_MUL,         34);
+    set_cost (t, IDX_EXTEND_EXTRA,                10);
 }
 
 /* ============================================
@@ -177,46 +177,46 @@ init_cost_size_68000 (int t[IDX_COUNT])
 {
     for (int i = 0; i < IDX_COUNT; ++i) t[i] = 0;
 
-    set_cost (t, IDX_REG_SRC,                      1);
-    set_cost (t, IDX_REG_DST,                     34);
-    set_cost (t, IDX_MEM_REG,                      8);
+    set_cost (t, IDX_REG_SRC,                      0);
+    set_cost (t, IDX_REG_DST,                     37);
+    set_cost (t, IDX_MEM_REG,                      6);
     set_cost (t, IDX_MEM_PLUS_REG_DISP,            1);
-    set_cost (t, IDX_MEM_PLUS_REG_REG,            13);
+    set_cost (t, IDX_MEM_PLUS_REG_REG,            16);
     set_cost (t, IDX_MEM_OTHER,                    0);
     set_cost (t, IDX_CONST_INT_Q,                  0);
-    set_cost (t, IDX_CONST_INT_W,                 40);
-    set_cost (t, IDX_CONST_INT_L_1,               24);
-    set_cost (t, IDX_CONST_INT_L_2,                3);
+    set_cost (t, IDX_CONST_INT_W,                 39);
+    set_cost (t, IDX_CONST_INT_L_1,               22);
+    set_cost (t, IDX_CONST_INT_L_2,                2);
     set_cost (t, IDX_SYMBOL,                      36);
-    set_cost (t, IDX_PLUS_REG_REG,                11);
-    set_cost (t, IDX_PLUS_REG_CONSTQ,             10);
-    set_cost (t, IDX_PLUS_REG_CONSTW,             32);
-    set_cost (t, IDX_PLUS_REG_CONSTL,              5);
-    set_cost (t, IDX_PLUS_OTHER,                  11);
+    set_cost (t, IDX_PLUS_REG_REG,                16);
+    set_cost (t, IDX_PLUS_REG_CONSTQ,              8);
+    set_cost (t, IDX_PLUS_REG_CONSTW,             34);
+    set_cost (t, IDX_PLUS_REG_CONSTL,              7);
+    set_cost (t, IDX_PLUS_OTHER,                  18);
     set_cost (t, IDX_LOGIC_REG_CONST,             40);
     set_cost (t, IDX_SHIFT_CONST,                  0);  /* zeroed for -Os */
     set_cost (t, IDX_SHIFT_CONST_W,                0);  /* zeroed for -Os */
-    set_cost (t, IDX_CALL_OTHER,                  16);
+    set_cost (t, IDX_CALL_OTHER,                  25);
     set_cost (t, IDX_DIV_L,                        0);  /* zeroed for -Os */
     set_cost (t, IDX_DIV_W,                        0);  /* zeroed for -Os */
     set_cost (t, IDX_LSL_SHIFT,                    0);  /* zeroed for -Os */
     set_cost (t, IDX_LSL_SHIFT_STEP,               0);  /* zeroed for -Os */
-    set_cost (t, IDX_MEM_LONG_EXTRA,               2);
-    set_cost (t, IDX_MEM_PREDEC_EXTRA,            14);
-    set_cost (t, IDX_CLR_LONG_PENALTY,            30);
-    set_cost (t, IDX_CLR_WORD_PENALTY,            13);
-    set_cost (t, IDX_PLUS_LEA_OFFSET,             15);
-    set_cost (t, IDX_PLUS_LONG_EXTRA,              0);
-    set_cost (t, IDX_PLUS_SHORT_EXTRA,             8);
-    set_cost (t, IDX_LOGIC_LONG_EXTRA,            14);
-    set_cost (t, IDX_LOGIC_WORD_EXTRA,             6);
+    set_cost (t, IDX_MEM_LONG_EXTRA,               0);
+    set_cost (t, IDX_MEM_PREDEC_EXTRA,            11);
+    set_cost (t, IDX_CLR_LONG_PENALTY,            26);
+    set_cost (t, IDX_CLR_WORD_PENALTY,            10);
+    set_cost (t, IDX_PLUS_LEA_OFFSET,             14);
+    set_cost (t, IDX_PLUS_LONG_EXTRA,              1);
+    set_cost (t, IDX_PLUS_SHORT_EXTRA,             1);
+    set_cost (t, IDX_LOGIC_LONG_EXTRA,            17);
+    set_cost (t, IDX_LOGIC_WORD_EXTRA,            12);
     set_cost (t, IDX_MULT_68000_BASE,              0);  /* zeroed for -Os */
     set_cost (t, IDX_MULT_68000_BITS,              0);  /* zeroed for -Os */
     set_cost (t, IDX_MULT_68000_TRANS,             0);  /* zeroed for -Os */
     set_cost (t, IDX_MULT_68000_WORD_BASE,         0);  /* zeroed for -Os */
     set_cost (t, IDX_MULT_68000_LONG_MUL,          0);  /* zeroed for -Os */
     set_cost (t, IDX_MULT_68000_WORD_MUL,          0);  /* zeroed for -Os */
-    set_cost (t, IDX_EXTEND_EXTRA,                13);
+    set_cost (t, IDX_EXTEND_EXTRA,                10);
 }
 
 /* ============================================
@@ -228,46 +228,46 @@ init_cost_speed_68020 (int t[IDX_COUNT])
 {
     for (int i = 0; i < IDX_COUNT; ++i) t[i] = 0;
 
-    set_cost (t, IDX_REG_SRC,                      5);
-    set_cost (t, IDX_REG_DST,                      1);
-    set_cost (t, IDX_MEM_REG,                     20);
-    set_cost (t, IDX_MEM_PLUS_REG_DISP,            9);
+    set_cost (t, IDX_REG_SRC,                      6);
+    set_cost (t, IDX_REG_DST,                      6);
+    set_cost (t, IDX_MEM_REG,                     22);
+    set_cost (t, IDX_MEM_PLUS_REG_DISP,            7);
     set_cost (t, IDX_MEM_PLUS_REG_REG,            40);
-    set_cost (t, IDX_MEM_OTHER,                    5);
-    set_cost (t, IDX_CONST_INT_Q,                  4);
-    set_cost (t, IDX_CONST_INT_W,                  2);
-    set_cost (t, IDX_CONST_INT_L_1,                7);
+    set_cost (t, IDX_MEM_OTHER,                    8);
+    set_cost (t, IDX_CONST_INT_Q,                  5);
+    set_cost (t, IDX_CONST_INT_W,                  6);
+    set_cost (t, IDX_CONST_INT_L_1,               11);
     set_cost (t, IDX_CONST_INT_L_2,                6);
-    set_cost (t, IDX_SYMBOL,                       5);
-    set_cost (t, IDX_PLUS_REG_REG,                 8);
-    set_cost (t, IDX_PLUS_REG_CONSTQ,             12);
-    set_cost (t, IDX_PLUS_REG_CONSTW,             37);
-    set_cost (t, IDX_PLUS_REG_CONSTL,             33);
-    set_cost (t, IDX_PLUS_OTHER,                  20);
-    set_cost (t, IDX_LOGIC_REG_CONST,             25);
-    set_cost (t, IDX_SHIFT_CONST,                  6);
-    set_cost (t, IDX_SHIFT_CONST_W,                1);
-    set_cost (t, IDX_CALL_OTHER,                  13);
-    set_cost (t, IDX_DIV_L,                       37);
-    set_cost (t, IDX_DIV_W,                       22);
-    set_cost (t, IDX_LSL_SHIFT,                    8);
-    set_cost (t, IDX_LSL_SHIFT_STEP,               1);
-    set_cost (t, IDX_MEM_LONG_EXTRA,              10);
-    set_cost (t, IDX_MEM_PREDEC_EXTRA,            14);
+    set_cost (t, IDX_SYMBOL,                       4);
+    set_cost (t, IDX_PLUS_REG_REG,                12);
+    set_cost (t, IDX_PLUS_REG_CONSTQ,             16);
+    set_cost (t, IDX_PLUS_REG_CONSTW,             38);
+    set_cost (t, IDX_PLUS_REG_CONSTL,             39);
+    set_cost (t, IDX_PLUS_OTHER,                  15);
+    set_cost (t, IDX_LOGIC_REG_CONST,             30);
+    set_cost (t, IDX_SHIFT_CONST,                 12);
+    set_cost (t, IDX_SHIFT_CONST_W,                2);
+    set_cost (t, IDX_CALL_OTHER,                  12);
+    set_cost (t, IDX_DIV_L,                       40);
+    set_cost (t, IDX_DIV_W,                       21);
+    set_cost (t, IDX_LSL_SHIFT,                   10);
+    set_cost (t, IDX_LSL_SHIFT_STEP,               0);
+    set_cost (t, IDX_MEM_LONG_EXTRA,              16);
+    set_cost (t, IDX_MEM_PREDEC_EXTRA,            15);
     set_cost (t, IDX_CLR_LONG_PENALTY,            32);
-    set_cost (t, IDX_CLR_WORD_PENALTY,            10);
-    set_cost (t, IDX_PLUS_LEA_OFFSET,             27);
-    set_cost (t, IDX_PLUS_LONG_EXTRA,              2);
-    set_cost (t, IDX_PLUS_SHORT_EXTRA,             1);
-    set_cost (t, IDX_LOGIC_LONG_EXTRA,             1);
-    set_cost (t, IDX_LOGIC_WORD_EXTRA,             3);
-    set_cost (t, IDX_MULT_68000_BASE,              4);
-    set_cost (t, IDX_MULT_68000_BITS,             21);
+    set_cost (t, IDX_CLR_WORD_PENALTY,             3);
+    set_cost (t, IDX_PLUS_LEA_OFFSET,             10);
+    set_cost (t, IDX_PLUS_LONG_EXTRA,              0);
+    set_cost (t, IDX_PLUS_SHORT_EXTRA,             5);
+    set_cost (t, IDX_LOGIC_LONG_EXTRA,             4);
+    set_cost (t, IDX_LOGIC_WORD_EXTRA,            12);
+    set_cost (t, IDX_MULT_68000_BASE,              7);
+    set_cost (t, IDX_MULT_68000_BITS,             34);
     set_cost (t, IDX_MULT_68000_TRANS,            15);
-    set_cost (t, IDX_MULT_68000_WORD_BASE,         7);
-    set_cost (t, IDX_MULT_68000_LONG_MUL,         36);
-    set_cost (t, IDX_MULT_68000_WORD_MUL,         31);
-    set_cost (t, IDX_EXTEND_EXTRA,                 7);
+    set_cost (t, IDX_MULT_68000_WORD_BASE,        14);
+    set_cost (t, IDX_MULT_68000_LONG_MUL,         35);
+    set_cost (t, IDX_MULT_68000_WORD_MUL,         39);
+    set_cost (t, IDX_EXTEND_EXTRA,                 2);
 }
 
 /* ============================================
@@ -282,46 +282,46 @@ init_cost_size_68020 (int t[IDX_COUNT])
 {
     for (int i = 0; i < IDX_COUNT; ++i) t[i] = 0;
 
-    set_cost (t, IDX_REG_SRC,                      5);
-    set_cost (t, IDX_REG_DST,                      1);
-    set_cost (t, IDX_MEM_REG,                     20);
-    set_cost (t, IDX_MEM_PLUS_REG_DISP,            9);
+    set_cost (t, IDX_REG_SRC,                      6);
+    set_cost (t, IDX_REG_DST,                      6);
+    set_cost (t, IDX_MEM_REG,                     22);
+    set_cost (t, IDX_MEM_PLUS_REG_DISP,            7);
     set_cost (t, IDX_MEM_PLUS_REG_REG,            40);
-    set_cost (t, IDX_MEM_OTHER,                    5);
-    set_cost (t, IDX_CONST_INT_Q,                  4);
-    set_cost (t, IDX_CONST_INT_W,                  2);
-    set_cost (t, IDX_CONST_INT_L_1,                7);
+    set_cost (t, IDX_MEM_OTHER,                    8);
+    set_cost (t, IDX_CONST_INT_Q,                  5);
+    set_cost (t, IDX_CONST_INT_W,                  6);
+    set_cost (t, IDX_CONST_INT_L_1,               11);
     set_cost (t, IDX_CONST_INT_L_2,                6);
-    set_cost (t, IDX_SYMBOL,                       5);
-    set_cost (t, IDX_PLUS_REG_REG,                 8);
-    set_cost (t, IDX_PLUS_REG_CONSTQ,             12);
-    set_cost (t, IDX_PLUS_REG_CONSTW,             37);
-    set_cost (t, IDX_PLUS_REG_CONSTL,             33);
-    set_cost (t, IDX_PLUS_OTHER,                  20);
-    set_cost (t, IDX_LOGIC_REG_CONST,             25);
+    set_cost (t, IDX_SYMBOL,                       4);
+    set_cost (t, IDX_PLUS_REG_REG,                12);
+    set_cost (t, IDX_PLUS_REG_CONSTQ,             16);
+    set_cost (t, IDX_PLUS_REG_CONSTW,             38);
+    set_cost (t, IDX_PLUS_REG_CONSTL,             39);
+    set_cost (t, IDX_PLUS_OTHER,                  15);
+    set_cost (t, IDX_LOGIC_REG_CONST,             30);
     set_cost (t, IDX_SHIFT_CONST,                  0);  /* zeroed for -Os */
     set_cost (t, IDX_SHIFT_CONST_W,                0);  /* zeroed for -Os */
-    set_cost (t, IDX_CALL_OTHER,                  13);
+    set_cost (t, IDX_CALL_OTHER,                  12);
     set_cost (t, IDX_DIV_L,                        0);  /* zeroed for -Os */
     set_cost (t, IDX_DIV_W,                        0);  /* zeroed for -Os */
     set_cost (t, IDX_LSL_SHIFT,                    0);  /* zeroed for -Os */
     set_cost (t, IDX_LSL_SHIFT_STEP,               0);  /* zeroed for -Os */
-    set_cost (t, IDX_MEM_LONG_EXTRA,              10);
-    set_cost (t, IDX_MEM_PREDEC_EXTRA,            14);
+    set_cost (t, IDX_MEM_LONG_EXTRA,              16);
+    set_cost (t, IDX_MEM_PREDEC_EXTRA,            15);
     set_cost (t, IDX_CLR_LONG_PENALTY,            32);
-    set_cost (t, IDX_CLR_WORD_PENALTY,            10);
-    set_cost (t, IDX_PLUS_LEA_OFFSET,             27);
-    set_cost (t, IDX_PLUS_LONG_EXTRA,              2);
-    set_cost (t, IDX_PLUS_SHORT_EXTRA,             1);
-    set_cost (t, IDX_LOGIC_LONG_EXTRA,             1);
-    set_cost (t, IDX_LOGIC_WORD_EXTRA,             3);
+    set_cost (t, IDX_CLR_WORD_PENALTY,             3);
+    set_cost (t, IDX_PLUS_LEA_OFFSET,             10);
+    set_cost (t, IDX_PLUS_LONG_EXTRA,              0);
+    set_cost (t, IDX_PLUS_SHORT_EXTRA,             5);
+    set_cost (t, IDX_LOGIC_LONG_EXTRA,             4);
+    set_cost (t, IDX_LOGIC_WORD_EXTRA,            12);
     set_cost (t, IDX_MULT_68000_BASE,              0);  /* zeroed for -Os */
     set_cost (t, IDX_MULT_68000_BITS,              0);  /* zeroed for -Os */
     set_cost (t, IDX_MULT_68000_TRANS,             0);  /* zeroed for -Os */
     set_cost (t, IDX_MULT_68000_WORD_BASE,         0);  /* zeroed for -Os */
     set_cost (t, IDX_MULT_68000_LONG_MUL,          0);  /* zeroed for -Os */
     set_cost (t, IDX_MULT_68000_WORD_MUL,          0);  /* zeroed for -Os */
-    set_cost (t, IDX_EXTEND_EXTRA,                 7);
+    set_cost (t, IDX_EXTEND_EXTRA,                 2);
 }
 
 /* ============================================
@@ -438,46 +438,46 @@ init_cost_speed_68040 (int t[IDX_COUNT])
 {
     for (int i = 0; i < IDX_COUNT; ++i) t[i] = 0;
 
-    set_cost (t, IDX_REG_SRC,                      1);
+    set_cost (t, IDX_REG_SRC,                      2);
     set_cost (t, IDX_REG_DST,                      1);
-    set_cost (t, IDX_MEM_REG,                     11);
-    set_cost (t, IDX_MEM_PLUS_REG_DISP,            0);
-    set_cost (t, IDX_MEM_PLUS_REG_REG,            22);
-    set_cost (t, IDX_MEM_OTHER,                   21);
+    set_cost (t, IDX_MEM_REG,                      9);
+    set_cost (t, IDX_MEM_PLUS_REG_DISP,            1);
+    set_cost (t, IDX_MEM_PLUS_REG_REG,            21);
+    set_cost (t, IDX_MEM_OTHER,                   22);
     set_cost (t, IDX_CONST_INT_Q,                  0);
-    set_cost (t, IDX_CONST_INT_W,                 23);
-    set_cost (t, IDX_CONST_INT_L_1,               13);
-    set_cost (t, IDX_CONST_INT_L_2,               39);
+    set_cost (t, IDX_CONST_INT_W,                 25);
+    set_cost (t, IDX_CONST_INT_L_1,               12);
+    set_cost (t, IDX_CONST_INT_L_2,               38);
     set_cost (t, IDX_SYMBOL,                       4);
     set_cost (t, IDX_PLUS_REG_REG,                 9);
-    set_cost (t, IDX_PLUS_REG_CONSTQ,              6);
+    set_cost (t, IDX_PLUS_REG_CONSTQ,              7);
     set_cost (t, IDX_PLUS_REG_CONSTW,             17);
-    set_cost (t, IDX_PLUS_REG_CONSTL,             12);
-    set_cost (t, IDX_PLUS_OTHER,                  12);
-    set_cost (t, IDX_LOGIC_REG_CONST,              3);
-    set_cost (t, IDX_SHIFT_CONST,                 10);
-    set_cost (t, IDX_SHIFT_CONST_W,               27);
-    set_cost (t, IDX_CALL_OTHER,                  34);
+    set_cost (t, IDX_PLUS_REG_CONSTL,              7);
+    set_cost (t, IDX_PLUS_OTHER,                   9);
+    set_cost (t, IDX_LOGIC_REG_CONST,              4);
+    set_cost (t, IDX_SHIFT_CONST,                  9);
+    set_cost (t, IDX_SHIFT_CONST_W,               24);
+    set_cost (t, IDX_CALL_OTHER,                  36);
     set_cost (t, IDX_DIV_L,                       17);
-    set_cost (t, IDX_DIV_W,                        8);
-    set_cost (t, IDX_LSL_SHIFT,                   15);
+    set_cost (t, IDX_DIV_W,                        7);
+    set_cost (t, IDX_LSL_SHIFT,                   13);
     set_cost (t, IDX_LSL_SHIFT_STEP,               2);
-    set_cost (t, IDX_MEM_LONG_EXTRA,               4);
-    set_cost (t, IDX_MEM_PREDEC_EXTRA,            14);
-    set_cost (t, IDX_CLR_LONG_PENALTY,            24);
-    set_cost (t, IDX_CLR_WORD_PENALTY,             2);
+    set_cost (t, IDX_MEM_LONG_EXTRA,               6);
+    set_cost (t, IDX_MEM_PREDEC_EXTRA,            15);
+    set_cost (t, IDX_CLR_LONG_PENALTY,            23);
+    set_cost (t, IDX_CLR_WORD_PENALTY,             4);
     set_cost (t, IDX_PLUS_LEA_OFFSET,              8);
-    set_cost (t, IDX_PLUS_LONG_EXTRA,              4);
-    set_cost (t, IDX_PLUS_SHORT_EXTRA,            10);
-    set_cost (t, IDX_LOGIC_LONG_EXTRA,             5);
-    set_cost (t, IDX_LOGIC_WORD_EXTRA,            11);
-    set_cost (t, IDX_MULT_68000_BASE,             21);
-    set_cost (t, IDX_MULT_68000_BITS,             13);
-    set_cost (t, IDX_MULT_68000_TRANS,             2);
+    set_cost (t, IDX_PLUS_LONG_EXTRA,              2);
+    set_cost (t, IDX_PLUS_SHORT_EXTRA,            13);
+    set_cost (t, IDX_LOGIC_LONG_EXTRA,             3);
+    set_cost (t, IDX_LOGIC_WORD_EXTRA,             9);
+    set_cost (t, IDX_MULT_68000_BASE,             24);
+    set_cost (t, IDX_MULT_68000_BITS,             11);
+    set_cost (t, IDX_MULT_68000_TRANS,             1);
     set_cost (t, IDX_MULT_68000_WORD_BASE,        24);
     set_cost (t, IDX_MULT_68000_LONG_MUL,         40);
-    set_cost (t, IDX_MULT_68000_WORD_MUL,         39);
-    set_cost (t, IDX_EXTEND_EXTRA,                37);
+    set_cost (t, IDX_MULT_68000_WORD_MUL,         40);
+    set_cost (t, IDX_EXTEND_EXTRA,                38);
 }
 
 /* ============================================
@@ -492,46 +492,46 @@ init_cost_size_68040 (int t[IDX_COUNT])
 {
     for (int i = 0; i < IDX_COUNT; ++i) t[i] = 0;
 
-    set_cost (t, IDX_REG_SRC,                      1);
+    set_cost (t, IDX_REG_SRC,                      2);
     set_cost (t, IDX_REG_DST,                      1);
-    set_cost (t, IDX_MEM_REG,                     11);
-    set_cost (t, IDX_MEM_PLUS_REG_DISP,            0);
-    set_cost (t, IDX_MEM_PLUS_REG_REG,            22);
-    set_cost (t, IDX_MEM_OTHER,                   21);
+    set_cost (t, IDX_MEM_REG,                      9);
+    set_cost (t, IDX_MEM_PLUS_REG_DISP,            1);
+    set_cost (t, IDX_MEM_PLUS_REG_REG,            21);
+    set_cost (t, IDX_MEM_OTHER,                   22);
     set_cost (t, IDX_CONST_INT_Q,                  0);
-    set_cost (t, IDX_CONST_INT_W,                 23);
-    set_cost (t, IDX_CONST_INT_L_1,               13);
-    set_cost (t, IDX_CONST_INT_L_2,               39);
+    set_cost (t, IDX_CONST_INT_W,                 25);
+    set_cost (t, IDX_CONST_INT_L_1,               12);
+    set_cost (t, IDX_CONST_INT_L_2,               38);
     set_cost (t, IDX_SYMBOL,                       4);
     set_cost (t, IDX_PLUS_REG_REG,                 9);
-    set_cost (t, IDX_PLUS_REG_CONSTQ,              6);
+    set_cost (t, IDX_PLUS_REG_CONSTQ,              7);
     set_cost (t, IDX_PLUS_REG_CONSTW,             17);
-    set_cost (t, IDX_PLUS_REG_CONSTL,             12);
-    set_cost (t, IDX_PLUS_OTHER,                  12);
-    set_cost (t, IDX_LOGIC_REG_CONST,              3);
+    set_cost (t, IDX_PLUS_REG_CONSTL,              7);
+    set_cost (t, IDX_PLUS_OTHER,                   9);
+    set_cost (t, IDX_LOGIC_REG_CONST,              4);
     set_cost (t, IDX_SHIFT_CONST,                  0);  /* zeroed for -Os */
     set_cost (t, IDX_SHIFT_CONST_W,                0);  /* zeroed for -Os */
-    set_cost (t, IDX_CALL_OTHER,                  34);
+    set_cost (t, IDX_CALL_OTHER,                  36);
     set_cost (t, IDX_DIV_L,                        0);  /* zeroed for -Os */
     set_cost (t, IDX_DIV_W,                        0);  /* zeroed for -Os */
     set_cost (t, IDX_LSL_SHIFT,                    0);  /* zeroed for -Os */
     set_cost (t, IDX_LSL_SHIFT_STEP,               0);  /* zeroed for -Os */
-    set_cost (t, IDX_MEM_LONG_EXTRA,               4);
-    set_cost (t, IDX_MEM_PREDEC_EXTRA,            14);
-    set_cost (t, IDX_CLR_LONG_PENALTY,            24);
-    set_cost (t, IDX_CLR_WORD_PENALTY,             2);
+    set_cost (t, IDX_MEM_LONG_EXTRA,               6);
+    set_cost (t, IDX_MEM_PREDEC_EXTRA,            15);
+    set_cost (t, IDX_CLR_LONG_PENALTY,            23);
+    set_cost (t, IDX_CLR_WORD_PENALTY,             4);
     set_cost (t, IDX_PLUS_LEA_OFFSET,              8);
-    set_cost (t, IDX_PLUS_LONG_EXTRA,              4);
-    set_cost (t, IDX_PLUS_SHORT_EXTRA,            10);
-    set_cost (t, IDX_LOGIC_LONG_EXTRA,             5);
-    set_cost (t, IDX_LOGIC_WORD_EXTRA,            11);
+    set_cost (t, IDX_PLUS_LONG_EXTRA,              2);
+    set_cost (t, IDX_PLUS_SHORT_EXTRA,            13);
+    set_cost (t, IDX_LOGIC_LONG_EXTRA,             3);
+    set_cost (t, IDX_LOGIC_WORD_EXTRA,             9);
     set_cost (t, IDX_MULT_68000_BASE,              0);  /* zeroed for -Os */
     set_cost (t, IDX_MULT_68000_BITS,              0);  /* zeroed for -Os */
     set_cost (t, IDX_MULT_68000_TRANS,             0);  /* zeroed for -Os */
     set_cost (t, IDX_MULT_68000_WORD_BASE,         0);  /* zeroed for -Os */
     set_cost (t, IDX_MULT_68000_LONG_MUL,          0);  /* zeroed for -Os */
     set_cost (t, IDX_MULT_68000_WORD_MUL,          0);  /* zeroed for -Os */
-    set_cost (t, IDX_EXTEND_EXTRA,                37);
+    set_cost (t, IDX_EXTEND_EXTRA,                38);
 }
 
 /* ============================================
@@ -543,46 +543,46 @@ init_cost_speed_68060 (int t[IDX_COUNT])
 {
     for (int i = 0; i < IDX_COUNT; ++i) t[i] = 0;
 
-    set_cost (t, IDX_REG_SRC,                     17);
-    set_cost (t, IDX_REG_DST,                     28);
-    set_cost (t, IDX_MEM_REG,                     19);
-    set_cost (t, IDX_MEM_PLUS_REG_DISP,            4);
-    set_cost (t, IDX_MEM_PLUS_REG_REG,            28);
-    set_cost (t, IDX_MEM_OTHER,                    1);
-    set_cost (t, IDX_CONST_INT_Q,                  4);
+    set_cost (t, IDX_REG_SRC,                     19);
+    set_cost (t, IDX_REG_DST,                     20);
+    set_cost (t, IDX_MEM_REG,                     21);
+    set_cost (t, IDX_MEM_PLUS_REG_DISP,            5);
+    set_cost (t, IDX_MEM_PLUS_REG_REG,            30);
+    set_cost (t, IDX_MEM_OTHER,                    0);
+    set_cost (t, IDX_CONST_INT_Q,                  3);
     set_cost (t, IDX_CONST_INT_W,                  4);
-    set_cost (t, IDX_CONST_INT_L_1,                1);
-    set_cost (t, IDX_CONST_INT_L_2,               40);
-    set_cost (t, IDX_SYMBOL,                       1);
-    set_cost (t, IDX_PLUS_REG_REG,                21);
-    set_cost (t, IDX_PLUS_REG_CONSTQ,              3);
-    set_cost (t, IDX_PLUS_REG_CONSTW,              8);
-    set_cost (t, IDX_PLUS_REG_CONSTL,             14);
+    set_cost (t, IDX_CONST_INT_L_1,                0);
+    set_cost (t, IDX_CONST_INT_L_2,               33);
+    set_cost (t, IDX_SYMBOL,                       5);
+    set_cost (t, IDX_PLUS_REG_REG,                23);
+    set_cost (t, IDX_PLUS_REG_CONSTQ,              4);
+    set_cost (t, IDX_PLUS_REG_CONSTW,              7);
+    set_cost (t, IDX_PLUS_REG_CONSTL,             12);
     set_cost (t, IDX_PLUS_OTHER,                  17);
-    set_cost (t, IDX_LOGIC_REG_CONST,              4);
-    set_cost (t, IDX_SHIFT_CONST,                 11);
-    set_cost (t, IDX_SHIFT_CONST_W,               37);
-    set_cost (t, IDX_CALL_OTHER,                  40);
-    set_cost (t, IDX_DIV_L,                       17);
-    set_cost (t, IDX_DIV_W,                       24);
-    set_cost (t, IDX_LSL_SHIFT,                    4);
-    set_cost (t, IDX_LSL_SHIFT_STEP,               8);
+    set_cost (t, IDX_LOGIC_REG_CONST,              5);
+    set_cost (t, IDX_SHIFT_CONST,                 12);
+    set_cost (t, IDX_SHIFT_CONST_W,               25);
+    set_cost (t, IDX_CALL_OTHER,                  37);
+    set_cost (t, IDX_DIV_L,                       18);
+    set_cost (t, IDX_DIV_W,                       16);
+    set_cost (t, IDX_LSL_SHIFT,                   13);
+    set_cost (t, IDX_LSL_SHIFT_STEP,               5);
     set_cost (t, IDX_MEM_LONG_EXTRA,               0);
-    set_cost (t, IDX_MEM_PREDEC_EXTRA,            18);
-    set_cost (t, IDX_CLR_LONG_PENALTY,            19);
-    set_cost (t, IDX_CLR_WORD_PENALTY,            18);
-    set_cost (t, IDX_PLUS_LEA_OFFSET,              8);
-    set_cost (t, IDX_PLUS_LONG_EXTRA,              0);
-    set_cost (t, IDX_PLUS_SHORT_EXTRA,            16);
-    set_cost (t, IDX_LOGIC_LONG_EXTRA,             8);
-    set_cost (t, IDX_LOGIC_WORD_EXTRA,            22);
-    set_cost (t, IDX_MULT_68000_BASE,             14);
-    set_cost (t, IDX_MULT_68000_BITS,             31);
-    set_cost (t, IDX_MULT_68000_TRANS,            22);
-    set_cost (t, IDX_MULT_68000_WORD_BASE,         1);
-    set_cost (t, IDX_MULT_68000_LONG_MUL,         38);
-    set_cost (t, IDX_MULT_68000_WORD_MUL,         40);
-    set_cost (t, IDX_EXTEND_EXTRA,                39);
+    set_cost (t, IDX_MEM_PREDEC_EXTRA,            20);
+    set_cost (t, IDX_CLR_LONG_PENALTY,             1);
+    set_cost (t, IDX_CLR_WORD_PENALTY,            15);
+    set_cost (t, IDX_PLUS_LEA_OFFSET,              7);
+    set_cost (t, IDX_PLUS_LONG_EXTRA,              4);
+    set_cost (t, IDX_PLUS_SHORT_EXTRA,            15);
+    set_cost (t, IDX_LOGIC_LONG_EXTRA,            28);
+    set_cost (t, IDX_LOGIC_WORD_EXTRA,            32);
+    set_cost (t, IDX_MULT_68000_BASE,             30);
+    set_cost (t, IDX_MULT_68000_BITS,             40);
+    set_cost (t, IDX_MULT_68000_TRANS,            20);
+    set_cost (t, IDX_MULT_68000_WORD_BASE,         5);
+    set_cost (t, IDX_MULT_68000_LONG_MUL,         39);
+    set_cost (t, IDX_MULT_68000_WORD_MUL,         32);
+    set_cost (t, IDX_EXTEND_EXTRA,                40);
 }
 
 /* ============================================
@@ -597,46 +597,46 @@ init_cost_size_68060 (int t[IDX_COUNT])
 {
     for (int i = 0; i < IDX_COUNT; ++i) t[i] = 0;
 
-    set_cost (t, IDX_REG_SRC,                     17);
-    set_cost (t, IDX_REG_DST,                     28);
-    set_cost (t, IDX_MEM_REG,                     19);
-    set_cost (t, IDX_MEM_PLUS_REG_DISP,            4);
-    set_cost (t, IDX_MEM_PLUS_REG_REG,            28);
-    set_cost (t, IDX_MEM_OTHER,                    1);
-    set_cost (t, IDX_CONST_INT_Q,                  4);
+    set_cost (t, IDX_REG_SRC,                     19);
+    set_cost (t, IDX_REG_DST,                     20);
+    set_cost (t, IDX_MEM_REG,                     21);
+    set_cost (t, IDX_MEM_PLUS_REG_DISP,            5);
+    set_cost (t, IDX_MEM_PLUS_REG_REG,            30);
+    set_cost (t, IDX_MEM_OTHER,                    0);
+    set_cost (t, IDX_CONST_INT_Q,                  3);
     set_cost (t, IDX_CONST_INT_W,                  4);
-    set_cost (t, IDX_CONST_INT_L_1,                1);
-    set_cost (t, IDX_CONST_INT_L_2,               40);
-    set_cost (t, IDX_SYMBOL,                       1);
-    set_cost (t, IDX_PLUS_REG_REG,                21);
-    set_cost (t, IDX_PLUS_REG_CONSTQ,              3);
-    set_cost (t, IDX_PLUS_REG_CONSTW,              8);
-    set_cost (t, IDX_PLUS_REG_CONSTL,             14);
+    set_cost (t, IDX_CONST_INT_L_1,                0);
+    set_cost (t, IDX_CONST_INT_L_2,               33);
+    set_cost (t, IDX_SYMBOL,                       5);
+    set_cost (t, IDX_PLUS_REG_REG,                23);
+    set_cost (t, IDX_PLUS_REG_CONSTQ,              4);
+    set_cost (t, IDX_PLUS_REG_CONSTW,              7);
+    set_cost (t, IDX_PLUS_REG_CONSTL,             12);
     set_cost (t, IDX_PLUS_OTHER,                  17);
-    set_cost (t, IDX_LOGIC_REG_CONST,              4);
+    set_cost (t, IDX_LOGIC_REG_CONST,              5);
     set_cost (t, IDX_SHIFT_CONST,                  0);  /* zeroed for -Os */
     set_cost (t, IDX_SHIFT_CONST_W,                0);  /* zeroed for -Os */
-    set_cost (t, IDX_CALL_OTHER,                  40);
+    set_cost (t, IDX_CALL_OTHER,                  37);
     set_cost (t, IDX_DIV_L,                        0);  /* zeroed for -Os */
     set_cost (t, IDX_DIV_W,                        0);  /* zeroed for -Os */
     set_cost (t, IDX_LSL_SHIFT,                    0);  /* zeroed for -Os */
     set_cost (t, IDX_LSL_SHIFT_STEP,               0);  /* zeroed for -Os */
     set_cost (t, IDX_MEM_LONG_EXTRA,               0);
-    set_cost (t, IDX_MEM_PREDEC_EXTRA,            18);
-    set_cost (t, IDX_CLR_LONG_PENALTY,            19);
-    set_cost (t, IDX_CLR_WORD_PENALTY,            18);
-    set_cost (t, IDX_PLUS_LEA_OFFSET,              8);
-    set_cost (t, IDX_PLUS_LONG_EXTRA,              0);
-    set_cost (t, IDX_PLUS_SHORT_EXTRA,            16);
-    set_cost (t, IDX_LOGIC_LONG_EXTRA,             8);
-    set_cost (t, IDX_LOGIC_WORD_EXTRA,            22);
+    set_cost (t, IDX_MEM_PREDEC_EXTRA,            20);
+    set_cost (t, IDX_CLR_LONG_PENALTY,             1);
+    set_cost (t, IDX_CLR_WORD_PENALTY,            15);
+    set_cost (t, IDX_PLUS_LEA_OFFSET,              7);
+    set_cost (t, IDX_PLUS_LONG_EXTRA,              4);
+    set_cost (t, IDX_PLUS_SHORT_EXTRA,            15);
+    set_cost (t, IDX_LOGIC_LONG_EXTRA,            28);
+    set_cost (t, IDX_LOGIC_WORD_EXTRA,            32);
     set_cost (t, IDX_MULT_68000_BASE,              0);  /* zeroed for -Os */
     set_cost (t, IDX_MULT_68000_BITS,              0);  /* zeroed for -Os */
     set_cost (t, IDX_MULT_68000_TRANS,             0);  /* zeroed for -Os */
     set_cost (t, IDX_MULT_68000_WORD_BASE,         0);  /* zeroed for -Os */
     set_cost (t, IDX_MULT_68000_LONG_MUL,          0);  /* zeroed for -Os */
     set_cost (t, IDX_MULT_68000_WORD_MUL,          0);  /* zeroed for -Os */
-    set_cost (t, IDX_EXTEND_EXTRA,                39);
+    set_cost (t, IDX_EXTEND_EXTRA,                40);
 }
 
 /* ============================================
