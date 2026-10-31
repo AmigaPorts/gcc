@@ -341,6 +341,7 @@ extern const char *amigaos_crt_check (int argc, const char **argv);
   "%{mcrt=nix13:-isystem %:find-file(../ndk13-include)} " \
   "%{noixemul:%(cpp_libnix)} " \
   "%{mcrt=nix*:%(cpp_libnix)} " \
+  "%{mcrt=library:%(cpp_libnix)} " \
   "%{mcrt=ixemul:%(cpp_ixemul)} " \
   "%{mcrt=clib2:%(cpp_clib2)} " \
   CRT_CHECK_SPEC
