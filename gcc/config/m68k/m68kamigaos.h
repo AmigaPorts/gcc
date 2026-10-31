@@ -323,6 +323,7 @@ if (target_flags & (MASK_RESTORE_A4|MASK_ALWAYS_RESTORE_A4)) \
   "%{mcrt=nix13:-isystem %:sdk_root(ndk13-include)} " \
   "%{noixemul:%(cpp_libnix)} " \
   "%{mcrt=nix*:%(cpp_libnix)} " \
+  "%{mcrt=library:%(cpp_libnix)} " \
   "%{mcrt=ixemul:%(cpp_ixemul)} " \
   "%{mcrt=clib2:%(cpp_clib2)}"
 
