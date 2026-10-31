@@ -849,14 +849,17 @@ bool
 m68k_use_by_pieces_infrastructure_p (unsigned HOST_WIDE_INT size,
                                      unsigned int align ATTRIBUTE_UNUSED,
                                      enum by_pieces_operation op ATTRIBUTE_UNUSED,
-                                     bool speed_p ATTRIBUTE_UNUSED)
+                                     bool speed_p)
 {
   /* ALIGN is in bits.  Word alignment is as good as long alignment for
      the pieces, and nothing beyond a long helps: a 16384-byte aligned
      struct must not turn a 48 KB memset into thousands of stores
      (c-c++-common/torture/builtin-clear-padding-2.c at -Os).  */
   if (align >= 16) align = 32;
-  unsigned HOST_WIDE_INT max = get_env_uint ("M68K_BY_PIECES_MAX", 48);
+  /* Above 8 bytes a call is usually smaller: repeated calls share the
+     length and the address of memcpy, inline moves share nothing.  */
+  unsigned HOST_WIDE_INT max = get_env_uint ("M68K_BY_PIECES_MAX",
+					     speed_p ? 48 : 8);
   return size * 32 <= max * align;
 }
 
@@ -921,7 +924,11 @@ m68k_emit_setmemsi(rtx blkdest, rtx val, rtx length, rtx alignment)
 
   /* Above this size, the generic implementation using MOVEM is faster.
      nloops is -1 below one unrolled iteration; keep the comparison signed.  */
-  if (nloops > (HOST_WIDE_INT) get_env_uint ("M68K_SETMEMSI_MAX_NLOOPS", 63))
+  /* When optimizing for size, leave anything that needs a loop to the
+     libcall; see m68k_use_by_pieces_infrastructure_p.  */
+  if (nloops > (HOST_WIDE_INT) get_env_uint ("M68K_SETMEMSI_MAX_NLOOPS",
+					     optimize_function_for_size_p (cfun)
+					     ? 0 : 63))
     return false;
 
   int single = size % n;
@@ -1087,7 +1094,9 @@ m68k_emit_movmemsi(rtx blkdest, rtx blksrc, rtx length, rtx alignment,
   int nloops = size / n - 1;
 
   /* nloops is -1 below one unrolled iteration; keep the comparison signed.  */
-  if (nloops > (HOST_WIDE_INT) get_env_uint ("M68K_MOVMEMSI_MAX_NLOOPS", 63))
+  if (nloops > (HOST_WIDE_INT) get_env_uint ("M68K_MOVMEMSI_MAX_NLOOPS",
+					     optimize_function_for_size_p (cfun)
+					     ? 0 : 63))
     return false;
 
   int single = size % n;
