@@ -856,8 +856,7 @@ m68k_use_by_pieces_infrastructure_p (unsigned HOST_WIDE_INT size,
      struct must not turn a 48 KB memset into thousands of stores
      (c-c++-common/torture/builtin-clear-padding-2.c at -Os).  */
   if (align >= 16) align = 32;
-  /* Above 8 bytes a call is usually smaller: repeated calls share the
-     length and the address of memcpy, inline moves share nothing.  */
+  /* Above 8 bytes a call came out smaller on the projects measured.  */
   unsigned HOST_WIDE_INT max = get_env_uint ("M68K_BY_PIECES_MAX",
 					     speed_p ? 48 : 8);
   return size * 32 <= max * align;
@@ -868,7 +867,8 @@ m68k_emit_setmemsi(rtx blkdest, rtx val, rtx length, rtx alignment)
 {
   int align = INTVAL(alignment);
   int size = INTVAL(length);
-  int n = optimize_size ? 4 : 16;
+  const bool for_size = optimize_insn_for_size_p ();
+  int n = for_size ? 1 : 16;
   rtx regdst = XEXP(blkdest, 0);
   rtx src, dst;
   int rest = 0;
@@ -920,15 +920,20 @@ m68k_emit_setmemsi(rtx blkdest, rtx val, rtx length, rtx alignment)
       dst = gen_rtx_MEM(SImode, gen_rtx_POST_INC(SImode, regdst));
     }
 
+  /* When optimizing for size, up to 7 stores go straight, and more are
+     one store in a dbra loop, which is shorter than the call to memset
+     at any length.  */
+  if (for_size && size > 0 && size <= 7)
+    n = size;
+
   int nloops = size / n - 1;
 
   /* Above this size, the generic implementation using MOVEM is faster.
-     nloops is -1 below one unrolled iteration; keep the comparison signed.  */
-  /* When optimizing for size, leave all but the shortest loops to the
-     libcall; see m68k_use_by_pieces_infrastructure_p.  */
+     nloops is -1 below one unrolled iteration; keep the comparison signed.
+     When optimizing for size, blocks above 4 KB still go to memset, whose
+     loop is faster than this one.  */
   if (nloops > (HOST_WIDE_INT) get_env_uint ("M68K_SETMEMSI_MAX_NLOOPS",
-					     optimize_insn_for_size_p ()
-					     ? 2 : 63))
+					     for_size ? 1023 : 63))
     return false;
 
   int single = size % n;
@@ -986,7 +991,7 @@ m68k_emit_movmemsi(rtx blkdest, rtx blksrc, rtx length, rtx alignment,
 {
   int align = INTVAL(alignment);
   int size = INTVAL(length);
-  int n = optimize_size ? 4 : 16;
+  int n = optimize_insn_for_size_p () ? 4 : 16;
 
   rtx regsrc = XEXP(blksrc, 0);
   rtx regdst = XEXP(blkdest, 0);
