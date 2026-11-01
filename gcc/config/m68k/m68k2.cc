@@ -879,7 +879,23 @@ m68k_emit_setmemsi(rtx blkdest, rtx val, rtx length, rtx alignment)
      on -mtune: -m68000 -mtune=68020-60 still runs on a 68000.  */
   const bool bytewise = align == 1 && !TARGET_68020;
 
-  if (value != 0)
+  /* A register is the fastest source of a store even for zero, where it
+     beats clr.  One store in a loop is shorter with the constant.  */
+  if (!for_size)
+    {
+      HOST_WIDE_INT v = (signed char) value;
+      if (!bytewise)
+	{
+	  v = (unsigned char) value;
+	  v |= v << 8;
+	  v |= v << 16;
+	}
+      src = gen_reg_rtx (SImode);
+      emit_insn (gen_m68k_setmem_value (src, gen_int_mode (v, SImode)));
+      if (bytewise)
+	src = gen_lowpart (QImode, src);
+    }
+  else if (value != 0)
     {
       if (bytewise)
         {
