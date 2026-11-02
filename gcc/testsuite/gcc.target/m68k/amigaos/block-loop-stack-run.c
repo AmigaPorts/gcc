@@ -5,7 +5,7 @@
    The AmigaOS test driver supplies the optimization/allocator/CPU matrix. */
 #include <stdlib.h>
 
-#define NOINLINE __attribute__ ((noinline, noclone))
+#define NOINLINE __attribute__ ((noipa))
 
 static volatile unsigned calls;
 
