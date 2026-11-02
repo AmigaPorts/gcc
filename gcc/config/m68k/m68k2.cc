@@ -863,6 +863,22 @@ m68k_use_by_pieces_infrastructure_p (unsigned HOST_WIDE_INT size,
   return size * 32 <= max * align;
 }
 
+/* A dbra loop starts a new basic block, and LRA can only replace the frame
+   pointer by the stack pointer if the stack is at its base level wherever a
+   block with successors ends (see init_elimination).  Return true if it will
+   be there once do_pending_stack_adjust has run.  That isn't so while the
+   arguments of a call are being pushed.
+
+   This must not emit the adjustment itself: the block expanders can still
+   fail, and the insns they emitted are then thrown away.  */
+
+static bool
+m68k_stack_level_allows_loop_p (void)
+{
+  return (inhibit_defer_pop == 0
+	  && known_eq (stack_pointer_delta, pending_stack_adjust));
+}
+
 int
 m68k_emit_setmemsi(rtx blkdest, rtx val, rtx length, rtx alignment)
 {
@@ -931,6 +947,9 @@ m68k_emit_setmemsi(rtx blkdest, rtx val, rtx length, rtx alignment)
 					     ? 2 : 63))
     return false;
 
+  if (nloops > 0 && !m68k_stack_level_allows_loop_p ())
+    return false;
+
   int single = size % n;
 
   if (nloops == 0)
@@ -941,6 +960,7 @@ m68k_emit_setmemsi(rtx blkdest, rtx val, rtx length, rtx alignment)
       rtx looplabel = gen_label_rtx();
 
       emit_move_insn(counter, GEN_INT(nloops));
+      do_pending_stack_adjust ();
       emit_label(looplabel);
 
       int count = n;
@@ -1099,6 +1119,9 @@ m68k_emit_movmemsi(rtx blkdest, rtx blksrc, rtx length, rtx alignment,
 					     ? 0 : 63))
     return false;
 
+  if (nloops > 0 && !m68k_stack_level_allows_loop_p ())
+    return false;
+
   int single = size % n;
 
   if (nloops == 0)
@@ -1109,6 +1132,7 @@ m68k_emit_movmemsi(rtx blkdest, rtx blksrc, rtx length, rtx alignment,
       rtx looplabel = gen_label_rtx();
 
       emit_move_insn(counter, GEN_INT(nloops));
+      do_pending_stack_adjust ();
       emit_label(looplabel);
 
       int count = n;
