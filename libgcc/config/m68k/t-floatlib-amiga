@@ -1,4 +1,6 @@
-LIB2ADD += xfpgnulib.c xfpgnulib__unordsf2.c xfpgnulib__unorddf2.c \
+LIB2ADD += $(srcdir)/config/m68k/fpextendsfdf2.S \
+	$(srcdir)/config/m68k/fptruncdfsf2.S \
+	xfpgnulib.c xfpgnulib__unordsf2.c xfpgnulib__unorddf2.c \
 	xfpgnulib__floatunsidf.c xfpgnulib__floatsidf.c xfpgnulib__floatunsisf.c \
 	xfpgnulib__floatsisf.c xfpgnulib__extendsfdf2.c xfpgnulib__truncdfsf2.c \
 	xfpgnulib__fixdfsi.c xfpgnulib__fixsfsi.c \
@@ -35,12 +37,20 @@ xfpgnulib__floatsisf.c: $(srcdir)/config/m68k/fpgnulib.c
 	echo '#define __FLOATSISF' > xfpgnulib__floatsisf.c
 	cat $< >> xfpgnulib__floatsisf.c
 
-xfpgnulib__extendsfdf2.c: $(srcdir)/config/m68k/fpgnulib.c
+xfpgnulib__extendsfdf2.c: $(srcdir)/config/m68k/fpgnulib.c \
+		$(srcdir)/config/m68k/t-floatlib-amiga
 	echo '#define __EXTENDSFDF2' > xfpgnulib__extendsfdf2.c
+	echo '#ifndef __HAVE_68881__' >> xfpgnulib__extendsfdf2.c
+	echo '#define __extendsfdf2 __extendsfdf2_slow' >> xfpgnulib__extendsfdf2.c
+	echo '#endif' >> xfpgnulib__extendsfdf2.c
 	cat $< >> xfpgnulib__extendsfdf2.c
 
-xfpgnulib__truncdfsf2.c: $(srcdir)/config/m68k/fpgnulib.c
+xfpgnulib__truncdfsf2.c: $(srcdir)/config/m68k/fpgnulib.c \
+		$(srcdir)/config/m68k/t-floatlib-amiga
 	echo '#define __TRUNCDFSF2' > xfpgnulib__truncdfsf2.c
+	echo '#ifndef __HAVE_68881__' >> xfpgnulib__truncdfsf2.c
+	echo '#define __truncdfsf2 __truncdfsf2_slow' >> xfpgnulib__truncdfsf2.c
+	echo '#endif' >> xfpgnulib__truncdfsf2.c
 	cat $< >> xfpgnulib__truncdfsf2.c
 
 xfpgnulib__fixdfsi.c: $(srcdir)/config/m68k/fpgnulib.c
