@@ -9,9 +9,11 @@ Completed:
 
 - C and C++ cross compiler build.
 - All 228 SPE builtin declarations compile.
+- Standard vector arithmetic, autovectorization, double ABI code generation,
+  and scheduler reservation checks pass.
 - Scalar/ABI, vector, intrinsic-memory, C++, conventional-caller bridge,
-  and linked libgcc runtime tests at `-O0`, `-O2`, `-O3`, `-Os`:
-  all 24 freestanding QEMU images passed.
+  linked libgcc, and optimization runtime tests at `-O0`, `-O2`, `-O3`, `-Os`:
+  all 28 freestanding QEMU images passed.
 - All nine conventional and SPE libgcc and libstdc++ multilib variants
   build successfully.
 - Conventional scalar test assembly matches the installed compiler for
@@ -30,3 +32,11 @@ Not validated: AmigaOS4 runtime, physical A1222, IEEE assist handlers,
 exceptions/unwinding under OS4, performance, or SDK floating-point ABI
 boundaries. The ordinary SDK runtimes have not been ported to SPE.
 This is focused regression coverage, not a full GCC DejaGNU run.
+
+The optimization follow-up is based on restoration commit
+`97a3e6bfb04d838f630175a275630ebf5610507e`. Clean rebuilds of all nine
+libgcc and libstdc++ multilib variants passed. The compile-only loop
+corpus also passed at `-O2`, `-O3`, and `-Os`, with and without
+`-ffast-math`.
+`optimization-validation.json` records its runtime and code-generation
+results. `validation.json` preserves the original restoration results.

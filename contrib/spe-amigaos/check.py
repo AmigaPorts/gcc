@@ -47,7 +47,8 @@ for src in (a.gcc_source / 'libgcc/config/rs6000').glob('e500crt*.S'):
 cases = [('scalar', ['scalar.c', 'scalar-run.c']),
          ('vector', ['intrinsics.c', 'vector-run.c']),
          ('alias', ['alias.c']), ('cxx', ['cxx.cc']),
-         ('bridge', ['bridge-kernel.c', 'bridge-run.c'])]
+         ('bridge', ['bridge-kernel.c', 'bridge-run.c']),
+         ('optimize', ['optimize-kernels.c', 'optimize-run.c'])]
 if a.libgcc:
     cases.append(('libgcc', ['libgcc.c', 'libgcc-ops.c']))
 for opt in ['-O0', '-O2', '-O3', '-Os']:
@@ -69,6 +70,15 @@ for opt in ['-O0', '-O2', '-O3', '-Os']:
             subprocess.run([sys.executable, str(tests.parent / 'run-qemu.py'), str(elf), '0'],
                            env=env, check=True)
             report['runtime'].append(elf.name)
+
+# Exercise generic vectorizer paths beyond the focused runtime kernels.
+report['loop_corpus_compile_count'] = 0
+for opt in ['-O2', '-O3', '-Os']:
+    for fast in [False, True]:
+        name = 'loop-corpus' + opt + ('-fast' if fast else '') + '.o'
+        run(cc + ['-mcpu=8548', opt] + (['-ffast-math'] if fast else [])
+            + ['-c', str(tests / 'loop-corpus.c'), '-o', str(out / name)])
+        report['loop_corpus_compile_count'] += 1
 
 # Exercise every declaration through the GCC16 builtin generator interface.
 source = (config / 'rs6000-builtins.def').read_text().split('[spe]')[1]
