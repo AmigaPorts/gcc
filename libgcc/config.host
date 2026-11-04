@@ -1020,6 +1020,11 @@ m32rle-*-elf*)
 	;;
 m68k-*-amiga*)
 	tmake_file="$tmake_file m68k/t-glue m68k/t-floatlib-amiga m68k/t-amigaos-benaphore soft-fp"
+	case ${target_thread_file} in
+	  amigaos)
+	    tmake_file="$tmake_file m68k/t-amigaos-gthr"
+	    ;;
+	esac
 	CFLAGS="-Os"
 	;;
 m68k-*-elf* | fido-*-elf)
