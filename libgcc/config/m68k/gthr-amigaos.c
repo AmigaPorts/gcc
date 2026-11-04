@@ -92,6 +92,7 @@ __gthread_key_create (__gthread_key_t *key, void (*destroy) (void *))
       b->values[i] = 0;
   key_destroy[i] = destroy;
   key_used[i] = 1;
+  __gthread_amigaos_task_end_hook = __gthread_amigaos_end_keys;
   benaphore_unlock (&key_lock);
   *key = i;
   return 0;

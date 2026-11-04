@@ -1,2 +1,4 @@
-# The out-of-line half of <benaphore.h>.
-LIB2ADD += $(srcdir)/config/m68k/amigaos-benaphore.c
+# The out-of-line half of <benaphore.h>, and the end of a task that another
+# thread library started, which that library calls with any thread model.
+LIB2ADD += $(srcdir)/config/m68k/amigaos-benaphore.c \
+	   $(srcdir)/config/m68k/amigaos-task-end.c
