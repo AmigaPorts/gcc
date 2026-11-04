@@ -38,7 +38,10 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 extern struct ExecBase *SysBase;
 extern struct DosLibrary *DOSBase;
 
-/* Threads.  Each is a DOS process, and its __gthread_t is its Task.  */
+/* Threads.  Each is a DOS process, and its __gthread_t is its Task.  A
+   joinable thread that has ended waits in its process until it is joined
+   or detached: until then its Task, and so its handle, can't go to a new
+   process.  */
 
 struct thread {
   void *a4;			/* first: the entry code loads it */
@@ -50,6 +53,7 @@ struct thread {
   struct thread *next;
   volatile unsigned char done;
   unsigned char detached;
+  volatile unsigned char released;	/* joined or detached after done */
 };
 
 /* Only touched under Forbid().  */
@@ -111,17 +115,24 @@ __gthread_amigaos_run (struct thread *t)
   t->result = t->func (t->args);
   __gthread_amigaos_end_keys (t->task);
 
-  /* Stay in Forbid() until the process is gone: whoever we signal may
-     free t and end the program.  */
+  /* Stay in Forbid() until the process is gone: whoever we signal may end
+     the program.  Returning from the entry code in Forbid() is safe: DOS
+     removes the process, and exec keeps each task's Forbid() count, so the
+     next task runs with its own.  Wait() breaks the Forbid() while it
+     sleeps and restores it.  */
   Forbid ();
   t->done = 1;
   if (t->detached)
+    unlink_thread (t);
+  else
     {
-      unlink_thread (t);
-      FreeVec (t);
+      /* Joined or detached later: whoever lets us go unlinks t.  */
+      if (t->joiner)
+	Signal (t->joiner, SIGF_SINGLE);
+      while (!t->released)
+	Wait (SIGF_SINGLE);
     }
-  else if (t->joiner)
-    Signal (t->joiner, SIGF_SINGLE);
+  FreeVec (t);
 }
 
 int
@@ -196,11 +207,13 @@ __gthread_join (__gthread_t thread, void **value_ptr)
   t->joiner = me;
   while (!t->done)
     Wait (SIGF_SINGLE);
-  unlink_thread (t);
-  Permit ();
   if (value_ptr)
     *value_ptr = t->result;
-  FreeVec (t);
+  /* The thread frees t and ends once we let it go.  */
+  unlink_thread (t);
+  t->released = 1;
+  Signal (t->task, SIGF_SINGLE);
+  Permit ();
   return 0;
 }
 
@@ -215,13 +228,13 @@ __gthread_detach (__gthread_t thread)
       Permit ();
       return t ? EINVAL : ESRCH;
     }
+  t->detached = 1;
   if (t->done)
     {
       unlink_thread (t);
-      FreeVec (t);
+      t->released = 1;
+      Signal (t->task, SIGF_SINGLE);
     }
-  else
-    t->detached = 1;
   Permit ();
   return 0;
 }
