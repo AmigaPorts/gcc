@@ -993,6 +993,66 @@
 
 ;; end of vector xors
 
+;; Standard optabs must be visible before vector lowering scalarizes V2SF.
+
+(define_expand "addv2sf3"
+  [(set (match_operand:V2SF 0 "gpc_reg_operand")
+	(plus:V2SF (match_operand:V2SF 1 "gpc_reg_operand")
+		    (match_operand:V2SF 2 "gpc_reg_operand")))]
+  "TARGET_SPE && TARGET_HARD_FLOAT"
+{
+  emit_insn (gen_spe_evfsadd (operands[0], operands[1], operands[2]));
+  DONE;
+})
+
+(define_expand "subv2sf3"
+  [(set (match_operand:V2SF 0 "gpc_reg_operand")
+	(minus:V2SF (match_operand:V2SF 1 "gpc_reg_operand")
+		    (match_operand:V2SF 2 "gpc_reg_operand")))]
+  "TARGET_SPE && TARGET_HARD_FLOAT"
+{
+  emit_insn (gen_spe_evfssub (operands[0], operands[1], operands[2]));
+  DONE;
+})
+
+(define_expand "mulv2sf3"
+  [(set (match_operand:V2SF 0 "gpc_reg_operand")
+	(mult:V2SF (match_operand:V2SF 1 "gpc_reg_operand")
+		    (match_operand:V2SF 2 "gpc_reg_operand")))]
+  "TARGET_SPE && TARGET_HARD_FLOAT"
+{
+  emit_insn (gen_spe_evfsmul (operands[0], operands[1], operands[2]));
+  DONE;
+})
+
+(define_expand "divv2sf3"
+  [(set (match_operand:V2SF 0 "gpc_reg_operand")
+	(div:V2SF (match_operand:V2SF 1 "gpc_reg_operand")
+		    (match_operand:V2SF 2 "gpc_reg_operand")))]
+  "TARGET_SPE && TARGET_HARD_FLOAT"
+{
+  emit_insn (gen_spe_evfsdiv (operands[0], operands[1], operands[2]));
+  DONE;
+})
+
+(define_expand "absv2sf2"
+  [(set (match_operand:V2SF 0 "gpc_reg_operand")
+	(abs:V2SF (match_operand:V2SF 1 "gpc_reg_operand")))]
+  "TARGET_SPE && TARGET_HARD_FLOAT"
+{
+  emit_insn (gen_spe_evfsabs (operands[0], operands[1]));
+  DONE;
+})
+
+(define_expand "negv2sf2"
+  [(set (match_operand:V2SF 0 "gpc_reg_operand")
+	(neg:V2SF (match_operand:V2SF 1 "gpc_reg_operand")))]
+  "TARGET_SPE && TARGET_HARD_FLOAT"
+{
+  emit_insn (gen_spe_evfsneg (operands[0], operands[1]));
+  DONE;
+})
+
 (define_insn "spe_evfsabs"
   [(set (match_operand:V2SF 0 "gpc_reg_operand" "=r")
 	(abs:V2SF (match_operand:V2SF 1 "gpc_reg_operand" "r")))]
