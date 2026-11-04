@@ -131,6 +131,7 @@ __gthread_create (__gthread_t *thread, void *(*func) (void *), void *args)
   unsigned long stack = (char *) me->tc_SPUpper - (char *) me->tc_SPLower;
   struct Process *proc;
   struct thread *t;
+  BPTR in = 0, out = 0;
 
   if (!(t = AllocVec (sizeof (*t), MEMF_ANY | MEMF_CLEAR)))
     return EAGAIN;
@@ -142,9 +143,21 @@ __gthread_create (__gthread_t *thread, void *(*func) (void *), void *args)
      4000 bytes DOS gives by default.  */
   if (stack < 32768)
     stack = 32768;
+  /* The creator's console, which the thread shares and must not close: by
+     default a new process gets NIL: handles of its own, and a C library
+     that sets up stdio on first use would bind it to them.  */
+  if (me->tc_Node.ln_Type == NT_PROCESS)
+    {
+      in = Input ();
+      out = Output ();
+    }
   proc = CreateNewProcTags (NP_Entry, (ULONG) __gthread_amigaos_entry,
 			    NP_StackSize, stack,
 			    NP_Name, (ULONG) "gthread",
+			    in ? NP_Input : TAG_IGNORE, in,
+			    in ? NP_CloseInput : TAG_IGNORE, FALSE,
+			    out ? NP_Output : TAG_IGNORE, out,
+			    out ? NP_CloseOutput : TAG_IGNORE, FALSE,
 			    TAG_END);
   if (!proc)
     {
