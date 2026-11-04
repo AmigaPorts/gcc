@@ -1,0 +1,2 @@
+# The out-of-line half of <benaphore.h>.
+LIB2ADD += $(srcdir)/config/m68k/amigaos-benaphore.c
