@@ -11268,6 +11268,69 @@ rs6000_emit_move (rtx dest, rtx source, machine_mode mode)
     }
 #endif
 
+  /* Read a word of an SPE double without a read/write dependency on
+     either register.  This is also needed for LRA-generated bitcast
+     reloads; the older subreg moves have preservation constraints.  */
+  if (TARGET_HARD_FLOAT && TARGET_E500_DOUBLE && mode == SImode
+      && SUBREG_P (source) && REG_P (SUBREG_REG (source))
+      && GET_MODE (SUBREG_REG (source)) == DFmode
+      && (REG_P (dest) || can_create_pseudo_p ()))
+    {
+      rtx value = REG_P (dest) ? dest : gen_reg_rtx (SImode);
+      emit_insn (gen_spe_extract_df (value, SUBREG_REG (source),
+				    GEN_INT (SUBREG_BYTE (source).to_constant ())));
+      if (value != dest)
+	emit_move_insn (dest, value);
+      return;
+    }
+
+  /* DF and DI have different hard-register layouts under the SPE ABI.
+     Express full-width packing as an operation, not a subreg that combine
+     could fold into arithmetic and force IRA to spill the DI pseudo.  */
+  if (TARGET_HARD_FLOAT && TARGET_E500_DOUBLE && mode == DFmode
+      && can_create_pseudo_p ())
+    {
+      if (SUBREG_P (source) && SUBREG_BYTE (source) == 0
+	  && REG_P (SUBREG_REG (source))
+	  && GET_MODE (SUBREG_REG (source)) == DImode)
+	{
+	  rtx value = gen_reg_rtx (DFmode);
+	  emit_insn (gen_spe_pack_df (value, SUBREG_REG (source)));
+	  emit_move_insn (dest, value);
+	  return;
+	}
+      if (SUBREG_P (dest) && SUBREG_BYTE (dest) == 0
+	  && REG_P (SUBREG_REG (dest))
+	  && GET_MODE (SUBREG_REG (dest)) == DImode)
+	{
+	  emit_insn (gen_spe_unpack_df (SUBREG_REG (dest),
+				      force_reg (DFmode, source)));
+	  return;
+	}
+    }
+
+  if (TARGET_HARD_FLOAT && TARGET_E500_DOUBLE && mode == DImode
+      && can_create_pseudo_p ())
+    {
+      if (SUBREG_P (source) && SUBREG_BYTE (source) == 0
+	  && REG_P (SUBREG_REG (source))
+	  && GET_MODE (SUBREG_REG (source)) == DFmode)
+	{
+	  rtx value = gen_reg_rtx (DImode);
+	  emit_insn (gen_spe_unpack_df (value, SUBREG_REG (source)));
+	  emit_move_insn (dest, value);
+	  return;
+	}
+      if (SUBREG_P (dest) && SUBREG_BYTE (dest) == 0
+	  && REG_P (SUBREG_REG (dest))
+	  && GET_MODE (SUBREG_REG (dest)) == DFmode)
+	{
+	  emit_insn (gen_spe_pack_df (SUBREG_REG (dest),
+				    force_reg (DImode, source)));
+	  return;
+	}
+    }
+
   /* See if we need to special case SImode/SFmode SUBREG moves.  */
   if ((mode == SImode || mode == SFmode) && SUBREG_P (source)
       && rs6000_emit_move_si_sf_subreg (dest, source, mode))
