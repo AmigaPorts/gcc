@@ -1,0 +1,181 @@
+{
+  "status": "compiler, all runtime library builds, 28 QEMU images and code-generation checks passed",
+  "base_commit": "97a3e6bfb04d838f630175a275630ebf5610507e",
+  "implementation_commit": "b68e5fc6667cb8a5a660ed709e027eb2a0d52a35",
+  "compiler": "GCC 16.2.1b 20261010182711",
+  "target": "ppc-amigaos",
+  "cpu": "8548 / e500v2",
+  "builtins_compiled": 228,
+  "libgcc_multilibs_built": 9,
+  "run_mode": "freestanding QEMU ppce500 e500v2",
+  "qemu_version": "11.1.50 (v11.1.0-3642-gb6ad0b0305)",
+  "runtime_results": [
+    {
+      "test": "scalar-O0",
+      "pass": true,
+      "output": "stop: T05core:01;\nrun: T05thread:01;\npc: 00100018\nr3: 0 r4: 0x0\n"
+    },
+    {
+      "test": "scalar-O2",
+      "pass": true,
+      "output": "stop: T05core:01;\nrun: T05thread:01;\npc: 00100018\nr3: 0 r4: 0x0\n"
+    },
+    {
+      "test": "scalar-O3",
+      "pass": true,
+      "output": "stop: T05core:01;\nrun: T05thread:01;\npc: 00100018\nr3: 0 r4: 0x0\n"
+    },
+    {
+      "test": "scalar-Os",
+      "pass": true,
+      "output": "stop: T05core:01;\nrun: T05thread:01;\npc: 00100018\nr3: 0 r4: 0x0\n"
+    },
+    {
+      "test": "vector-O0",
+      "pass": true,
+      "output": "stop: T05core:01;\nrun: T05thread:01;\npc: 00100018\nr3: 0 r4: 0x76543210\n"
+    },
+    {
+      "test": "vector-O2",
+      "pass": true,
+      "output": "stop: T05core:01;\nrun: T05thread:01;\npc: 00100018\nr3: 0 r4: 0x5\n"
+    },
+    {
+      "test": "vector-O3",
+      "pass": true,
+      "output": "stop: T05core:01;\nrun: T05thread:01;\npc: 00100018\nr3: 0 r4: 0x5\n"
+    },
+    {
+      "test": "vector-Os",
+      "pass": true,
+      "output": "stop: T05core:01;\nrun: T05thread:01;\npc: 00100018\nr3: 0 r4: 0x5\n"
+    },
+    {
+      "test": "alias-O0",
+      "pass": true,
+      "output": "stop: T05core:01;\nrun: T05thread:01;\npc: 00100018\nr3: 0 r4: 0x9abcdef0\n"
+    },
+    {
+      "test": "alias-O2",
+      "pass": true,
+      "output": "stop: T05core:01;\nrun: T05thread:01;\npc: 00100018\nr3: 0 r4: 0x0\n"
+    },
+    {
+      "test": "alias-O3",
+      "pass": true,
+      "output": "stop: T05core:01;\nrun: T05thread:01;\npc: 00100018\nr3: 0 r4: 0x0\n"
+    },
+    {
+      "test": "alias-Os",
+      "pass": true,
+      "output": "stop: T05core:01;\nrun: T05thread:01;\npc: 00100018\nr3: 0 r4: 0x0\n"
+    },
+    {
+      "test": "cxx-O0",
+      "pass": true,
+      "output": "stop: T05core:01;\nrun: T05thread:01;\npc: 00100018\nr3: 0 r4: 0x4\n"
+    },
+    {
+      "test": "cxx-O2",
+      "pass": true,
+      "output": "stop: T05core:01;\nrun: T05thread:01;\npc: 00100018\nr3: 0 r4: 0x0\n"
+    },
+    {
+      "test": "cxx-O3",
+      "pass": true,
+      "output": "stop: T05core:01;\nrun: T05thread:01;\npc: 00100018\nr3: 0 r4: 0x0\n"
+    },
+    {
+      "test": "cxx-Os",
+      "pass": true,
+      "output": "stop: T05core:01;\nrun: T05thread:01;\npc: 00100018\nr3: 0 r4: 0x0\n"
+    },
+    {
+      "test": "bridge-O0",
+      "pass": true,
+      "output": "stop: T05core:01;\nrun: T05thread:01;\npc: 00100018\nr3: 0 r4: 0x101020\n"
+    },
+    {
+      "test": "bridge-O2",
+      "pass": true,
+      "output": "stop: T05core:01;\nrun: T05thread:01;\npc: 00100018\nr3: 0 r4: 0x101008\n"
+    },
+    {
+      "test": "bridge-O3",
+      "pass": true,
+      "output": "stop: T05core:01;\nrun: T05thread:01;\npc: 00100018\nr3: 0 r4: 0x101008\n"
+    },
+    {
+      "test": "bridge-Os",
+      "pass": true,
+      "output": "stop: T05core:01;\nrun: T05thread:01;\npc: 00100018\nr3: 0 r4: 0x101008\n"
+    },
+    {
+      "test": "optimize-O0",
+      "pass": true,
+      "output": "stop: T05core:01;\nrun: T05thread:01;\npc: 00100018\nr3: 0 r4: 0xfffc2c\n"
+    },
+    {
+      "test": "optimize-O2",
+      "pass": true,
+      "output": "stop: T05core:01;\nrun: T05thread:01;\npc: 00100018\nr3: 0 r4: 0xfffd10\n"
+    },
+    {
+      "test": "optimize-O3",
+      "pass": true,
+      "output": "stop: T05core:01;\nrun: T05thread:01;\npc: 00100018\nr3: 0 r4: 0xfffd10\n"
+    },
+    {
+      "test": "optimize-Os",
+      "pass": true,
+      "output": "stop: T05core:01;\nrun: T05thread:01;\npc: 00100018\nr3: 0 r4: 0xfffecc\n"
+    },
+    {
+      "test": "libgcc-O0",
+      "pass": true,
+      "output": "stop: T05core:01;\nrun: T05thread:01;\npc: 00100018\nr3: 0 r4: 0x0\n"
+    },
+    {
+      "test": "libgcc-O2",
+      "pass": true,
+      "output": "stop: T05core:01;\nrun: T05thread:01;\npc: 00100018\nr3: 0 r4: 0x0\n"
+    },
+    {
+      "test": "libgcc-O3",
+      "pass": true,
+      "output": "stop: T05core:01;\nrun: T05thread:01;\npc: 00100018\nr3: 0 r4: 0x0\n"
+    },
+    {
+      "test": "libgcc-Os",
+      "pass": true,
+      "output": "stop: T05core:01;\nrun: T05thread:01;\npc: 00100018\nr3: 0 r4: 0x0\n"
+    }
+  ],
+  "code_generation": {
+    "options": "-mcpu=8548 -O3",
+    "v2sf_add": {
+      "instructions_before": 14,
+      "instructions_after": 2,
+      "frame_before": 32,
+      "frame_after": 0
+    },
+    "double_division": {
+      "instructions_before": 22,
+      "instructions_after": 6,
+      "frame_before": 32,
+      "frame_after": 0
+    },
+    "array_addition": "float and int loops vectorize with 8-byte vectors and runtime alignment checks",
+    "double_scheduling": "6-cycle arithmetic/conversion and 32-cycle division reservations"
+  },
+  "not_validated": [
+    "AmigaOS4 runtime",
+    "physical A1222",
+    "IEEE floating-point assist",
+    "OS4 exceptions and unwinding",
+    "hardware performance",
+    "SPE libc/libm integration"
+  ],
+  "loop_corpus_compile_configurations": 6,
+  "libstdcxx_multilibs_built": 9
+}

@@ -24,7 +24,7 @@ this source branch without maintaining a patch in that repository:
 
 ```sh
 ./build.sh --target ppc-amigaos \
-  --version 16.2:stefan/ppc-amigaos-spe \
+  --version 16.2:stefan/ppc-spe-optimize \
   --workdir /tmp/amiga-spe-build --prefix /tmp/amiga-spe-install
 ```
 
@@ -101,6 +101,26 @@ The port also fixes issues found while adapting the old implementation:
 - integer selects testing the conventional EQ bit after an SPE comparison;
 - scaled intrinsic offsets and access widths incorrectly described to the
   optimizer, allowing wrong loads and dead-store removal.
+
+## Optimization follow-up
+
+The compiler exposes standard two-float vector arithmetic and selects
+8-byte SPE vectors for float and integer loops. Unaligned pointers use
+alignment checks and scalar fallback where required; `-msoft-float` does
+not enable automatic hardware floating-point vector operations.
+
+Double argument/return packing uses explicit register operations, and the
+scheduler models the e500v2 double-precision pipeline. In small functions
+compiled with `-mcpu=8548 -O3`, two-float addition falls from 14 instructions
+to 2 and double division from 22 to 6, including return. Both lose their
+32-byte stack frames. These are code-generation results, not measured
+A1222 speedups.
+
+The `optimize` runtime suite checks vector arithmetic, double bitcasts,
+empty loops, odd-length tails, and every combination of four-byte/eight-byte
+pointer alignment. It adds four images to the original 24-image suite.
+See [optimization-validation.json](optimization-validation.json) for the
+follow-up results; `validation.json` retains the initial port's results.
 
 ## References
 
