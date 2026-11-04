@@ -1,0 +1,7 @@
+# The out-of-line half of gthr-amigaos.h, for --enable-threads=amigaos.
+# One object each for keys, condition variables, threads and timed waits,
+# so that a program links only those it uses.
+LIB2ADD += $(srcdir)/config/m68k/gthr-amigaos.c \
+	   $(srcdir)/config/m68k/gthr-amigaos-cond.c \
+	   $(srcdir)/config/m68k/gthr-amigaos-thread.c \
+	   $(srcdir)/config/m68k/gthr-amigaos-timed.c
