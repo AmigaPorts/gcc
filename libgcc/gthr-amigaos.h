@@ -29,6 +29,8 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 
 #define __GTHREADS 1
 #define __GTHREADS_CXX0X 1
+/* std::call_once unlocks the flag when its function throws.  */
+#define __GTHREAD_HAS_ONCE_UNLOCK 1
 
 typedef benaphore_t __gthread_mutex_t;
 typedef benaphore_recursive_t __gthread_recursive_mutex_t;
@@ -258,6 +260,8 @@ typedef struct { int seconds; long nanoseconds;} __gthread_time_t;
 
 #define __GTHREADS 1
 #define __GTHREADS_CXX0X 1
+/* std::call_once unlocks the flag when its function throws.  */
+#define __GTHREAD_HAS_ONCE_UNLOCK 1
 
 #define __GTHREAD_ONCE_INIT {0,0}
 //#define __GTHREAD_MUTEX_INIT 0
