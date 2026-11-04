@@ -923,12 +923,12 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
       // https://gcc.gnu.org/bugzilla/show_bug.cgi?id=66146
       // https://github.com/sba1/adtools/issues/82
       int __e = 0;
-#if defined(__amigaos4__) && defined(__EXCEPTIONS)
+#if (defined(__amigaos4__) || defined(__amigaos3__)) && defined(__EXCEPTIONS)
       try
       {
 #endif
         __e = __gthread_once(&__once._M_once, &__once_proxy);
-#if defined(__amigaos4__) && defined(__EXCEPTIONS)
+#if (defined(__amigaos4__) || defined(__amigaos3__)) && defined(__EXCEPTIONS)
       }
       catch (...)
       {
