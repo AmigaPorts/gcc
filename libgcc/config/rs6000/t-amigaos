@@ -47,7 +47,7 @@ SHLIB_INSTALL = \
 EXTRA_PARTS += gthr-amigaos-native.o gthr-amigaos-single.o
 
 # Only clib4 has pthreads, so -athread=pthread is a clib4-only option.
-ifeq ($(MULTISUBDIR),/clib4)
+ifneq ($(filter /clib4 /clib4/spe,$(MULTISUBDIR)),)
 EXTRA_PARTS += gthr-amigaos-pthread.o
 endif
 
@@ -56,7 +56,7 @@ gthr-amigaos-%.o: $(srcdir)/gthr-amigaos-%.c $(srcdir)/gthr-amigaos.h
 
 # clib4's startup code registers the program's .eh_frame with the
 # unwinder, newlib's and clib2's do not; see amigaos-crteh.c.
-ifneq ($(MULTISUBDIR),/clib4)
+ifeq ($(filter /clib4 /clib4/spe,$(MULTISUBDIR)),)
 EXTRA_PARTS += crtehbegin.o crtehend.o
 endif
 

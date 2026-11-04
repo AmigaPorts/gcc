@@ -697,3 +697,35 @@ default value is 4.
 Target Undocumented Joined UInteger Var(rs6000_vect_unroll_reduc_threshold) Init(1) Param
 When reduction factor computed for a loop exceeds the threshold specified by
 this parameter, prefer to unroll this loop.  The default value is 1.
+
+mspe
+Target Var(rs6000_spe) Save
+Generate SPE SIMD instructions on E500.
+
+mabi=spe
+Target RejectNegative Var(rs6000_spe_abi) Save
+Use the SPE ABI extensions.
+
+mabi=no-spe
+Target RejectNegative Var(rs6000_spe_abi, 0)
+Do not use the SPE ABI extensions.
+
+mfloat-gprs=
+Target RejectNegative Joined Enum(rs6000_float_gprs) Var(rs6000_float_gprs) Save
+-mfloat-gprs=	Select GPR floating point method.
+
+Enum
+Name(rs6000_float_gprs) Type(unsigned char)
+Valid arguments to -mfloat-gprs=:
+
+EnumValue
+Enum(rs6000_float_gprs) String(yes) Value(1)
+
+EnumValue
+Enum(rs6000_float_gprs) String(single) Value(1)
+
+EnumValue
+Enum(rs6000_float_gprs) String(double) Value(2)
+
+EnumValue
+Enum(rs6000_float_gprs) String(no) Value(0)

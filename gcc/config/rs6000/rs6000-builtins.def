@@ -4313,3 +4313,689 @@
   dmr1024 __builtin_mma_pmdmxvf16gerx2nn_internal (dmr1024, v256, vuc, const int<8>, \
 						 const int<4>, const int<2>);
     PMDMXVF16GERX2NN_INTERNAL dmf_pmdmxvf16gerx2nn {dm,pair}
+
+; e500 Signal Processing Engine intrinsics.
+[spe]
+  spev2si __builtin_spe_evaddw (spev2si, spev2si);
+    SPE_EVADDW addv2si3 {}
+
+  spev2si __builtin_spe_evand (spev2si, spev2si);
+    SPE_EVAND andv2si3 {}
+
+  spev2si __builtin_spe_evandc (spev2si, spev2si);
+    SPE_EVANDC spe_evandc {}
+
+  spev2si __builtin_spe_evdivws (spev2si, spev2si);
+    SPE_EVDIVWS divv2si3 {}
+
+  spev2si __builtin_spe_evdivwu (spev2si, spev2si);
+    SPE_EVDIVWU spe_evdivwu {}
+
+  spev2si __builtin_spe_eveqv (spev2si, spev2si);
+    SPE_EVEQV spe_eveqv {}
+
+  spev2sf __builtin_spe_evfsadd (spev2sf, spev2sf);
+    SPE_EVFSADD spe_evfsadd {}
+
+  spev2sf __builtin_spe_evfsdiv (spev2sf, spev2sf);
+    SPE_EVFSDIV spe_evfsdiv {}
+
+  spev2sf __builtin_spe_evfsmul (spev2sf, spev2sf);
+    SPE_EVFSMUL spe_evfsmul {}
+
+  spev2sf __builtin_spe_evfssub (spev2sf, spev2sf);
+    SPE_EVFSSUB spe_evfssub {}
+
+  spev2si __builtin_spe_evmergehi (spev2si, spev2si);
+    SPE_EVMERGEHI spe_evmergehi {}
+
+  spev2si __builtin_spe_evmergehilo (spev2si, spev2si);
+    SPE_EVMERGEHILO spe_evmergehilo {}
+
+  spev2si __builtin_spe_evmergelo (spev2si, spev2si);
+    SPE_EVMERGELO spe_evmergelo {}
+
+  spev2si __builtin_spe_evmergelohi (spev2si, spev2si);
+    SPE_EVMERGELOHI spe_evmergelohi {}
+
+  spev2si __builtin_spe_evmhegsmfaa (spev2si, spev2si);
+    SPE_EVMHEGSMFAA spe_evmhegsmfaa {}
+
+  spev2si __builtin_spe_evmhegsmfan (spev2si, spev2si);
+    SPE_EVMHEGSMFAN spe_evmhegsmfan {}
+
+  spev2si __builtin_spe_evmhegsmiaa (spev2si, spev2si);
+    SPE_EVMHEGSMIAA spe_evmhegsmiaa {}
+
+  spev2si __builtin_spe_evmhegsmian (spev2si, spev2si);
+    SPE_EVMHEGSMIAN spe_evmhegsmian {}
+
+  spev2si __builtin_spe_evmhegumiaa (spev2si, spev2si);
+    SPE_EVMHEGUMIAA spe_evmhegumiaa {}
+
+  spev2si __builtin_spe_evmhegumian (spev2si, spev2si);
+    SPE_EVMHEGUMIAN spe_evmhegumian {}
+
+  spev2si __builtin_spe_evmhesmf (spev2si, spev2si);
+    SPE_EVMHESMF spe_evmhesmf {}
+
+  spev2si __builtin_spe_evmhesmfa (spev2si, spev2si);
+    SPE_EVMHESMFA spe_evmhesmfa {}
+
+  spev2si __builtin_spe_evmhesmfaaw (spev2si, spev2si);
+    SPE_EVMHESMFAAW spe_evmhesmfaaw {}
+
+  spev2si __builtin_spe_evmhesmfanw (spev2si, spev2si);
+    SPE_EVMHESMFANW spe_evmhesmfanw {}
+
+  spev2si __builtin_spe_evmhesmi (spev2si, spev2si);
+    SPE_EVMHESMI spe_evmhesmi {}
+
+  spev2si __builtin_spe_evmhesmia (spev2si, spev2si);
+    SPE_EVMHESMIA spe_evmhesmia {}
+
+  spev2si __builtin_spe_evmhesmiaaw (spev2si, spev2si);
+    SPE_EVMHESMIAAW spe_evmhesmiaaw {}
+
+  spev2si __builtin_spe_evmhesmianw (spev2si, spev2si);
+    SPE_EVMHESMIANW spe_evmhesmianw {}
+
+  spev2si __builtin_spe_evmhessf (spev2si, spev2si);
+    SPE_EVMHESSF spe_evmhessf {}
+
+  spev2si __builtin_spe_evmhessfa (spev2si, spev2si);
+    SPE_EVMHESSFA spe_evmhessfa {}
+
+  spev2si __builtin_spe_evmhessfaaw (spev2si, spev2si);
+    SPE_EVMHESSFAAW spe_evmhessfaaw {}
+
+  spev2si __builtin_spe_evmhessfanw (spev2si, spev2si);
+    SPE_EVMHESSFANW spe_evmhessfanw {}
+
+  spev2si __builtin_spe_evmhessiaaw (spev2si, spev2si);
+    SPE_EVMHESSIAAW spe_evmhessiaaw {}
+
+  spev2si __builtin_spe_evmhessianw (spev2si, spev2si);
+    SPE_EVMHESSIANW spe_evmhessianw {}
+
+  spev2si __builtin_spe_evmheumi (spev2si, spev2si);
+    SPE_EVMHEUMI spe_evmheumi {}
+
+  spev2si __builtin_spe_evmheumia (spev2si, spev2si);
+    SPE_EVMHEUMIA spe_evmheumia {}
+
+  spev2si __builtin_spe_evmheumiaaw (spev2si, spev2si);
+    SPE_EVMHEUMIAAW spe_evmheumiaaw {}
+
+  spev2si __builtin_spe_evmheumianw (spev2si, spev2si);
+    SPE_EVMHEUMIANW spe_evmheumianw {}
+
+  spev2si __builtin_spe_evmheusiaaw (spev2si, spev2si);
+    SPE_EVMHEUSIAAW spe_evmheusiaaw {}
+
+  spev2si __builtin_spe_evmheusianw (spev2si, spev2si);
+    SPE_EVMHEUSIANW spe_evmheusianw {}
+
+  spev2si __builtin_spe_evmhogsmfaa (spev2si, spev2si);
+    SPE_EVMHOGSMFAA spe_evmhogsmfaa {}
+
+  spev2si __builtin_spe_evmhogsmfan (spev2si, spev2si);
+    SPE_EVMHOGSMFAN spe_evmhogsmfan {}
+
+  spev2si __builtin_spe_evmhogsmiaa (spev2si, spev2si);
+    SPE_EVMHOGSMIAA spe_evmhogsmiaa {}
+
+  spev2si __builtin_spe_evmhogsmian (spev2si, spev2si);
+    SPE_EVMHOGSMIAN spe_evmhogsmian {}
+
+  spev2si __builtin_spe_evmhogumiaa (spev2si, spev2si);
+    SPE_EVMHOGUMIAA spe_evmhogumiaa {}
+
+  spev2si __builtin_spe_evmhogumian (spev2si, spev2si);
+    SPE_EVMHOGUMIAN spe_evmhogumian {}
+
+  spev2si __builtin_spe_evmhosmf (spev2si, spev2si);
+    SPE_EVMHOSMF spe_evmhosmf {}
+
+  spev2si __builtin_spe_evmhosmfa (spev2si, spev2si);
+    SPE_EVMHOSMFA spe_evmhosmfa {}
+
+  spev2si __builtin_spe_evmhosmfaaw (spev2si, spev2si);
+    SPE_EVMHOSMFAAW spe_evmhosmfaaw {}
+
+  spev2si __builtin_spe_evmhosmfanw (spev2si, spev2si);
+    SPE_EVMHOSMFANW spe_evmhosmfanw {}
+
+  spev2si __builtin_spe_evmhosmi (spev2si, spev2si);
+    SPE_EVMHOSMI spe_evmhosmi {}
+
+  spev2si __builtin_spe_evmhosmia (spev2si, spev2si);
+    SPE_EVMHOSMIA spe_evmhosmia {}
+
+  spev2si __builtin_spe_evmhosmiaaw (spev2si, spev2si);
+    SPE_EVMHOSMIAAW spe_evmhosmiaaw {}
+
+  spev2si __builtin_spe_evmhosmianw (spev2si, spev2si);
+    SPE_EVMHOSMIANW spe_evmhosmianw {}
+
+  spev2si __builtin_spe_evmhossf (spev2si, spev2si);
+    SPE_EVMHOSSF spe_evmhossf {}
+
+  spev2si __builtin_spe_evmhossfa (spev2si, spev2si);
+    SPE_EVMHOSSFA spe_evmhossfa {}
+
+  spev2si __builtin_spe_evmhossfaaw (spev2si, spev2si);
+    SPE_EVMHOSSFAAW spe_evmhossfaaw {}
+
+  spev2si __builtin_spe_evmhossfanw (spev2si, spev2si);
+    SPE_EVMHOSSFANW spe_evmhossfanw {}
+
+  spev2si __builtin_spe_evmhossiaaw (spev2si, spev2si);
+    SPE_EVMHOSSIAAW spe_evmhossiaaw {}
+
+  spev2si __builtin_spe_evmhossianw (spev2si, spev2si);
+    SPE_EVMHOSSIANW spe_evmhossianw {}
+
+  spev2si __builtin_spe_evmhoumi (spev2si, spev2si);
+    SPE_EVMHOUMI spe_evmhoumi {}
+
+  spev2si __builtin_spe_evmhoumia (spev2si, spev2si);
+    SPE_EVMHOUMIA spe_evmhoumia {}
+
+  spev2si __builtin_spe_evmhoumiaaw (spev2si, spev2si);
+    SPE_EVMHOUMIAAW spe_evmhoumiaaw {}
+
+  spev2si __builtin_spe_evmhoumianw (spev2si, spev2si);
+    SPE_EVMHOUMIANW spe_evmhoumianw {}
+
+  spev2si __builtin_spe_evmhousiaaw (spev2si, spev2si);
+    SPE_EVMHOUSIAAW spe_evmhousiaaw {}
+
+  spev2si __builtin_spe_evmhousianw (spev2si, spev2si);
+    SPE_EVMHOUSIANW spe_evmhousianw {}
+
+  spev2si __builtin_spe_evmwhsmf (spev2si, spev2si);
+    SPE_EVMWHSMF spe_evmwhsmf {}
+
+  spev2si __builtin_spe_evmwhsmfa (spev2si, spev2si);
+    SPE_EVMWHSMFA spe_evmwhsmfa {}
+
+  spev2si __builtin_spe_evmwhsmi (spev2si, spev2si);
+    SPE_EVMWHSMI spe_evmwhsmi {}
+
+  spev2si __builtin_spe_evmwhsmia (spev2si, spev2si);
+    SPE_EVMWHSMIA spe_evmwhsmia {}
+
+  spev2si __builtin_spe_evmwhssf (spev2si, spev2si);
+    SPE_EVMWHSSF spe_evmwhssf {}
+
+  spev2si __builtin_spe_evmwhssfa (spev2si, spev2si);
+    SPE_EVMWHSSFA spe_evmwhssfa {}
+
+  spev2si __builtin_spe_evmwhumi (spev2si, spev2si);
+    SPE_EVMWHUMI spe_evmwhumi {}
+
+  spev2si __builtin_spe_evmwhumia (spev2si, spev2si);
+    SPE_EVMWHUMIA spe_evmwhumia {}
+
+  spev2si __builtin_spe_evmwlsmiaaw (spev2si, spev2si);
+    SPE_EVMWLSMIAAW spe_evmwlsmiaaw {}
+
+  spev2si __builtin_spe_evmwlsmianw (spev2si, spev2si);
+    SPE_EVMWLSMIANW spe_evmwlsmianw {}
+
+  spev2si __builtin_spe_evmwlssiaaw (spev2si, spev2si);
+    SPE_EVMWLSSIAAW spe_evmwlssiaaw {}
+
+  spev2si __builtin_spe_evmwlssianw (spev2si, spev2si);
+    SPE_EVMWLSSIANW spe_evmwlssianw {}
+
+  spev2si __builtin_spe_evmwlumi (spev2si, spev2si);
+    SPE_EVMWLUMI spe_evmwlumi {}
+
+  spev2si __builtin_spe_evmwlumia (spev2si, spev2si);
+    SPE_EVMWLUMIA spe_evmwlumia {}
+
+  spev2si __builtin_spe_evmwlumiaaw (spev2si, spev2si);
+    SPE_EVMWLUMIAAW spe_evmwlumiaaw {}
+
+  spev2si __builtin_spe_evmwlumianw (spev2si, spev2si);
+    SPE_EVMWLUMIANW spe_evmwlumianw {}
+
+  spev2si __builtin_spe_evmwlusiaaw (spev2si, spev2si);
+    SPE_EVMWLUSIAAW spe_evmwlusiaaw {}
+
+  spev2si __builtin_spe_evmwlusianw (spev2si, spev2si);
+    SPE_EVMWLUSIANW spe_evmwlusianw {}
+
+  spev2si __builtin_spe_evmwsmf (spev2si, spev2si);
+    SPE_EVMWSMF spe_evmwsmf {}
+
+  spev2si __builtin_spe_evmwsmfa (spev2si, spev2si);
+    SPE_EVMWSMFA spe_evmwsmfa {}
+
+  spev2si __builtin_spe_evmwsmfaa (spev2si, spev2si);
+    SPE_EVMWSMFAA spe_evmwsmfaa {}
+
+  spev2si __builtin_spe_evmwsmfan (spev2si, spev2si);
+    SPE_EVMWSMFAN spe_evmwsmfan {}
+
+  spev2si __builtin_spe_evmwsmi (spev2si, spev2si);
+    SPE_EVMWSMI spe_evmwsmi {}
+
+  spev2si __builtin_spe_evmwsmia (spev2si, spev2si);
+    SPE_EVMWSMIA spe_evmwsmia {}
+
+  spev2si __builtin_spe_evmwsmiaa (spev2si, spev2si);
+    SPE_EVMWSMIAA spe_evmwsmiaa {}
+
+  spev2si __builtin_spe_evmwsmian (spev2si, spev2si);
+    SPE_EVMWSMIAN spe_evmwsmian {}
+
+  spev2si __builtin_spe_evmwssf (spev2si, spev2si);
+    SPE_EVMWSSF spe_evmwssf {}
+
+  spev2si __builtin_spe_evmwssfa (spev2si, spev2si);
+    SPE_EVMWSSFA spe_evmwssfa {}
+
+  spev2si __builtin_spe_evmwssfaa (spev2si, spev2si);
+    SPE_EVMWSSFAA spe_evmwssfaa {}
+
+  spev2si __builtin_spe_evmwssfan (spev2si, spev2si);
+    SPE_EVMWSSFAN spe_evmwssfan {}
+
+  spev2si __builtin_spe_evmwumi (spev2si, spev2si);
+    SPE_EVMWUMI spe_evmwumi {}
+
+  spev2si __builtin_spe_evmwumia (spev2si, spev2si);
+    SPE_EVMWUMIA spe_evmwumia {}
+
+  spev2si __builtin_spe_evmwumiaa (spev2si, spev2si);
+    SPE_EVMWUMIAA spe_evmwumiaa {}
+
+  spev2si __builtin_spe_evmwumian (spev2si, spev2si);
+    SPE_EVMWUMIAN spe_evmwumian {}
+
+  spev2si __builtin_spe_evnand (spev2si, spev2si);
+    SPE_EVNAND spe_evnand {}
+
+  spev2si __builtin_spe_evnor (spev2si, spev2si);
+    SPE_EVNOR spe_evnor {}
+
+  spev2si __builtin_spe_evor (spev2si, spev2si);
+    SPE_EVOR spe_evor {}
+
+  spev2si __builtin_spe_evorc (spev2si, spev2si);
+    SPE_EVORC spe_evorc {}
+
+  spev2si __builtin_spe_evrlw (spev2si, spev2si);
+    SPE_EVRLW spe_evrlw {}
+
+  spev2si __builtin_spe_evslw (spev2si, spev2si);
+    SPE_EVSLW spe_evslw {}
+
+  spev2si __builtin_spe_evsrws (spev2si, spev2si);
+    SPE_EVSRWS spe_evsrws {}
+
+  spev2si __builtin_spe_evsrwu (spev2si, spev2si);
+    SPE_EVSRWU spe_evsrwu {}
+
+  spev2si __builtin_spe_evsubfw (spev2si, spev2si);
+    SPE_EVSUBFW subv2si3 {}
+
+  spev2si __builtin_spe_evaddiw (spev2si, const int<5>);
+    SPE_EVADDIW spe_evaddiw {}
+
+  spev2si __builtin_spe_evrlwi (spev2si, const int<5>);
+    SPE_EVRLWI spe_evrlwi {}
+
+  spev2si __builtin_spe_evslwi (spev2si, const int<5>);
+    SPE_EVSLWI spe_evslwi {}
+
+  spev2si __builtin_spe_evsrwis (spev2si, const int<5>);
+    SPE_EVSRWIS spe_evsrwis {}
+
+  spev2si __builtin_spe_evsrwiu (spev2si, const int<5>);
+    SPE_EVSRWIU spe_evsrwiu {}
+
+  spev2si __builtin_spe_evsubifw (spev2si, const int<5>);
+    SPE_EVSUBIFW spe_evsubifw {}
+
+  spev2si __builtin_spe_evmwhssfaa (spev2si, spev2si);
+    SPE_EVMWHSSFAA spe_evmwhssfaa {}
+
+  spev2si __builtin_spe_evmwhssmaa (spev2si, spev2si);
+    SPE_EVMWHSSMAA spe_evmwhssmaa {}
+
+  spev2si __builtin_spe_evmwhsmfaa (spev2si, spev2si);
+    SPE_EVMWHSMFAA spe_evmwhsmfaa {}
+
+  spev2si __builtin_spe_evmwhsmiaa (spev2si, spev2si);
+    SPE_EVMWHSMIAA spe_evmwhsmiaa {}
+
+  spev2si __builtin_spe_evmwhusiaa (spev2si, spev2si);
+    SPE_EVMWHUSIAA spe_evmwhusiaa {}
+
+  spev2si __builtin_spe_evmwhumiaa (spev2si, spev2si);
+    SPE_EVMWHUMIAA spe_evmwhumiaa {}
+
+  spev2si __builtin_spe_evmwhssfan (spev2si, spev2si);
+    SPE_EVMWHSSFAN spe_evmwhssfan {}
+
+  spev2si __builtin_spe_evmwhssian (spev2si, spev2si);
+    SPE_EVMWHSSIAN spe_evmwhssian {}
+
+  spev2si __builtin_spe_evmwhsmfan (spev2si, spev2si);
+    SPE_EVMWHSMFAN spe_evmwhsmfan {}
+
+  spev2si __builtin_spe_evmwhsmian (spev2si, spev2si);
+    SPE_EVMWHSMIAN spe_evmwhsmian {}
+
+  spev2si __builtin_spe_evmwhusian (spev2si, spev2si);
+    SPE_EVMWHUSIAN spe_evmwhusian {}
+
+  spev2si __builtin_spe_evmwhumian (spev2si, spev2si);
+    SPE_EVMWHUMIAN spe_evmwhumian {}
+
+  spev2si __builtin_spe_evmwhgssfaa (spev2si, spev2si);
+    SPE_EVMWHGSSFAA spe_evmwhgssfaa {}
+
+  spev2si __builtin_spe_evmwhgsmfaa (spev2si, spev2si);
+    SPE_EVMWHGSMFAA spe_evmwhgsmfaa {}
+
+  spev2si __builtin_spe_evmwhgsmiaa (spev2si, spev2si);
+    SPE_EVMWHGSMIAA spe_evmwhgsmiaa {}
+
+  spev2si __builtin_spe_evmwhgumiaa (spev2si, spev2si);
+    SPE_EVMWHGUMIAA spe_evmwhgumiaa {}
+
+  spev2si __builtin_spe_evmwhgssfan (spev2si, spev2si);
+    SPE_EVMWHGSSFAN spe_evmwhgssfan {}
+
+  spev2si __builtin_spe_evmwhgsmfan (spev2si, spev2si);
+    SPE_EVMWHGSMFAN spe_evmwhgsmfan {}
+
+  spev2si __builtin_spe_evmwhgsmian (spev2si, spev2si);
+    SPE_EVMWHGSMIAN spe_evmwhgsmian {}
+
+  spev2si __builtin_spe_evmwhgumian (spev2si, spev2si);
+    SPE_EVMWHGUMIAN spe_evmwhgumian {}
+
+  int __builtin_spe_brinc (int, int);
+    SPE_BRINC spe_brinc {}
+
+  spev2si __builtin_spe_evxor (spev2si, spev2si);
+    SPE_EVXOR xorv2si3 {}
+
+  int __builtin_spe_evcmpeq (const int<2>, spev2si, spev2si);
+    SPE_EVCMPEQ spe_evcmpeq {}
+
+  int __builtin_spe_evcmpgts (const int<2>, spev2si, spev2si);
+    SPE_EVCMPGTS spe_evcmpgts {}
+
+  int __builtin_spe_evcmpgtu (const int<2>, spev2si, spev2si);
+    SPE_EVCMPGTU spe_evcmpgtu {}
+
+  int __builtin_spe_evcmplts (const int<2>, spev2si, spev2si);
+    SPE_EVCMPLTS spe_evcmplts {}
+
+  int __builtin_spe_evcmpltu (const int<2>, spev2si, spev2si);
+    SPE_EVCMPLTU spe_evcmpltu {}
+
+  int __builtin_spe_evfscmpeq (const int<2>, spev2sf, spev2sf);
+    SPE_EVFSCMPEQ spe_evfscmpeq {}
+
+  int __builtin_spe_evfscmpgt (const int<2>, spev2sf, spev2sf);
+    SPE_EVFSCMPGT spe_evfscmpgt {}
+
+  int __builtin_spe_evfscmplt (const int<2>, spev2sf, spev2sf);
+    SPE_EVFSCMPLT spe_evfscmplt {}
+
+  int __builtin_spe_evfststeq (const int<2>, spev2sf, spev2sf);
+    SPE_EVFSTSTEQ spe_evfststeq {}
+
+  int __builtin_spe_evfststgt (const int<2>, spev2sf, spev2sf);
+    SPE_EVFSTSTGT spe_evfststgt {}
+
+  int __builtin_spe_evfststlt (const int<2>, spev2sf, spev2sf);
+    SPE_EVFSTSTLT spe_evfststlt {}
+
+  spev2si __builtin_spe_evsel_gts (spev2si, spev2si, spev2si, spev2si);
+    SPE_EVSEL_CMPGTS spe_evcmpgts {}
+
+  spev2si __builtin_spe_evsel_gtu (spev2si, spev2si, spev2si, spev2si);
+    SPE_EVSEL_CMPGTU spe_evcmpgtu {}
+
+  spev2si __builtin_spe_evsel_lts (spev2si, spev2si, spev2si, spev2si);
+    SPE_EVSEL_CMPLTS spe_evcmplts {}
+
+  spev2si __builtin_spe_evsel_ltu (spev2si, spev2si, spev2si, spev2si);
+    SPE_EVSEL_CMPLTU spe_evcmpltu {}
+
+  spev2si __builtin_spe_evsel_eq (spev2si, spev2si, spev2si, spev2si);
+    SPE_EVSEL_CMPEQ spe_evcmpeq {}
+
+  spev2sf __builtin_spe_evsel_fsgt (spev2sf, spev2sf, spev2sf, spev2sf);
+    SPE_EVSEL_FSCMPGT spe_evfscmpgt {}
+
+  spev2sf __builtin_spe_evsel_fslt (spev2sf, spev2sf, spev2sf, spev2sf);
+    SPE_EVSEL_FSCMPLT spe_evfscmplt {}
+
+  spev2sf __builtin_spe_evsel_fseq (spev2sf, spev2sf, spev2sf, spev2sf);
+    SPE_EVSEL_FSCMPEQ spe_evfscmpeq {}
+
+  spev2sf __builtin_spe_evsel_fststgt (spev2sf, spev2sf, spev2sf, spev2sf);
+    SPE_EVSEL_FSTSTGT spe_evfststgt {}
+
+  spev2sf __builtin_spe_evsel_fststlt (spev2sf, spev2sf, spev2sf, spev2sf);
+    SPE_EVSEL_FSTSTLT spe_evfststlt {}
+
+  spev2sf __builtin_spe_evsel_fststeq (spev2sf, spev2sf, spev2sf, spev2sf);
+    SPE_EVSEL_FSTSTEQ spe_evfststeq {}
+
+  const spev2si __builtin_spe_evabs (spev2si);
+    SPE_EVABS absv2si2 {}
+
+  spev2si __builtin_spe_evaddsmiaaw (spev2si);
+    SPE_EVADDSMIAAW spe_evaddsmiaaw {}
+
+  spev2si __builtin_spe_evaddssiaaw (spev2si);
+    SPE_EVADDSSIAAW spe_evaddssiaaw {}
+
+  spev2si __builtin_spe_evaddumiaaw (spev2si);
+    SPE_EVADDUMIAAW spe_evaddumiaaw {}
+
+  spev2si __builtin_spe_evaddusiaaw (spev2si);
+    SPE_EVADDUSIAAW spe_evaddusiaaw {}
+
+  const spev2si __builtin_spe_evcntlsw (spev2si);
+    SPE_EVCNTLSW spe_evcntlsw {}
+
+  const spev2si __builtin_spe_evcntlzw (spev2si);
+    SPE_EVCNTLZW spe_evcntlzw {}
+
+  const spev2si __builtin_spe_evextsb (spev2si);
+    SPE_EVEXTSB spe_evextsb {}
+
+  const spev2si __builtin_spe_evextsh (spev2si);
+    SPE_EVEXTSH spe_evextsh {}
+
+  const spev2sf __builtin_spe_evfsabs (spev2sf);
+    SPE_EVFSABS spe_evfsabs {}
+
+  const spev2sf __builtin_spe_evfscfsf (spev2sf);
+    SPE_EVFSCFSF spe_evfscfsf {}
+
+  const spev2sf __builtin_spe_evfscfsi (spev2si);
+    SPE_EVFSCFSI spe_evfscfsi {}
+
+  const spev2sf __builtin_spe_evfscfuf (spev2sf);
+    SPE_EVFSCFUF spe_evfscfuf {}
+
+  const spev2sf __builtin_spe_evfscfui (spev2si);
+    SPE_EVFSCFUI spe_evfscfui {}
+
+  const spev2sf __builtin_spe_evfsctsf (spev2sf);
+    SPE_EVFSCTSF spe_evfsctsf {}
+
+  const spev2si __builtin_spe_evfsctsi (spev2sf);
+    SPE_EVFSCTSI spe_evfsctsi {}
+
+  const spev2si __builtin_spe_evfsctsiz (spev2sf);
+    SPE_EVFSCTSIZ spe_evfsctsiz {}
+
+  const spev2sf __builtin_spe_evfsctuf (spev2sf);
+    SPE_EVFSCTUF spe_evfsctuf {}
+
+  const spev2si __builtin_spe_evfsctui (spev2sf);
+    SPE_EVFSCTUI spe_evfsctui {}
+
+  const spev2si __builtin_spe_evfsctuiz (spev2sf);
+    SPE_EVFSCTUIZ spe_evfsctuiz {}
+
+  const spev2sf __builtin_spe_evfsnabs (spev2sf);
+    SPE_EVFSNABS spe_evfsnabs {}
+
+  const spev2sf __builtin_spe_evfsneg (spev2sf);
+    SPE_EVFSNEG spe_evfsneg {}
+
+  spev2si __builtin_spe_evmra (spev2si);
+    SPE_EVMRA spe_evmra {}
+
+  const spev2si __builtin_spe_evneg (spev2si);
+    SPE_EVNEG negv2si2 {}
+
+  const spev2si __builtin_spe_evrndw (spev2si);
+    SPE_EVRNDW spe_evrndw {}
+
+  spev2si __builtin_spe_evsubfsmiaaw (spev2si);
+    SPE_EVSUBFSMIAAW spe_evsubfsmiaaw {}
+
+  spev2si __builtin_spe_evsubfssiaaw (spev2si);
+    SPE_EVSUBFSSIAAW spe_evsubfssiaaw {}
+
+  spev2si __builtin_spe_evsubfumiaaw (spev2si);
+    SPE_EVSUBFUMIAAW spe_evsubfumiaaw {}
+
+  spev2si __builtin_spe_evsubfusiaaw (spev2si);
+    SPE_EVSUBFUSIAAW spe_evsubfusiaaw {}
+
+  spev2si __builtin_spe_evldd (void *, const int<5>);
+    SPE_EVLDD spe_evldd {}
+
+  spev2si __builtin_spe_evlddx (void *, int);
+    SPE_EVLDDX spe_evlddx {}
+
+  spev2si __builtin_spe_evldh (void *, const int<5>);
+    SPE_EVLDH spe_evldh {}
+
+  spev2si __builtin_spe_evldhx (void *, int);
+    SPE_EVLDHX spe_evldhx {}
+
+  spev2si __builtin_spe_evldw (void *, const int<5>);
+    SPE_EVLDW spe_evldw {}
+
+  spev2si __builtin_spe_evldwx (void *, int);
+    SPE_EVLDWX spe_evldwx {}
+
+  spev2si __builtin_spe_evlhhesplat (void *, const int<5>);
+    SPE_EVLHHESPLAT spe_evlhhesplat {}
+
+  spev2si __builtin_spe_evlhhesplatx (void *, int);
+    SPE_EVLHHESPLATX spe_evlhhesplatx {}
+
+  spev2si __builtin_spe_evlhhossplat (void *, const int<5>);
+    SPE_EVLHHOSSPLAT spe_evlhhossplat {}
+
+  spev2si __builtin_spe_evlhhossplatx (void *, int);
+    SPE_EVLHHOSSPLATX spe_evlhhossplatx {}
+
+  spev2si __builtin_spe_evlhhousplat (void *, const int<5>);
+    SPE_EVLHHOUSPLAT spe_evlhhousplat {}
+
+  spev2si __builtin_spe_evlhhousplatx (void *, int);
+    SPE_EVLHHOUSPLATX spe_evlhhousplatx {}
+
+  spev2si __builtin_spe_evlwhe (void *, const int<5>);
+    SPE_EVLWHE spe_evlwhe {}
+
+  spev2si __builtin_spe_evlwhex (void *, int);
+    SPE_EVLWHEX spe_evlwhex {}
+
+  spev2si __builtin_spe_evlwhos (void *, const int<5>);
+    SPE_EVLWHOS spe_evlwhos {}
+
+  spev2si __builtin_spe_evlwhosx (void *, int);
+    SPE_EVLWHOSX spe_evlwhosx {}
+
+  spev2si __builtin_spe_evlwhou (void *, const int<5>);
+    SPE_EVLWHOU spe_evlwhou {}
+
+  spev2si __builtin_spe_evlwhoux (void *, int);
+    SPE_EVLWHOUX spe_evlwhoux {}
+
+  spev2si __builtin_spe_evlwhsplat (void *, const int<5>);
+    SPE_EVLWHSPLAT spe_evlwhsplat {}
+
+  spev2si __builtin_spe_evlwhsplatx (void *, int);
+    SPE_EVLWHSPLATX spe_evlwhsplatx {}
+
+  spev2si __builtin_spe_evlwwsplat (void *, const int<5>);
+    SPE_EVLWWSPLAT spe_evlwwsplat {}
+
+  spev2si __builtin_spe_evlwwsplatx (void *, int);
+    SPE_EVLWWSPLATX spe_evlwwsplatx {}
+
+  spev2si __builtin_spe_evsplatfi (const int<-16,15>);
+    SPE_EVSPLATFI spe_evsplatfi {}
+
+  spev2si __builtin_spe_evsplati (const int<-16,15>);
+    SPE_EVSPLATI spe_evsplati {}
+
+  void __builtin_spe_evstdd (spev2si, void *, const int<5>);
+    SPE_EVSTDD spe_evstdd {}
+
+  void __builtin_spe_evstddx (spev2si, void *, int);
+    SPE_EVSTDDX spe_evstddx {}
+
+  void __builtin_spe_evstdh (spev2si, void *, const int<5>);
+    SPE_EVSTDH spe_evstdh {}
+
+  void __builtin_spe_evstdhx (spev2si, void *, int);
+    SPE_EVSTDHX spe_evstdhx {}
+
+  void __builtin_spe_evstdw (spev2si, void *, const int<5>);
+    SPE_EVSTDW spe_evstdw {}
+
+  void __builtin_spe_evstdwx (spev2si, void *, int);
+    SPE_EVSTDWX spe_evstdwx {}
+
+  void __builtin_spe_evstwhe (spev2si, void *, const int<5>);
+    SPE_EVSTWHE spe_evstwhe {}
+
+  void __builtin_spe_evstwhex (spev2si, void *, int);
+    SPE_EVSTWHEX spe_evstwhex {}
+
+  void __builtin_spe_evstwho (spev2si, void *, const int<5>);
+    SPE_EVSTWHO spe_evstwho {}
+
+  void __builtin_spe_evstwhox (spev2si, void *, int);
+    SPE_EVSTWHOX spe_evstwhox {}
+
+  void __builtin_spe_evstwwe (spev2si, void *, const int<5>);
+    SPE_EVSTWWE spe_evstwwe {}
+
+  void __builtin_spe_evstwwex (spev2si, void *, int);
+    SPE_EVSTWWEX spe_evstwwex {}
+
+  void __builtin_spe_evstwwo (spev2si, void *, const int<5>);
+    SPE_EVSTWWO spe_evstwwo {}
+
+  void __builtin_spe_evstwwox (spev2si, void *, int);
+    SPE_EVSTWWOX spe_evstwwox {}
+
+  int __builtin_spe_mfspefscr ();
+    SPE_MFSPEFSCR spe_mfspefscr {}
+
+  void __builtin_spe_mtspefscr (int);
+    SPE_MTSPEFSCR spe_mtspefscr {}

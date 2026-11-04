@@ -45,6 +45,7 @@ typedef struct rs6000_stack {
   int lr_save_offset;		/* offset to save LR from initial SP */
   int cr_save_offset;		/* offset to save CR from initial SP */
   int vrsave_save_offset;	/* offset to save VRSAVE from initial SP */
+  int spe_gp_save_offset;	/* offset to save spe 64-bit gprs  */
   int varargs_save_offset;	/* offset to save the varargs registers */
   int ehrd_offset;		/* offset to EH return data */
   int ehcr_offset;		/* offset to EH CR field data */
@@ -60,7 +61,10 @@ typedef struct rs6000_stack {
   int cr_size;			/* size to hold CR if not in fixed area */
   int vrsave_size;		/* size to hold VRSAVE */
   int altivec_padding_size;	/* size of altivec alignment padding */
+  int spe_gp_size;		/* size of 64-bit GPR save size for SPE */
+  int spe_padding_size;
   HOST_WIDE_INT total_size;	/* total bytes allocated for stack */
+  int spe_64bit_regs_used;
   int savres_strategy;
 #ifdef TARGET_BASEREL
   int baserel_save_p;		/* true if r2 (baserel base) must be saved */

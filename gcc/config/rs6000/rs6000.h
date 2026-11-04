@@ -737,13 +737,14 @@ enum data_align { align_abi, align_opt, align_both };
 #define DATA_ALIGNMENT(TYPE, ALIGN) \
   rs6000_data_alignment (TYPE, ALIGN, align_opt)
 
-/* Align vectors to 128 bits.  */
+/* Align vectors to 128 bits.  Align SPE vectors and E500 v2 doubles to
+   64 bits.  */
 #define DATA_ABI_ALIGNMENT(TYPE, ALIGN) \
   rs6000_data_alignment (TYPE, ALIGN, align_abi)
 
 /* Nonzero if move instructions will actually fail to work
    when given unaligned data.  */
-#define STRICT_ALIGNMENT 0
+#define STRICT_ALIGNMENT TARGET_SPE
 
 /* Standard register usage.  */
 
@@ -773,7 +774,23 @@ enum data_align { align_abi, align_opt, align_both };
    Another pseudo (not included in DWARF_FRAME_REGISTERS) is soft frame
    pointer, which is eventually eliminated in favor of SP or FP.  */
 
-#define FIRST_PSEUDO_REGISTER 119
+#define FIRST_PSEUDO_REGISTER 153
+
+#define DWARF_REG_TO_UNWIND_COLUMN(R) \
+  ((R) >= 1200 ? (R) - 1200 + FIRST_SPE_HIGH_REGNO : (R))
+
+#define TARGET_SPE rs6000_spe
+#define TARGET_SPE_ABI rs6000_spe_abi
+#define TARGET_FPRS (rs6000_float_gprs == 0)
+#define TARGET_E500_SINGLE (TARGET_HARD_FLOAT && rs6000_float_gprs == 1)
+#define TARGET_E500_DOUBLE (TARGET_HARD_FLOAT && rs6000_float_gprs == 2)
+#define TARGET_SF_SPE (TARGET_HARD_FLOAT && !TARGET_FPRS)
+#define TARGET_DF_SPE TARGET_E500_DOUBLE
+#define UNITS_PER_SPE_WORD 8
+#define SPE_HIGH_REGNO_P(N) IN_RANGE ((N), FIRST_SPE_HIGH_REGNO, LAST_SPE_HIGH_REGNO)
+#define SPE_SIMD_REGNO_P(N) IN_RANGE ((N), 0, 31)
+#define SPE_VECTOR_MODE(M) ((M) == V4HImode || (M) == V2SFmode \
+			    || (M) == V1DImode || (M) == V2SImode)
 
 /* Use standard DWARF numbering for DWARF debugging information.  */
 #define DEBUGGER_REGNO(REGNO) rs6000_debugger_regno ((REGNO), 0)
@@ -812,7 +829,9 @@ enum data_align { align_abi, align_opt, align_both };
    /* vrsave vscr sfp */			   \
    1, 1, 1,					   \
    /* DMRs */					   \
-   0, 0, 0, 0, 0, 0, 0, 0			   \
+   0, 0, 0, 0, 0, 0, 0, 0			, \
+   /* SPE accumulator, status and synthetic upper GPR halves.  */ \
+   1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 \
 }
 
 /* Like `CALL_USED_REGISTERS' except this macro doesn't require that
@@ -838,7 +857,9 @@ enum data_align { align_abi, align_opt, align_both };
    /* vrsave vscr sfp */			   \
    0, 0, 0,					   \
    /* DMRs */					   \
-   1, 1, 1, 1, 1, 1, 1, 1			   \
+   1, 1, 1, 1, 1, 1, 1, 1			, \
+   /* SPE accumulator, status and synthetic upper GPR halves.  */ \
+   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 \
 }
 
 #define TOTAL_ALTIVEC_REGS	(LAST_ALTIVEC_REGNO - FIRST_ALTIVEC_REGNO + 1)
@@ -921,7 +942,8 @@ enum data_align { align_abi, align_opt, align_both };
    /* DMRs */							\
    111, 112, 113, 114, 115, 116, 117, 118,			\
    108, 109,							\
-   110								\
+   110								, \
+   119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152 \
 }
 
 /* True if register is floating-point.  */
@@ -975,9 +997,13 @@ enum data_align { align_abi, align_opt, align_both };
      && ((MODE) == VOIDmode || ALTIVEC_OR_VSX_VECTOR_MODE (MODE))	\
      && FP_REGNO_P (REGNO)						\
    ? V2DFmode								\
-   : FLOAT128_IBM_P (MODE) && FP_REGNO_P (REGNO)			\
+   : TARGET_E500_DOUBLE && (MODE) == SImode				\
+   ? SImode								\
+   : TARGET_E500_DOUBLE && ((MODE) == VOIDmode || (MODE) == DFmode)	\
    ? DFmode								\
-   : (MODE) == TDmode && FP_REGNO_P (REGNO)				\
+   : !TARGET_E500_DOUBLE && FLOAT128_IBM_P (MODE) && FP_REGNO_P (REGNO)	\
+   ? DFmode								\
+   : !TARGET_E500_DOUBLE && (MODE) == TDmode && FP_REGNO_P (REGNO)	\
    ? DImode								\
    : choose_hard_reg_mode ((REGNO), (NREGS), NULL))
 
@@ -1021,6 +1047,13 @@ enum data_align { align_abi, align_opt, align_both };
    performance for removing short circuiting from the logical ops.  */
 
 #define LOGICAL_OP_NON_SHORT_CIRCUIT 0
+
+/* A fixed register used at epilogue generation to address SPE registers
+   with negative offsets.  The 64-bit load/store instructions on the SPE
+   only take positive offsets (and small ones at that), so we need to
+   reserve a register for consing up negative offsets.  */
+
+#define FIXED_SCRATCH 0
 
 /* Specify the registers used for certain standard purposes.
    The values of these macros are register numbers.  */
@@ -1089,6 +1122,8 @@ enum reg_class
   DMR_REGS,
   VRSAVE_REGS,
   VSCR_REGS,
+  SPE_ACC_REGS,
+  SPEFSCR_REGS,
   GEN_OR_FLOAT_REGS,
   GEN_OR_VSX_REGS,
   LINK_REGS,
@@ -1100,6 +1135,7 @@ enum reg_class
   CR_REGS,
   NON_FLOAT_REGS,
   CA_REGS,
+  SPE_HIGH_REGS,
   ALL_REGS,
   LIM_REG_CLASSES
 };
@@ -1119,6 +1155,8 @@ enum reg_class
   "DMR_REGS",								\
   "VRSAVE_REGS",							\
   "VSCR_REGS",								\
+  "SPE_ACC_REGS", \
+  "SPEFSCR_REGS", \
   "GEN_OR_FLOAT_REGS",							\
   "GEN_OR_VSX_REGS",							\
   "LINK_REGS",								\
@@ -1130,6 +1168,7 @@ enum reg_class
   "CR_REGS",								\
   "NON_FLOAT_REGS",							\
   "CA_REGS",								\
+  "SPE_HIGH_REGS",							\
   "ALL_REGS"								\
 }
 
@@ -1140,47 +1179,53 @@ enum reg_class
 #define REG_CLASS_CONTENTS						\
 {									\
   /* NO_REGS.  */							\
-  { 0x00000000, 0x00000000, 0x00000000, 0x00000000 },			\
+  { 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 },	\
   /* BASE_REGS.  */							\
-  { 0xfffffffe, 0x00000000, 0x00000000, 0x00004008 },			\
+  { 0xfffffffe, 0x00000000, 0x00000000, 0x00004008, 0x00000000 },			\
   /* GENERAL_REGS.  */							\
-  { 0xffffffff, 0x00000000, 0x00000000, 0x00004008 },			\
+  { 0xffffffff, 0x00000000, 0x00000000, 0x00004008, 0x00000000 },			\
   /* FLOAT_REGS.  */							\
-  { 0x00000000, 0xffffffff, 0x00000000, 0x00000000 },			\
+  { 0x00000000, 0xffffffff, 0x00000000, 0x00000000, 0x00000000 },	\
   /* ALTIVEC_REGS.  */							\
-  { 0x00000000, 0x00000000, 0xffffffff, 0x00000000 },			\
+  { 0x00000000, 0x00000000, 0xffffffff, 0x00000000, 0x00000000 },			\
   /* VSX_REGS.  */							\
-  { 0x00000000, 0xffffffff, 0xffffffff, 0x00000000 },			\
+  { 0x00000000, 0xffffffff, 0xffffffff, 0x00000000, 0x00000000 },			\
   /* DMR_REGS.  */							\
-  { 0x00000000, 0x00000000, 0x00000000, 0x007f8000 },			\
+  { 0x00000000, 0x00000000, 0x00000000, 0x007f8000, 0x00000000 },			\
   /* VRSAVE_REGS.  */							\
-  { 0x00000000, 0x00000000, 0x00000000, 0x00001000 },			\
+  { 0x00000000, 0x00000000, 0x00000000, 0x00001000, 0x00000000 },			\
   /* VSCR_REGS.  */							\
-  { 0x00000000, 0x00000000, 0x00000000, 0x00002000 },			\
+  { 0x00000000, 0x00000000, 0x00000000, 0x00002000, 0x00000000 },			\
+  /* SPE_ACC_REGS.  */ \
+  { 0, 0, 0, 0x00800000, 0 }, \
+  /* SPEFSCR_REGS.  */ \
+  { 0, 0, 0, 0x01000000, 0 }, \
   /* GEN_OR_FLOAT_REGS.  */						\
-  { 0xffffffff, 0xffffffff, 0x00000000, 0x00004008 },			\
+  { 0xffffffff, 0xffffffff, 0x00000000, 0x00004008, 0x00000000 },			\
   /* GEN_OR_VSX_REGS.  */						\
-  { 0xffffffff, 0xffffffff, 0xffffffff, 0x00004008 },			\
+  { 0xffffffff, 0xffffffff, 0xffffffff, 0x00004008, 0x00000000 },			\
   /* LINK_REGS.  */							\
-  { 0x00000000, 0x00000000, 0x00000000, 0x00000001 },			\
+  { 0x00000000, 0x00000000, 0x00000000, 0x00000001, 0x00000000 },			\
   /* CTR_REGS.  */							\
-  { 0x00000000, 0x00000000, 0x00000000, 0x00000002 },			\
+  { 0x00000000, 0x00000000, 0x00000000, 0x00000002, 0x00000000 },			\
   /* LINK_OR_CTR_REGS.  */						\
-  { 0x00000000, 0x00000000, 0x00000000, 0x00000003 },			\
+  { 0x00000000, 0x00000000, 0x00000000, 0x00000003, 0x00000000 },			\
   /* SPECIAL_REGS.  */							\
-  { 0x00000000, 0x00000000, 0x00000000, 0x00001003 },			\
+  { 0x00000000, 0x00000000, 0x00000000, 0x00001003, 0x00000000 },			\
   /* SPEC_OR_GEN_REGS.  */						\
-  { 0xffffffff, 0x00000000, 0x00000000, 0x0000500b },			\
+  { 0xffffffff, 0x00000000, 0x00000000, 0x0000500b, 0x00000000 },			\
   /* CR0_REGS.  */							\
-  { 0x00000000, 0x00000000, 0x00000000, 0x00000010 },			\
+  { 0x00000000, 0x00000000, 0x00000000, 0x00000010, 0x00000000 },			\
   /* CR_REGS.  */							\
-  { 0x00000000, 0x00000000, 0x00000000, 0x00000ff0 },			\
+  { 0x00000000, 0x00000000, 0x00000000, 0x00000ff0, 0x00000000 },			\
   /* NON_FLOAT_REGS.  */						\
-  { 0xffffffff, 0x00000000, 0x00000000, 0x00004ffb },			\
+  { 0xffffffff, 0x00000000, 0x00000000, 0x00004ffb, 0x00000000 },			\
   /* CA_REGS.  */							\
-  { 0x00000000, 0x00000000, 0x00000000, 0x00000004 },			\
+  { 0x00000000, 0x00000000, 0x00000000, 0x00000004, 0x00000000 },			\
+  /* SPE_HIGH_REGS.  */ \
+  { 0, 0, 0, 0xfe000000, 0x01ffffff }, \
   /* ALL_REGS.  */							\
-  { 0xffffffff, 0xffffffff, 0xffffffff, 0x007fffff }			\
+  { 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0x01ffffff }			\
 }
 
 /* The same information, inverted:
@@ -1447,7 +1492,7 @@ enum rs6000_pltseq_enum {
 #define FUNCTION_VALUE_REGNO_P(N)					\
   ((N) == GP_ARG_RETURN							\
    || (IN_RANGE ((N), FP_ARG_RETURN, FP_ARG_MAX_RETURN)			\
-       && TARGET_HARD_FLOAT)						\
+       && TARGET_HARD_FLOAT && TARGET_FPRS)				\
    || (IN_RANGE ((N), ALTIVEC_ARG_RETURN, ALTIVEC_ARG_MAX_RETURN)	\
        && TARGET_ALTIVEC && TARGET_ALTIVEC_ABI))
 
@@ -2090,7 +2135,41 @@ extern char rs6000_reg_names[][8];	/* register names (0 vs. %r0).  */
   &rs6000_reg_names[115][0],	/* dmr4  */				\
   &rs6000_reg_names[116][0],	/* dmr5  */				\
   &rs6000_reg_names[117][0],	/* dmr6  */				\
-  &rs6000_reg_names[118][0] 	/* dmr7  */				\
+  &rs6000_reg_names[118][0] 	/* dmr7  */				, \
+  &rs6000_reg_names[119][0], \
+  &rs6000_reg_names[120][0], \
+  &rs6000_reg_names[121][0], \
+  &rs6000_reg_names[122][0], \
+  &rs6000_reg_names[123][0], \
+  &rs6000_reg_names[124][0], \
+  &rs6000_reg_names[125][0], \
+  &rs6000_reg_names[126][0], \
+  &rs6000_reg_names[127][0], \
+  &rs6000_reg_names[128][0], \
+  &rs6000_reg_names[129][0], \
+  &rs6000_reg_names[130][0], \
+  &rs6000_reg_names[131][0], \
+  &rs6000_reg_names[132][0], \
+  &rs6000_reg_names[133][0], \
+  &rs6000_reg_names[134][0], \
+  &rs6000_reg_names[135][0], \
+  &rs6000_reg_names[136][0], \
+  &rs6000_reg_names[137][0], \
+  &rs6000_reg_names[138][0], \
+  &rs6000_reg_names[139][0], \
+  &rs6000_reg_names[140][0], \
+  &rs6000_reg_names[141][0], \
+  &rs6000_reg_names[142][0], \
+  &rs6000_reg_names[143][0], \
+  &rs6000_reg_names[144][0], \
+  &rs6000_reg_names[145][0], \
+  &rs6000_reg_names[146][0], \
+  &rs6000_reg_names[147][0], \
+  &rs6000_reg_names[148][0], \
+  &rs6000_reg_names[149][0], \
+  &rs6000_reg_names[150][0], \
+  &rs6000_reg_names[151][0], \
+  &rs6000_reg_names[152][0], \
 }
 
 /* Table of additional register names to use in user input.  */
@@ -2223,6 +2302,10 @@ extern int frame_pointer_needed;
 enum rs6000_builtin_type_index
 {
   RS6000_BTI_NOT_OPAQUE,
+  RS6000_BTI_spe_V2SI,
+  RS6000_BTI_spe_V2SF,
+  RS6000_BTI_ptr_spe_V2SI,
+  RS6000_BTI_ptr_spe_V2SF,
   RS6000_BTI_opaque_V4SI,
   RS6000_BTI_V16QI,              /* __vector signed char */
   RS6000_BTI_V1TI,
@@ -2326,6 +2409,11 @@ enum rs6000_builtin_type_index
   RS6000_BTI_MAX
 };
 
+
+#define spe_V2SI_type_node (rs6000_builtin_types[RS6000_BTI_spe_V2SI])
+#define spe_V2SF_type_node (rs6000_builtin_types[RS6000_BTI_spe_V2SF])
+#define ptr_spe_V2SI_type_node (rs6000_builtin_types[RS6000_BTI_ptr_spe_V2SI])
+#define ptr_spe_V2SF_type_node (rs6000_builtin_types[RS6000_BTI_ptr_spe_V2SF])
 
 #define opaque_V4SI_type_node         (rs6000_builtin_types[RS6000_BTI_opaque_V4SI])
 #define V16QI_type_node               (rs6000_builtin_types[RS6000_BTI_V16QI])
@@ -2433,6 +2521,8 @@ extern GTY(()) section *toc_section;
    This is added to the cfun structure.  */
 typedef struct GTY(()) machine_function
 {
+  /* Whether the instruction chain has been scanned already.  */
+  int spe_insn_chain_scanned_p;
   /* Flags if __builtin_return_address (n) with n >= 1 was used.  */
   int ra_needs_full_frame;
   /* Flags if __builtin_return_address (0) was used.  */
@@ -2539,3 +2629,6 @@ while (0)
 #else
 #define RS6000_BASEREL_OPERAND_P(X) 0
 #endif
+
+/* SPE memory displacements are unsigned and scaled by eight.  */
+#define SPE_CONST_OFFSET_OK(x) (((x) & ~0xf8) == 0)
