@@ -22,7 +22,10 @@ a copy of the GCC Runtime Library Exception along with this program;
 see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 <http://www.gnu.org/licenses/>.  */
 
-/* The queue of sleeping tasks, which is only touched under Forbid().  */
+/* The queue of sleeping tasks, which is only touched under Forbid().  The
+   benaphore's longword is the last sleeper's address with the lock in bit 0,
+   and the last sleeper's next is the first.  Both slow paths run with the
+   lock held, so they write the longword back with bit 0 set.  */
 
 #include <exec/execbase.h>
 #include <exec/tasks.h>
@@ -36,11 +39,22 @@ struct __benaphore_waiter {
 	volatile int granted;
 };
 
+#define LOCKED 1UL
+
+static inline struct __benaphore_waiter *last(benaphore_t *b)
+{
+	return (struct __benaphore_waiter *) ((unsigned long) b->__last & ~LOCKED);
+}
+
+static inline void set_last(benaphore_t *b, struct __benaphore_waiter *w)
+{
+	b->__last = (struct __benaphore_waiter *) ((unsigned long) w | LOCKED);
+}
+
 void __benaphore_lock_slow(benaphore_t *b)
 {
-	struct __benaphore_waiter w;
+	struct __benaphore_waiter w, *l;
 
-	w.next = 0;
 	w.task = SysBase->ThisTask;
 	w.granted = 0;
 
@@ -50,11 +64,13 @@ void __benaphore_lock_slow(benaphore_t *b)
 		   task that grants us the lock dequeues us first.  */
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wdangling-pointer"
-		if (b->__tail)
-			b->__tail->next = &w;
-		else
-			b->__head = &w;
-		b->__tail = &w;
+		l = last(b);
+		if (l) {
+			w.next = l->next;
+			l->next = &w;
+		} else
+			w.next = &w;
+		set_last(b, &w);
 #pragma GCC diagnostic pop
 		/* SIGF_SINGLE is what exec's semaphores wait on; a task can't be
 		   in both at once.  Wait() breaks the Forbid() while it sleeps and
@@ -70,14 +86,16 @@ void __benaphore_lock_slow(benaphore_t *b)
    sleeper when it unlocks.  */
 void __benaphore_wake(benaphore_t *b)
 {
-	struct __benaphore_waiter *w;
+	struct __benaphore_waiter *w, *l;
 
 	Forbid();
-	w = b->__head;
-	if (w && benaphore_trylock(b)) {
-		b->__head = w->next;
-		if (!b->__head)
-			b->__tail = 0;
+	l = last(b);
+	if (l && benaphore_trylock(b)) {
+		w = l->next;
+		if (w == l)
+			set_last(b, 0);
+		else
+			l->next = w->next;
 		w->granted = 1;
 		Signal(w->task, SIGF_SINGLE);
 	}

@@ -26,15 +26,19 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
    instructions to take and two to release when nobody else wants it, and
    sleeps when someone does.
 
-   The lock is bit 0 of a byte, taken with bset and released with bclr.  On
-   a single CPU one instruction can't be interrupted by a task switch or an
-   interrupt, so bset is an atomic test-and-set (Linux/m68k's
-   test_and_set_bit() is the same bset), and it needs no locked bus cycle, so
-   unlike tas and cas it works on the 68000 and in chip RAM.
+   The lock is bit 0 of the benaphore's one longword, taken with bset and
+   released with bclr.  On a single CPU one instruction can't be interrupted
+   by a task switch or an interrupt, so bset is an atomic test-and-set
+   (Linux/m68k's test_and_set_bit() is the same bset), and it needs no locked
+   bus cycle, so unlike tas and cas it works on the 68000 and in chip RAM.
 
    A task that finds the lock taken queues itself and sleeps in Wait(); the
    task that releases it hands it to the first in the queue, so waiters are
-   served in order.  The queue is only touched under Forbid(), out of line.
+   served in order.  The rest of the longword points to the last of them,
+   whose next is the first: a circular queue, which takes new sleepers at the
+   end and hands the lock to the front, each in O(1).  The sleepers are on
+   their tasks' stacks, which are even, so bit 0 of their address is free
+   for the lock.  The queue is only touched under Forbid(), out of line.
    The name is from BeOS, which paired an atomic fast path with a semaphore
    in the same way:
    https://www.haiku-os.org/legacy-docs/benewsletter/Issue1-26.html
@@ -53,12 +57,15 @@ extern "C" {
 struct __benaphore_waiter;
 
 typedef struct {
-	volatile unsigned char __locked;	/* bit 0 */
-	struct __benaphore_waiter *volatile __head;
-	struct __benaphore_waiter *__tail;
+	/* the last sleeper, or 0; bit 0 is the lock */
+	struct __benaphore_waiter *volatile __last;
 } benaphore_t;
 
-#define BENAPHORE_INITIALIZER { 0, 0, 0 }
+#define BENAPHORE_INITIALIZER { 0 }
+
+/* The byte of __last that holds bit 0: m68k is big-endian.  */
+#define __BENAPHORE_LOCK_BYTE(__b) \
+	(((volatile unsigned char *) &(__b)->__last)[3])
 
 /* Taken again by the task that holds it, it counts instead of blocking. */
 typedef struct {
@@ -92,7 +99,8 @@ __BENAPHORE_INLINE int benaphore_trylock(benaphore_t *__b)
 	unsigned char __was;
 
 	__asm__ __volatile__ ("bset #0,%1\n\tsne %0"
-			      : "=d" (__was), "+m" (__b->__locked) : : "cc", "memory");
+			      : "=d" (__was), "+m" (__BENAPHORE_LOCK_BYTE(__b))
+			      : : "cc", "memory");
 	return !__was;
 }
 
@@ -104,11 +112,14 @@ __BENAPHORE_INLINE void benaphore_lock(benaphore_t *__b)
 
 /* Release first, then look for sleepers: a task that queues itself does so
    only after seeing the bit set under Forbid(), so either it saw the bit
-   clear and took the lock, or it is in the queue by the time we look. */
+   clear and took the lock, or it is in the queue by the time we look.  The
+   longword is nonzero with no sleepers only if another task took the lock
+   in between, which costs a call that finds nobody to wake. */
 __BENAPHORE_INLINE void benaphore_unlock(benaphore_t *__b)
 {
-	__asm__ __volatile__ ("bclr #0,%0" : "+m" (__b->__locked) : : "cc", "memory");
-	if (__b->__head)
+	__asm__ __volatile__ ("bclr #0,%0" : "+m" (__BENAPHORE_LOCK_BYTE(__b))
+			      : : "cc", "memory");
+	if (__b->__last)
 		__benaphore_wake(__b);
 }
 

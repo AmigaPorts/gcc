@@ -100,8 +100,7 @@ __gthread_once_unlock (__gthread_once_t *__once)
 __GTHREAD_INLINE int
 __gthread_mutex_init (__gthread_mutex_t *__mx)
 {
-  __mx->__locked = 0;
-  __mx->__head = __mx->__tail = 0;
+  __mx->__last = 0;
   return 0;
 }
 
