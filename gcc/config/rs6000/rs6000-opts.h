@@ -141,6 +141,7 @@ enum rs6000_vector {
   VECTOR_NONE,			/* Type is not  a vector or not supported */
   VECTOR_ALTIVEC,		/* Use altivec for vector processing */
   VECTOR_VSX,			/* Use VSX for vector processing */
+  VECTOR_SPE,
   VECTOR_P8_VECTOR		/* Use ISA 2.07 VSX for vector processing */
 };
 

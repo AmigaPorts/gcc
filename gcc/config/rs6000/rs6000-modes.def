@@ -80,3 +80,7 @@ PARTIAL_INT_MODE (TI, 128, PTI);
 OPAQUE_MODE (OO, 32);
 OPAQUE_MODE (XO, 64);
 OPAQUE_MODE (TDO, 128);
+
+/* SPE holds these 64-bit vector modes in a single extended GPR.  */
+VECTOR_MODE (INT, HI, 4);
+VECTOR_MODE (INT, DI, 1);

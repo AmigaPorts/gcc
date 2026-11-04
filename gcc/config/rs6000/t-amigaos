@@ -16,5 +16,11 @@ NATIVE_SYSTEM_HEADER_DIR=/gcc/include
 # Only clib2 has soft float libraries, so that is the only soft float flavour.
 MULTILIB_OPTIONS = mcrt=newlib/mcrt=clib2/mcrt=clib4 msoft-float
 MULTILIB_DIRNAMES = newlib clib2 clib4 soft-float
-MULTILIB_EXCEPTIONS = msoft-float mcrt=newlib/msoft-float mcrt=clib4/msoft-float
+MULTILIB_EXCEPTIONS = msoft-float* mcrt=newlib/msoft-float* mcrt=clib4/msoft-float*
 #MULTILIB_REUSE = =mcrt=newlib
+
+# Keep SPE support routines separate from the conventional FPR ABI.
+# A1222 builds use -mcpu=8548 (e500v2 double-precision SPE).
+MULTILIB_OPTIONS += mcpu=8548
+MULTILIB_DIRNAMES += spe
+MULTILIB_MATCHES += mcpu?8548=mfloat-gprs?double

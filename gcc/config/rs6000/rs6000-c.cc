@@ -768,7 +768,9 @@ rs6000_cpu_cpp_builtins (cpp_reader *pfile)
     builtin_define ("__VEC_ELEMENT_REG_ORDER__=__ORDER_LITTLE_ENDIAN__");
 
   /* Let the compiled code know if 'f' class registers will not be available.  */
-  if (TARGET_SOFT_FLOAT)
+  if (TARGET_SPE)
+    builtin_define ("__SPE__");
+  if (TARGET_SOFT_FLOAT || !TARGET_FPRS)
     builtin_define ("__NO_FPRS__");
 
   /* Whether aggregates passed by value are aligned to a 16 byte boundary

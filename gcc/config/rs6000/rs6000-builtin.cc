@@ -73,6 +73,9 @@ rs6000_invalid_builtin (enum rs6000_gen_builtins fncode)
 
   switch (rs6000_builtin_info[j].enable)
     {
+    case ENB_SPE:
+      error ("%qs requires the %qs option", name, "-mspe");
+      break;
     case ENB_P5:
       error ("%qs requires the %qs option", name, "-mcpu=power5");
       break;
@@ -166,6 +169,8 @@ rs6000_builtin_is_supported (enum rs6000_gen_builtins fncode)
 {
   switch (rs6000_builtin_info[(size_t) fncode].enable)
     {
+    case ENB_SPE:
+      return TARGET_SPE;
     case ENB_ALWAYS:
       return true;
     case ENB_P5:
@@ -533,6 +538,13 @@ rs6000_init_builtins (void)
     fprintf (stderr, "rs6000_init_builtins%s%s\n",
 	     (TARGET_ALTIVEC)	   ? ", altivec" : "",
 	     (TARGET_VSX)	   ? ", vsx"	 : "");
+
+  spe_V2SI_type_node = build_opaque_vector_type (intSI_type_node, 2);
+  spe_V2SF_type_node = build_opaque_vector_type (float_type_node, 2);
+  ptr_spe_V2SI_type_node = build_pointer_type (spe_V2SI_type_node);
+  ptr_spe_V2SF_type_node = build_pointer_type (spe_V2SF_type_node);
+  if (TARGET_SPE)
+    add_builtin_type ("__ev64_opaque__", spe_V2SI_type_node);
 
   V2DI_type_node = rs6000_vector_type ("__vector long long",
 				       long_long_integer_type_node, 2);
@@ -3332,6 +3344,197 @@ htm_expand_builtin (bifdata *bifaddr, rs6000_gen_builtins fcode,
    SUBTARGET may be used as the target for computing one of EXP's operands.
    IGNORE is nonzero if the value is to be ignored.
    Use the new builtin infrastructure.  */
+
+
+static rtx
+spe_expand_predicate_builtin (enum insn_code icode, tree exp, rtx target)
+{
+  rtx pat, scratch, tmp;
+  tree form = CALL_EXPR_ARG (exp, 0);
+  tree arg0 = CALL_EXPR_ARG (exp, 1);
+  tree arg1 = CALL_EXPR_ARG (exp, 2);
+  rtx op0 = expand_normal (arg0);
+  rtx op1 = expand_normal (arg1);
+  machine_mode mode0 = insn_data[icode].operand[1].mode;
+  machine_mode mode1 = insn_data[icode].operand[2].mode;
+  int form_int;
+  enum rtx_code code;
+
+  if (TREE_CODE (form) != INTEGER_CST)
+    {
+      error ("argument 1 of %<__builtin_spe_predicate%> must be a constant");
+      return const0_rtx;
+    }
+  else
+    form_int = TREE_INT_CST_LOW (form);
+
+  gcc_assert (mode0 == mode1);
+
+  if (arg0 == error_mark_node || arg1 == error_mark_node)
+    return const0_rtx;
+
+  if (target == 0
+      || GET_MODE (target) != SImode
+      || ! (*insn_data[icode].operand[0].predicate) (target, SImode))
+    target = gen_reg_rtx (SImode);
+
+  if (! (*insn_data[icode].operand[1].predicate) (op0, mode0))
+    op0 = copy_to_mode_reg (mode0, op0);
+  if (! (*insn_data[icode].operand[2].predicate) (op1, mode1))
+    op1 = copy_to_mode_reg (mode1, op1);
+
+  scratch = gen_reg_rtx (CCmode);
+
+  pat = GEN_FCN (icode) (scratch, op0, op1);
+  if (! pat)
+    return const0_rtx;
+  emit_insn (pat);
+
+  /* There are 4 variants for each predicate: _any_, _all_, _upper_,
+     _lower_.  We use one compare, but look in different bits of the
+     CR for each variant.
+
+     There are 2 elements in each SPE simd type (upper/lower).  The CR
+     bits are set as follows:
+
+     BIT0  | BIT 1  | BIT 2   | BIT 3
+     U     |   L    | (U | L) | (U & L)
+
+     So, for an "all" relationship, BIT 3 would be set.
+     For an "any" relationship, BIT 2 would be set.  Etc.
+
+     Following traditional nomenclature, these bits map to:
+
+     BIT0  | BIT 1  | BIT 2   | BIT 3
+     LT    | GT     | EQ      | OV
+
+     Later, we will generate rtl to look in the LT/EQ/EQ/OV bits.
+  */
+
+  switch (form_int)
+    {
+      /* All variant.  OV bit.  */
+    case 0:
+      /* We need to get to the OV bit, which is the ORDERED bit.  We
+	 could generate (ordered:SI (reg:CC xx) (const_int 0)), but
+	 that's ugly and will make validate_condition_mode die.
+	 So let's just use another pattern.  */
+      emit_insn (gen_move_from_CR_ov_bit (target, scratch));
+      return target;
+      /* Any variant.  EQ bit.  */
+    case 1:
+      code = EQ;
+      break;
+      /* Upper variant.  LT bit.  */
+    case 2:
+      code = LT;
+      break;
+      /* Lower variant.  GT bit.  */
+    case 3:
+      code = GT;
+      break;
+    default:
+      error ("argument 1 of %<__builtin_spe_predicate%> is out of range");
+      return const0_rtx;
+    }
+
+  tmp = gen_rtx_fmt_ee (code, SImode, scratch, const0_rtx);
+  emit_move_insn (target, tmp);
+
+  return target;
+}
+
+static rtx
+spe_expand_evsel_builtin (enum insn_code icode, tree exp, rtx target)
+{
+  rtx pat, scratch;
+  tree arg0 = CALL_EXPR_ARG (exp, 0);
+  tree arg1 = CALL_EXPR_ARG (exp, 1);
+  tree arg2 = CALL_EXPR_ARG (exp, 2);
+  tree arg3 = CALL_EXPR_ARG (exp, 3);
+  rtx op0 = expand_normal (arg0);
+  rtx op1 = expand_normal (arg1);
+  rtx op2 = expand_normal (arg2);
+  rtx op3 = expand_normal (arg3);
+  machine_mode mode0 = insn_data[icode].operand[1].mode;
+  machine_mode mode1 = insn_data[icode].operand[2].mode;
+
+  gcc_assert (mode0 == mode1);
+
+  if (arg0 == error_mark_node || arg1 == error_mark_node
+      || arg2 == error_mark_node || arg3 == error_mark_node)
+    return const0_rtx;
+
+  if (target == 0
+      || GET_MODE (target) != mode0
+      || ! (*insn_data[icode].operand[0].predicate) (target, mode0))
+    target = gen_reg_rtx (mode0);
+
+  if (! (*insn_data[icode].operand[1].predicate) (op0, mode0))
+    op0 = copy_to_mode_reg (mode0, op0);
+  if (! (*insn_data[icode].operand[1].predicate) (op1, mode1))
+    op1 = copy_to_mode_reg (mode0, op1);
+  if (! (*insn_data[icode].operand[1].predicate) (op2, mode1))
+    op2 = copy_to_mode_reg (mode0, op2);
+  if (! (*insn_data[icode].operand[1].predicate) (op3, mode1))
+    op3 = copy_to_mode_reg (mode0, op3);
+
+  /* Generate the compare.  */
+  scratch = gen_reg_rtx (CCmode);
+  pat = GEN_FCN (icode) (scratch, op0, op1);
+  if (! pat)
+    return const0_rtx;
+  emit_insn (pat);
+
+  if (mode0 == V2SImode)
+    emit_insn (gen_spe_evsel (target, op2, op3, scratch));
+  else
+    emit_insn (gen_spe_evsel_fs (target, op2, op3, scratch));
+
+  return target;
+}
+
+static rtx
+spe_expand_stv_builtin (enum insn_code icode, tree exp)
+{
+  tree arg0 = CALL_EXPR_ARG (exp, 0);
+  tree arg1 = CALL_EXPR_ARG (exp, 1);
+  tree arg2 = CALL_EXPR_ARG (exp, 2);
+  const char *name = IDENTIFIER_POINTER (DECL_NAME (get_callee_fndecl (exp)));
+  if (name[strlen (name) - 1] != 'x'
+      && (TREE_CODE (arg2) != INTEGER_CST
+	  || !tree_fits_uhwi_p (arg2) || tree_to_uhwi (arg2) > 31))
+    {
+      error ("argument 3 must be an integer constant between 0 and 31");
+      return const0_rtx;
+    }
+  rtx op0 = expand_normal (arg0);
+  rtx op1 = expand_normal (arg1);
+  rtx op2 = expand_normal (arg2);
+  rtx pat;
+  machine_mode mode0 = insn_data[icode].operand[0].mode;
+  machine_mode mode1 = insn_data[icode].operand[1].mode;
+  machine_mode mode2 = insn_data[icode].operand[2].mode;
+
+  /* Invalid arguments.  Bail before doing anything stoopid!  */
+  if (arg0 == error_mark_node
+      || arg1 == error_mark_node
+      || arg2 == error_mark_node)
+    return const0_rtx;
+
+  if (! (*insn_data[icode].operand[2].predicate) (op0, mode2))
+    op0 = copy_to_mode_reg (mode2, op0);
+  if (! (*insn_data[icode].operand[0].predicate) (op1, mode0))
+    op1 = copy_to_mode_reg (mode0, op1);
+  if (! (*insn_data[icode].operand[1].predicate) (op2, mode1))
+    op2 = copy_to_mode_reg (mode1, op2);
+
+  pat = GEN_FCN (icode) (op1, op2, op0);
+  if (pat)
+    emit_insn (pat);
+  return NULL_RTX;
+}
+
 rtx
 rs6000_expand_builtin (tree exp, rtx target, rtx /* subtarget */,
 		       machine_mode /* mode */, int ignore)
@@ -3454,6 +3657,52 @@ rs6000_expand_builtin (tree exp, rtx target, rtx /* subtarget */,
       rs6000_invalid_builtin (fcode);
       return expand_call (exp, target, ignore);
     }
+
+  if (bifaddr->enable == ENB_SPE)
+    switch (fcode)
+      {
+      case RS6000_BIF_SPE_EVCMPEQ:
+      case RS6000_BIF_SPE_EVCMPGTS:
+      case RS6000_BIF_SPE_EVCMPGTU:
+      case RS6000_BIF_SPE_EVCMPLTS:
+      case RS6000_BIF_SPE_EVCMPLTU:
+      case RS6000_BIF_SPE_EVFSCMPEQ:
+      case RS6000_BIF_SPE_EVFSCMPGT:
+      case RS6000_BIF_SPE_EVFSCMPLT:
+      case RS6000_BIF_SPE_EVFSTSTEQ:
+      case RS6000_BIF_SPE_EVFSTSTGT:
+      case RS6000_BIF_SPE_EVFSTSTLT:
+	return spe_expand_predicate_builtin (icode, exp, target);
+      case RS6000_BIF_SPE_EVSEL_CMPGTS:
+      case RS6000_BIF_SPE_EVSEL_CMPGTU:
+      case RS6000_BIF_SPE_EVSEL_CMPLTS:
+      case RS6000_BIF_SPE_EVSEL_CMPLTU:
+      case RS6000_BIF_SPE_EVSEL_CMPEQ:
+      case RS6000_BIF_SPE_EVSEL_FSCMPGT:
+      case RS6000_BIF_SPE_EVSEL_FSCMPLT:
+      case RS6000_BIF_SPE_EVSEL_FSCMPEQ:
+      case RS6000_BIF_SPE_EVSEL_FSTSTGT:
+      case RS6000_BIF_SPE_EVSEL_FSTSTLT:
+      case RS6000_BIF_SPE_EVSEL_FSTSTEQ:
+	return spe_expand_evsel_builtin (icode, exp, target);
+      case RS6000_BIF_SPE_EVSTDD:
+      case RS6000_BIF_SPE_EVSTDDX:
+      case RS6000_BIF_SPE_EVSTDH:
+      case RS6000_BIF_SPE_EVSTDHX:
+      case RS6000_BIF_SPE_EVSTDW:
+      case RS6000_BIF_SPE_EVSTDWX:
+      case RS6000_BIF_SPE_EVSTWHE:
+      case RS6000_BIF_SPE_EVSTWHEX:
+      case RS6000_BIF_SPE_EVSTWHO:
+      case RS6000_BIF_SPE_EVSTWHOX:
+      case RS6000_BIF_SPE_EVSTWWE:
+      case RS6000_BIF_SPE_EVSTWWEX:
+      case RS6000_BIF_SPE_EVSTWWO:
+      case RS6000_BIF_SPE_EVSTWWOX:
+	return spe_expand_stv_builtin (icode, exp);
+      default:
+	break;
+      }
 
   if (fcode == RS6000_BIF_PPC_ATOMIC_CAS_QI
       || fcode == RS6000_BIF_PPC_ATOMIC_CAS_HI
