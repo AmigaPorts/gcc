@@ -22,6 +22,9 @@
   [UNSPEC_MV_CR_OV
    UNSPEC_MV_CR_GT
    UNSPEC_SPE_ACC
+   UNSPEC_SPE_PACK_DF
+   UNSPEC_SPE_UNPACK_DF
+   UNSPEC_SPE_EXTRACT_DF
    UNSPEC_SPE_EVCMPEQ
    UNSPEC_SPE_EVCMPGTS
    UNSPEC_SPE_EVCMPGTU
@@ -2706,6 +2709,66 @@
    (set_attr  "length" "4")])
 
 ;; Double-precision floating point instructions.
+
+;; A DF value occupies a full SPE register, while the ABI passes it in
+;; the low words of two registers.  Keep these layout conversions explicit
+;; so combine cannot propagate a DF subreg of a DI pseudo into arithmetic.
+(define_insn "spe_pack_df"
+  [(set (match_operand:DF 0 "gpc_reg_operand" "=r")
+	(unspec:DF [(match_operand:DI 1 "gpc_reg_operand" "r")]
+		   UNSPEC_SPE_PACK_DF))]
+  "TARGET_HARD_FLOAT && TARGET_E500_DOUBLE"
+{
+  return WORDS_BIG_ENDIAN ? "evmergelo %0,%1,%L1"
+			  : "evmergelo %0,%L1,%1";
+}
+  [(set_attr "type" "vecperm")])
+
+(define_insn "spe_unpack_df"
+  [(set (match_operand:DI 0 "gpc_reg_operand" "=r")
+	(unspec:DI [(match_operand:DF 1 "gpc_reg_operand" "r")]
+		   UNSPEC_SPE_UNPACK_DF))]
+  "TARGET_HARD_FLOAT && TARGET_E500_DOUBLE"
+{
+  /* Copy the low word first so either destination may overlap the input.  */
+  return WORDS_BIG_ENDIAN ? "mr %L0,%1\;evmergehi %0,%1,%1"
+			  : "mr %0,%1\;evmergehi %L0,%1,%1";
+}
+  [(set_attr "type" "two")
+   (set_attr "length" "8")])
+
+(define_insn "spe_extract_df"
+  [(set (match_operand:SI 0 "gpc_reg_operand" "=r")
+	(unspec:SI [(match_operand:DF 1 "gpc_reg_operand" "r")
+		    (match_operand 2 "const_int_operand" "n")]
+		   UNSPEC_SPE_EXTRACT_DF))]
+  "TARGET_HARD_FLOAT && TARGET_E500_DOUBLE"
+{
+  return (INTVAL (operands[2]) == (WORDS_BIG_ENDIAN ? 0 : 4))
+	 ? "evmergehi %0,%1,%1" : "mr %0,%1";
+}
+  [(set_attr "type" "vecperm")])
+
+;; Packing and unpacking preserve all bits and cancel when combined.
+(define_insn_and_split "*spe_unpack_pack_df"
+  [(set (match_operand:DI 0 "gpc_reg_operand" "=r")
+	(unspec:DI [(unspec:DF
+		     [(match_operand:DI 1 "gpc_reg_operand" "r")]
+		     UNSPEC_SPE_PACK_DF)] UNSPEC_SPE_UNPACK_DF))]
+  "TARGET_HARD_FLOAT && TARGET_E500_DOUBLE"
+  "#"
+  "&& 1"
+  [(set (match_dup 0) (match_dup 1))])
+
+(define_insn_and_split "*spe_pack_unpack_df"
+  [(set (match_operand:DF 0 "gpc_reg_operand" "=r")
+	(unspec:DF [(unspec:DI
+		     [(match_operand:DF 1 "gpc_reg_operand" "r")]
+		     UNSPEC_SPE_UNPACK_DF)] UNSPEC_SPE_PACK_DF))]
+  "TARGET_HARD_FLOAT && TARGET_E500_DOUBLE"
+  "#"
+  "&& 1"
+  [(set (match_dup 0) (match_dup 1))])
 
 ;; Keep the DI/TI input in registers.  LRA folds a spilled SUBREG of MEM
 ;; into a plain MEM, which has a different recognition shape.
