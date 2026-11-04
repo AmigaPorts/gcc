@@ -36,3 +36,7 @@ void __gthread_cond_dequeue (__gthread_cond_t *, struct __gthread_cond_waiter *)
 /* At the end of a thread: run its key destructors and free its block.  */
 struct Task;
 void __gthread_amigaos_end_keys (struct Task *);
+
+/* The same for a task that another thread library started, which calls
+   __gthread_amigaos_task_end() (amigaos-task-end.c).  */
+extern void (*__gthread_amigaos_task_end_hook) (struct Task *);
