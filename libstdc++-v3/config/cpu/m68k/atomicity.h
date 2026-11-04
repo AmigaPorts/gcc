@@ -23,12 +23,35 @@
 // <http://www.gnu.org/licenses/>.
 
 #include <ext/atomicity.h>
+#ifdef __amigaos3__
+#include <benaphore.h>
+#endif
 
 namespace __gnu_cxx _GLIBCXX_VISIBILITY(default)
 {
 _GLIBCXX_BEGIN_NAMESPACE_VERSION
 
-#if ( defined(__mc68020__) || defined(__mc68030__) \
+#if defined(__amigaos3__)
+  // Amiga chip RAM has no read-modify-write bus cycle for cas or tas, and
+  // a task spinning on bset never lets a lower-priority owner run: take a
+  // benaphore, which sleeps when it is held.
+  static benaphore_t __atomicity_lock = BENAPHORE_INITIALIZER;
+
+  _Atomic_word
+  __attribute__ ((__unused__))
+  __exchange_and_add(volatile _Atomic_word* __mem, int __val) throw ()
+  {
+    _Atomic_word __result;
+
+    benaphore_lock(&__atomicity_lock);
+    __result = *__mem;
+    *__mem = __result + __val;
+    benaphore_unlock(&__atomicity_lock);
+
+    return __result;
+  }
+
+#elif ( defined(__mc68020__) || defined(__mc68030__) \
       || defined(__mc68040__) || defined(__mc68060__) ) \
     && !defined(__mcpu32__)
   // These variants support compare-and-swap.
