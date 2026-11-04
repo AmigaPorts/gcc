@@ -4835,8 +4835,10 @@ one_static_initialization_or_destruction (bool initp, tree decl, tree init,
 	}
 
       /* If we're using __cxa_atexit, register a function that calls the
-	 destructor for the object.  */
-      if (flag_use_cxa_atexit)
+	 destructor for the object.  A thread_local goes to
+	 __cxa_thread_atexit either way: without __cxa_atexit, nothing else
+	 would destroy it.  */
+      if (flag_use_cxa_atexit || CP_DECL_THREAD_LOCAL_P (decl))
 	finish_expr_stmt (register_dtor_fn (decl, omp_target));
     }
   else
