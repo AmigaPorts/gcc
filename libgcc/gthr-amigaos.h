@@ -194,9 +194,12 @@ __gthread_cond_destroy (__gthread_cond_t *__cond __attribute__ ((__unused__)))
   return 0;
 }
 
-/* None of these runs code of the caller's in its task, so none throws: C++
-   callers that can't throw then need no exception handling around them.  */
-#define __GTHREAD_NOTHROW __attribute__ ((__nothrow__))
+/* libgcc builds these once, so they take their arguments on the stack and
+   keep their plain names whatever -mregparm and -mmangle-regparm the
+   caller uses.  None of them runs code of the caller's in its task, so none
+   throws: C++ callers that can't throw then need no exception handling
+   around them.  */
+#define __GTHREAD_NOTHROW __attribute__ ((__stkparm__, __nothrow__))
 
 int __gthread_key_create (__gthread_key_t *__key, void (*__destroy) (void *))
   __GTHREAD_NOTHROW;
