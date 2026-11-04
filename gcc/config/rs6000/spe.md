@@ -308,14 +308,14 @@
 	(unsigned_fix:SI (match_operand:DF 1 "gpc_reg_operand" "r")))]
   "TARGET_HARD_FLOAT && TARGET_E500_DOUBLE"
   "efdctuiz %0,%1"
-  [(set_attr "type" "fp")])
+  [(set_attr "type" "vecdouble")])
 
 (define_insn "spe_extendsfdf2"
   [(set (match_operand:DF 0 "gpc_reg_operand" "=r")
 	(float_extend:DF (match_operand:SF 1 "gpc_reg_operand" "r")))]
   "TARGET_HARD_FLOAT && TARGET_E500_DOUBLE"
   "efdcfs %0,%1"
-  [(set_attr "type" "fp")])
+  [(set_attr "type" "vecdouble")])
 
 (define_insn "spe_fixuns_truncsfsi2"
   [(set (match_operand:SI 0 "gpc_reg_operand" "=r")
@@ -336,7 +336,7 @@
 	(fix:SI (match_operand:DF 1 "gpc_reg_operand" "r")))]
   "TARGET_HARD_FLOAT && TARGET_E500_DOUBLE"
   "efdctsiz %0,%1"
-  [(set_attr "type" "fp")])
+  [(set_attr "type" "vecdouble")])
 
 (define_insn "spe_floatunssisf2"
   [(set (match_operand:SF 0 "gpc_reg_operand" "=r")
@@ -350,7 +350,7 @@
 	(unsigned_float:DF (match_operand:SI 1 "gpc_reg_operand" "r")))]
   "TARGET_HARD_FLOAT && TARGET_E500_DOUBLE"
   "efdcfui %0,%1"
-  [(set_attr "type" "fp")])
+  [(set_attr "type" "vecdouble")])
 
 (define_insn "spe_floatsisf2"
   [(set (match_operand:SF 0 "gpc_reg_operand" "=r")
@@ -364,7 +364,7 @@
 	(float:DF (match_operand:SI 1 "gpc_reg_operand" "r")))]
   "TARGET_HARD_FLOAT && TARGET_E500_DOUBLE"
   "efdcfsi %0,%1"
-  [(set_attr "type" "fp")])
+  [(set_attr "type" "vecdouble")])
 
 ;; SPE SIMD instructions
 
@@ -3081,53 +3081,61 @@
   [(set (match_operand:SF 0 "gpc_reg_operand" "=r")
 	(float_truncate:SF (match_operand:DF 1 "gpc_reg_operand" "r")))]
   "TARGET_HARD_FLOAT && TARGET_E500_DOUBLE"
-  "efscfd %0,%1")
+  "efscfd %0,%1"
+  [(set_attr "type" "vecdouble")])
 
 (define_insn "spe_absdf2"
   [(set (match_operand:DF 0 "gpc_reg_operand" "=r")
 	(abs:DF (match_operand:DF 1 "gpc_reg_operand" "r")))]
   "TARGET_HARD_FLOAT && TARGET_E500_DOUBLE"
-  "efdabs %0,%1")
+  "efdabs %0,%1"
+  [(set_attr "type" "vecdouble")])
 
 (define_insn "spe_nabsdf2"
   [(set (match_operand:DF 0 "gpc_reg_operand" "=r")
 	(neg:DF (abs:DF (match_operand:DF 1 "gpc_reg_operand" "r"))))]
   "TARGET_HARD_FLOAT && TARGET_E500_DOUBLE"
-  "efdnabs %0,%1")
+  "efdnabs %0,%1"
+  [(set_attr "type" "vecdouble")])
 
 (define_insn "spe_negdf2"
   [(set (match_operand:DF 0 "gpc_reg_operand" "=r")
 	(neg:DF (match_operand:DF 1 "gpc_reg_operand" "r")))]
   "TARGET_HARD_FLOAT && TARGET_E500_DOUBLE"
-  "efdneg %0,%1")
+  "efdneg %0,%1"
+  [(set_attr "type" "vecdouble")])
 
 (define_insn "spe_adddf3"
   [(set (match_operand:DF 0 "gpc_reg_operand" "=r")
 	(plus:DF (match_operand:DF 1 "gpc_reg_operand" "r")
 		 (match_operand:DF 2 "gpc_reg_operand" "r")))]
   "TARGET_HARD_FLOAT && TARGET_E500_DOUBLE"
-  "efdadd %0,%1,%2")
+  "efdadd %0,%1,%2"
+  [(set_attr "type" "vecdouble")])
 
 (define_insn "spe_subdf3"
   [(set (match_operand:DF 0 "gpc_reg_operand" "=r")
 	(minus:DF (match_operand:DF 1 "gpc_reg_operand" "r")
 		  (match_operand:DF 2 "gpc_reg_operand" "r")))]
   "TARGET_HARD_FLOAT && TARGET_E500_DOUBLE"
-  "efdsub %0,%1,%2")
+  "efdsub %0,%1,%2"
+  [(set_attr "type" "vecdouble")])
 
 (define_insn "spe_muldf3"
   [(set (match_operand:DF 0 "gpc_reg_operand" "=r")
 	(mult:DF (match_operand:DF 1 "gpc_reg_operand" "r")
 		 (match_operand:DF 2 "gpc_reg_operand" "r")))]
   "TARGET_HARD_FLOAT && TARGET_E500_DOUBLE"
-  "efdmul %0,%1,%2")
+  "efdmul %0,%1,%2"
+  [(set_attr "type" "vecdouble")])
 
 (define_insn "spe_divdf3"
   [(set (match_operand:DF 0 "gpc_reg_operand" "=r")
 	(div:DF (match_operand:DF 1 "gpc_reg_operand" "r")
 		(match_operand:DF 2 "gpc_reg_operand" "r")))]
   "TARGET_HARD_FLOAT && TARGET_E500_DOUBLE"
-  "efddiv %0,%1,%2")
+  "efddiv %0,%1,%2"
+  [(set_attr "type" "ddiv")])
 
 ;; Double-precision floating point instructions for IBM long double.
 
@@ -3661,7 +3669,7 @@
   "TARGET_HARD_FLOAT && TARGET_E500_DOUBLE
    && !(flag_finite_math_only && !flag_trapping_math)"
   "efdcmpeq %0,%1,%2"
-  [(set_attr "type" "veccmp")])
+  [(set_attr "type" "vecdouble")])
 
 (define_insn "tstdfeq_gpr"
   [(set (match_operand:CCFP 0 "cc_reg_operand" "=y")
@@ -3672,7 +3680,7 @@
   "TARGET_HARD_FLOAT && TARGET_E500_DOUBLE
    && flag_finite_math_only && !flag_trapping_math"
   "efdtsteq %0,%1,%2"
-  [(set_attr "type" "veccmpsimple")])
+  [(set_attr "type" "vecdouble")])
 
 (define_insn "cmpdfgt_gpr"
   [(set (match_operand:CCFP 0 "cc_reg_operand" "=y")
@@ -3683,7 +3691,7 @@
   "TARGET_HARD_FLOAT && TARGET_E500_DOUBLE
    && !(flag_finite_math_only && !flag_trapping_math)"
   "efdcmpgt %0,%1,%2"
-  [(set_attr "type" "veccmp")])
+  [(set_attr "type" "vecdouble")])
 
 (define_insn "tstdfgt_gpr"
   [(set (match_operand:CCFP 0 "cc_reg_operand" "=y")
@@ -3694,7 +3702,7 @@
   "TARGET_HARD_FLOAT && TARGET_E500_DOUBLE
    && flag_finite_math_only && !flag_trapping_math"
   "efdtstgt %0,%1,%2"
-  [(set_attr "type" "veccmpsimple")])
+  [(set_attr "type" "vecdouble")])
 
 (define_insn "cmpdflt_gpr"
   [(set (match_operand:CCFP 0 "cc_reg_operand" "=y")
@@ -3705,7 +3713,7 @@
   "TARGET_HARD_FLOAT && TARGET_E500_DOUBLE
    && !(flag_finite_math_only && !flag_trapping_math)"
   "efdcmplt %0,%1,%2"
-  [(set_attr "type" "veccmp")])
+  [(set_attr "type" "vecdouble")])
 
 (define_insn "tstdflt_gpr"
   [(set (match_operand:CCFP 0 "cc_reg_operand" "=y")
@@ -3716,7 +3724,7 @@
   "TARGET_HARD_FLOAT && TARGET_E500_DOUBLE
    && flag_finite_math_only && !flag_trapping_math"
   "efdtstlt %0,%1,%2"
-  [(set_attr "type" "veccmpsimple")])
+  [(set_attr "type" "vecdouble")])
 
 ;; Same thing, but for IBM long double.
 
