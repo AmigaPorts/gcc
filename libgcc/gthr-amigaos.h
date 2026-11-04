@@ -29,6 +29,8 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 
 #define __GTHREADS 1
 #define __GTHREADS_CXX0X 1
+/* std::call_once unlocks the flag when its function throws.  */
+#define __GTHREAD_HAS_ONCE_UNLOCK 1
 
 typedef benaphore_t __gthread_mutex_t;
 typedef benaphore_recursive_t __gthread_recursive_mutex_t;
@@ -191,9 +193,12 @@ __gthread_cond_destroy (__gthread_cond_t *__cond __attribute__ ((__unused__)))
   return 0;
 }
 
-/* None of these runs code of the caller's in its task, so none throws: C++
-   callers that can't throw then need no exception handling around them.  */
-#define __GTHREAD_NOTHROW __attribute__ ((__nothrow__))
+/* libgcc builds these once, so they take their arguments on the stack and
+   keep their plain names whatever -mregparm and -mmangle-regparm the
+   caller uses.  None of them runs code of the caller's in its task, so none
+   throws: C++ callers that can't throw then need no exception handling
+   around them.  */
+#define __GTHREAD_NOTHROW __attribute__ ((__stkparm__, __nothrow__))
 
 int __gthread_key_create (__gthread_key_t *__key, void (*__destroy) (void *))
   __GTHREAD_NOTHROW;
@@ -257,6 +262,8 @@ typedef struct { int seconds; long nanoseconds;} __gthread_time_t;
 
 #define __GTHREADS 1
 #define __GTHREADS_CXX0X 1
+/* std::call_once unlocks the flag when its function throws.  */
+#define __GTHREAD_HAS_ONCE_UNLOCK 1
 
 #define __GTHREAD_ONCE_INIT {0,0}
 //#define __GTHREAD_MUTEX_INIT 0
