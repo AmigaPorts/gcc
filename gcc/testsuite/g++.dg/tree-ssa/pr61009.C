@@ -49,4 +49,4 @@ bool  Test(void) {
 // The block ending with cmp == 0 should not be threaded.  ie,
 // there should be a single == 0 comparison in the dump file.
 
-// { dg-final { scan-tree-dump-times "== 0" 1 "dom2" } }
+// { dg-final { scan-tree-dump-times "== 0\\)" 1 "dom2" } }
