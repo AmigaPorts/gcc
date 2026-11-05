@@ -691,17 +691,59 @@
   [(set_attr "type" "vecload")
    (set_attr  "length" "4")])
 
-;; Integer vector permutation instructions.  The pairs of digits in the
+(define_expand "vec_initv2sfsf"
+  [(match_operand:V2SF 0 "gpc_reg_operand")
+   (match_operand:V2SF 1 "")]
+  "TARGET_SPE"
+{
+  rs6000_expand_vector_init (operands[0], operands[1]);
+  DONE;
+})
+
+(define_insn "vec_extractv2sfsf"
+  [(set (match_operand:SF 0 "gpc_reg_operand" "=r")
+	(vec_select:SF
+	  (match_operand:V2SF 1 "gpc_reg_operand" "r")
+	  (parallel [(match_operand 2 "const_0_to_1_operand" "n")])))]
+  "TARGET_SPE"
+{
+  if (INTVAL (operands[2]) == (WORDS_BIG_ENDIAN ? 0 : 1))
+    return "evmergehi %0,%1,%1";
+  return REGNO (operands[0]) == REGNO (operands[1]) ? "" : "mr %0,%1";
+}
+  [(set_attr "type" "vecsimple")
+   (set (attr "length")
+	(if_then_else
+	  (and (match_test "INTVAL (operands[2]) == (WORDS_BIG_ENDIAN ? 1 : 0)")
+	       (match_test "REGNO (operands[0]) == REGNO (operands[1])"))
+	  (const_int 0) (const_int 4)))])
+
+(define_insn "spe_concat_v2sf"
+  [(set (match_operand:V2SF 0 "gpc_reg_operand" "=r")
+	(vec_concat:V2SF
+	  (match_operand:SF 1 "gpc_reg_operand" "r")
+	  (match_operand:SF 2 "gpc_reg_operand" "r")))]
+  "TARGET_SPE"
+{
+  return WORDS_BIG_ENDIAN ? "evmergelo %0,%1,%2"
+			 : "evmergelo %0,%2,%1";
+}
+  [(set_attr "type" "vecsimple")])
+
+(define_mode_iterator SPE2 [V2SI V2SF])
+(define_mode_attr SPE2_CONCAT [(V2SI "V4SI") (V2SF "V4SF")])
+
+;; Two-lane vector permutation instructions.  The pairs of digits in the
 ;; names of these instructions indicate the indices, in the memory vector
 ;; element ordering, of the vector elements permuted to the output vector
 ;; from the first and the second input vector respectively.
 
-(define_insn "vec_perm00_v2si"
-  [(set (match_operand:V2SI 0 "gpc_reg_operand" "=r")
-	(vec_select:V2SI
-	  (vec_concat:V4SI
-	    (match_operand:V2SI 1 "gpc_reg_operand" "r")
-	    (match_operand:V2SI 2 "gpc_reg_operand" "r"))
+(define_insn "vec_perm00_<mode>"
+  [(set (match_operand:SPE2 0 "gpc_reg_operand" "=r")
+	(vec_select:SPE2
+	  (vec_concat:<SPE2_CONCAT>
+	    (match_operand:SPE2 1 "gpc_reg_operand" "r")
+	    (match_operand:SPE2 2 "gpc_reg_operand" "r"))
 	  (parallel [(const_int 0) (const_int 2)])))]
   "TARGET_SPE"
 {
@@ -713,12 +755,12 @@
   [(set_attr "type" "vecsimple")
    (set_attr  "length" "4")])
 
-(define_insn "vec_perm01_v2si"
-  [(set (match_operand:V2SI 0 "gpc_reg_operand" "=r")
-	(vec_select:V2SI
-	  (vec_concat:V4SI
-	    (match_operand:V2SI 1 "gpc_reg_operand" "r")
-	    (match_operand:V2SI 2 "gpc_reg_operand" "r"))
+(define_insn "vec_perm01_<mode>"
+  [(set (match_operand:SPE2 0 "gpc_reg_operand" "=r")
+	(vec_select:SPE2
+	  (vec_concat:<SPE2_CONCAT>
+	    (match_operand:SPE2 1 "gpc_reg_operand" "r")
+	    (match_operand:SPE2 2 "gpc_reg_operand" "r"))
 	  (parallel [(const_int 0) (const_int 3)])))]
   "TARGET_SPE"
 {
@@ -730,12 +772,12 @@
   [(set_attr "type" "vecsimple")
    (set_attr  "length" "4")])
 
-(define_insn "vec_perm11_v2si"
-  [(set (match_operand:V2SI 0 "gpc_reg_operand" "=r")
-	(vec_select:V2SI
-	  (vec_concat:V4SI
-	    (match_operand:V2SI 1 "gpc_reg_operand" "r")
-	    (match_operand:V2SI 2 "gpc_reg_operand" "r"))
+(define_insn "vec_perm11_<mode>"
+  [(set (match_operand:SPE2 0 "gpc_reg_operand" "=r")
+	(vec_select:SPE2
+	  (vec_concat:<SPE2_CONCAT>
+	    (match_operand:SPE2 1 "gpc_reg_operand" "r")
+	    (match_operand:SPE2 2 "gpc_reg_operand" "r"))
 	  (parallel [(const_int 1) (const_int 3)])))]
   "TARGET_SPE"
 {
@@ -747,12 +789,12 @@
   [(set_attr "type" "vecsimple")
    (set_attr  "length" "4")])
 
-(define_insn "vec_perm10_v2si"
-  [(set (match_operand:V2SI 0 "gpc_reg_operand" "=r")
-	(vec_select:V2SI
-	  (vec_concat:V4SI
-	    (match_operand:V2SI 1 "gpc_reg_operand" "r")
-	    (match_operand:V2SI 2 "gpc_reg_operand" "r"))
+(define_insn "vec_perm10_<mode>"
+  [(set (match_operand:SPE2 0 "gpc_reg_operand" "=r")
+	(vec_select:SPE2
+	  (vec_concat:<SPE2_CONCAT>
+	    (match_operand:SPE2 1 "gpc_reg_operand" "r")
+	    (match_operand:SPE2 2 "gpc_reg_operand" "r"))
 	  (parallel [(const_int 1) (const_int 2)])))]
   "TARGET_SPE"
 {

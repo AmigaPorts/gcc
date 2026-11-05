@@ -48,7 +48,8 @@ cases = [('scalar', ['scalar.c', 'scalar-run.c']),
          ('vector', ['intrinsics.c', 'vector-run.c']),
          ('alias', ['alias.c']), ('cxx', ['cxx.cc']),
          ('bridge', ['bridge-kernel.c', 'bridge-run.c']),
-         ('optimize', ['optimize-kernels.c', 'optimize-run.c'])]
+         ('optimize', ['optimize-kernels.c', 'optimize-run.c']),
+         ('permute', ['permute-kernels.c', 'permute-run.c'])]
 if a.libgcc:
     cases.append(('libgcc', ['libgcc.c', 'libgcc-ops.c']))
 for opt in ['-O0', '-O2', '-O3', '-Os']:
