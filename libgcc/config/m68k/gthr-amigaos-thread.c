@@ -121,6 +121,7 @@ void
 __gthread_amigaos_run (struct thread *t)
 {
   t->task->tc_UserData = 0;
+  __gthread_amigaos_start_keys ();
   t->result = t->func (t->args);
   __gthread_amigaos_end_keys (t->task);
 
@@ -173,8 +174,13 @@ __gthread_create (__gthread_t *thread, void *(*func) (void *), void *args)
   struct thread *t;
   BPTR in = 0, out = 0;
 
-  if (!(t = AllocMem (sizeof (*t), MEMF_ANY | MEMF_CLEAR)))
+  if (__gthread_amigaos_new_keys ())
     return EAGAIN;
+  if (!(t = AllocMem (sizeof (*t), MEMF_ANY | MEMF_CLEAR)))
+    {
+      __gthread_amigaos_cancel_keys ();
+      return EAGAIN;
+    }
   t->func = func;
   t->args = args;
   __asm__ ("move.l a4,%0" : "=g" (t->a4));
@@ -202,6 +208,7 @@ __gthread_create (__gthread_t *thread, void *(*func) (void *), void *args)
   if (!proc)
     {
       FreeMem (t, sizeof (*t));
+      __gthread_amigaos_cancel_keys ();
       return EAGAIN;
     }
 

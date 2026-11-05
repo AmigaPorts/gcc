@@ -33,10 +33,19 @@ struct __gthread_cond_waiter {
 void __gthread_cond_enqueue (__gthread_cond_t *, struct __gthread_cond_waiter *);
 void __gthread_cond_dequeue (__gthread_cond_t *, struct __gthread_cond_waiter *);
 
-/* At the end of a thread: run its key destructors and free its block.  */
+/* A thread's keys: in its creator before it starts, first thing in it,
+   in the creator if it fails to start, and at its end, which runs their
+   destructors and frees its block.  */
 struct Task;
+int __gthread_amigaos_new_keys (void);
+void __gthread_amigaos_start_keys (void);
+void __gthread_amigaos_cancel_keys (void);
 void __gthread_amigaos_end_keys (struct Task *);
 
-/* The same for a task that another thread library started, which calls
-   __gthread_amigaos_task_end() (amigaos-task-end.c).  */
+/* The same for a task that another thread library starts, which calls
+   __gthread_amigaos_task_new(), _start(), _cancel() and _end()
+   (amigaos-task-end.c).  */
+extern int (*__gthread_amigaos_task_new_hook) (void);
+extern void (*__gthread_amigaos_task_start_hook) (void);
+extern void (*__gthread_amigaos_task_cancel_hook) (void);
 extern void (*__gthread_amigaos_task_end_hook) (struct Task *);
