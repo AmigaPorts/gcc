@@ -23231,7 +23231,11 @@ rs6000_rtx_costs (rtx x, machine_mode mode, int outer_code,
       return false;
 
     case FLOAT_EXTEND:
-      if (mode == DFmode)
+      /* SPE needs an explicit conversion even for a memory operand.
+	 Do not price it as a conventional FPR load-and-extend.  */
+      if (TARGET_E500_DOUBLE && mode == DFmode)
+	*total = COSTS_N_INSNS (1);
+      else if (mode == DFmode)
 	*total = rs6000_cost->sfdf_convert;
       else
 	*total = rs6000_cost->fp;
