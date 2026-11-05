@@ -79,6 +79,8 @@ expand_block_clear (rtx operands[])
     clear_step = 16;
   else if (TARGET_POWERPC64 && (align >= 64 || !STRICT_ALIGNMENT))
     clear_step = 8;
+  else if (TARGET_SPE && align >= 64)
+    clear_step = 8;
   else
     clear_step = 4;
 
@@ -99,6 +101,11 @@ expand_block_clear (rtx operands[])
 	{
 	  clear_bytes = 16;
 	  mode = V4SImode;
+	}
+      else if (bytes >= 8 && TARGET_SPE && align >= 64)
+	{
+	  clear_bytes = 8;
+	  mode = V2SImode;
 	}
       else if (bytes >= 8 && TARGET_POWERPC64
 	       && (align >= 64 || !STRICT_ALIGNMENT))

@@ -24,6 +24,18 @@
 #undef MD_EXEC_PREFIX
 #undef MD_STARTFILE_PREFIX
 
+/* Reject unsupported SPE library selections even in link-only invocations.
+   The legacy 8540 spelling remains valid when double GPRs are explicit.  */
+#undef SUBTARGET_DRIVER_SELF_SPECS
+#define SUBTARGET_DRIVER_SELF_SPECS \
+  "%{mcpu=8540|mspe|mabi=spe:%{!mcpu=8548:%{!mfloat-gprs=double:" \
+  "%eAmigaOS4 SPE requires -mcpu=8548 or -mfloat-gprs=double}}}", \
+  "%{mcpu=8548|mfloat-gprs=double:" \
+  "%{msoft-float|mno-spe|mabi=no-spe:" \
+  "%eAmigaOS4 SPE requires the hard-float SPE ABI}" \
+  "%{mfloat-gprs=single|mfloat-gprs=yes|mfloat-gprs=no:" \
+  "%eAmigaOS4 SPE requires double-precision GPR floating point}}"
+
 /* Make CPU default to 604e. FIXME: Make this 750 later */
 #undef PROCESSOR_DEFAULT
 #define PROCESSOR_DEFAULT PROCESSOR_PPC604e

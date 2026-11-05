@@ -83,6 +83,9 @@
 
 /* This file should be included last.  */
 #include "target-def.h"
+/* Return the string to flip the GT bit on a CR.  */ char * output_e500_flip_gt_bit (rtx dst, rtx src);
+static rtx rs6000_dwarf_register_span (rtx reg);
+static bool rs6000_member_type_forces_blk (const_tree field, machine_mode mode);
 
 extern tree rs6000_builtin_mask_for_load (void);
 extern tree rs6000_builtin_md_vectorized_function (tree, tree, tree);
@@ -1231,6 +1234,8 @@ char rs6000_reg_names[][8] =
       "vrsave", "vscr", "sfp",
   /* DMRs */
       "0", "1", "2", "3", "4", "5", "6", "7",
+  "spe_acc", "spefscr",
+  "rh0", "rh1", "rh2", "rh3", "rh4", "rh5", "rh6", "rh7", "rh8", "rh9", "rh10", "rh11", "rh12", "rh13", "rh14", "rh15", "rh16", "rh17", "rh18", "rh19", "rh20", "rh21", "rh22", "rh23", "rh24", "rh25", "rh26", "rh27", "rh28", "rh29", "rh30", "rh31"
 };
 
 #ifdef TARGET_REGNAMES
@@ -1259,6 +1264,8 @@ static const char alt_reg_names[][8] =
   "vrsave", "vscr", "sfp",
   /* DMRs */
   "%dm0", "%dm1", "%dm2", "%dm3", "%dm4", "%dm5", "%dm6", "%dm7",
+  "spe_acc", "spefscr",
+  "rh0", "rh1", "rh2", "rh3", "rh4", "rh5", "rh6", "rh7", "rh8", "rh9", "rh10", "rh11", "rh12", "rh13", "rh14", "rh15", "rh16", "rh17", "rh18", "rh19", "rh20", "rh21", "rh22", "rh23", "rh24", "rh25", "rh26", "rh27", "rh28", "rh29", "rh30", "rh31"
 };
 #endif
 
@@ -1513,8 +1520,14 @@ extern void amigaos_function_end_prologue (FILE *);
 #undef TARGET_INSN_COST
 #define TARGET_INSN_COST rs6000_insn_cost
 
+#undef TARGET_DWARF_REGISTER_SPAN
+#define TARGET_DWARF_REGISTER_SPAN rs6000_dwarf_register_span
+
 #undef TARGET_INIT_DWARF_REG_SIZES_EXTRA
 #define TARGET_INIT_DWARF_REG_SIZES_EXTRA rs6000_init_dwarf_reg_sizes_extra
+
+#undef TARGET_MEMBER_TYPE_FORCES_BLK
+#define TARGET_MEMBER_TYPE_FORCES_BLK rs6000_member_type_forces_blk
 
 #undef TARGET_PROMOTE_FUNCTION_MODE
 #define TARGET_PROMOTE_FUNCTION_MODE rs6000_promote_function_mode
@@ -1842,6 +1855,13 @@ rs6000_cpu_name_lookup (const char *name)
 static int
 rs6000_hard_regno_nregs_internal (int regno, machine_mode mode)
 {
+  if (SPE_SIMD_REGNO_P (regno) && TARGET_SPE && SPE_VECTOR_MODE (mode))
+    return 1;
+  if (TARGET_E500_DOUBLE && FLOAT_MODE_P (mode) && mode != SCmode
+      && !DECIMAL_FLOAT_MODE_P (mode)
+      && SPE_SIMD_REGNO_P (regno))
+    return (GET_MODE_SIZE (mode) + 7) / 8;
+
   unsigned HOST_WIDE_INT reg_size;
 
   /* 128-bit floating point usually takes 2 registers, unless it is IEEE
@@ -1851,6 +1871,9 @@ rs6000_hard_regno_nregs_internal (int regno, machine_mode mode)
     reg_size = (VECTOR_MEM_VSX_P (mode) || VECTOR_ALIGNMENT_P (mode)
 		? UNITS_PER_VSX_WORD
 		: UNITS_PER_FP_WORD);
+
+  else if (SPE_SIMD_REGNO_P (regno) && TARGET_SPE && SPE_VECTOR_MODE (mode))
+    reg_size = UNITS_PER_SPE_WORD;
 
   else if (ALTIVEC_REGNO_P (regno))
     reg_size = UNITS_PER_ALTIVEC_WORD;
@@ -1869,6 +1892,9 @@ rs6000_hard_regno_nregs_internal (int regno, machine_mode mode)
 static int
 rs6000_hard_regno_mode_ok_uncached (int regno, machine_mode mode)
 {
+  if (FP_REGNO_P (regno) && !TARGET_FPRS)
+    return false;
+
   int last_regno = regno + rs6000_hard_regno_nregs[mode][regno] - 1;
 
   if (COMPLEX_MODE_P (mode))
@@ -1978,6 +2004,10 @@ rs6000_hard_regno_mode_ok_uncached (int regno, machine_mode mode)
     return (VECTOR_MEM_ALTIVEC_OR_VSX_P (mode)
 	    || mode == V1TImode);
 
+  /* ...but GPRs can hold SIMD data on the SPE in one register.  */
+  if (SPE_SIMD_REGNO_P (regno) && TARGET_SPE && SPE_VECTOR_MODE (mode))
+    return 1;
+
   /* We cannot put non-VSX TImode or PTImode anywhere except general register
      and it must be able to fit within the register set.  */
 
@@ -2016,6 +2046,11 @@ rs6000_hard_regno_mode_ok (unsigned int regno, machine_mode mode)
 static bool
 rs6000_modes_tieable_p (machine_mode mode1, machine_mode mode2)
 {
+  if (TARGET_E500_DOUBLE && ((mode1 == DFmode) != (mode2 == DFmode)))
+    return false;
+  if (TARGET_SPE && (SPE_VECTOR_MODE (mode1) != SPE_VECTOR_MODE (mode2)))
+    return false;
+
   if (mode1 == PTImode || mode1 == OOmode || mode1 == XOmode
       || mode1 == TDOmode || mode2 == PTImode || mode2 == OOmode
       || mode2 == XOmode || mode2 == TDOmode)
@@ -2352,6 +2387,8 @@ rs6000_debug_reg_global (void)
   rs6000_debug_reg_print (CA_REGNO, CA_REGNO, "ca");
   rs6000_debug_reg_print (VRSAVE_REGNO, VRSAVE_REGNO, "vrsave");
   rs6000_debug_reg_print (VSCR_REGNO, VSCR_REGNO, "vscr");
+  rs6000_debug_reg_print (SPE_ACC_REGNO, SPE_ACC_REGNO, "spe_a");
+  rs6000_debug_reg_print (SPEFSCR_REGNO, SPEFSCR_REGNO, "spe_f");
 
   fputs ("\nVirtual/stack/frame registers:\n", stderr);
   for (v = 0; v < ARRAY_SIZE (virtual_regs); v++)
@@ -2585,6 +2622,12 @@ rs6000_debug_reg_global (void)
 
   fprintf (stderr, DEBUG_FMT_S, "soft_float",
 	   (TARGET_SOFT_FLOAT ? "true" : "false"));
+
+  fprintf (stderr, DEBUG_FMT_S, "e500_single",
+	   (TARGET_E500_SINGLE ? "true" : "false"));
+
+  fprintf (stderr, DEBUG_FMT_S, "e500_double",
+	   (TARGET_E500_DOUBLE ? "true" : "false"));
 
   if (TARGET_LINK_STACK)
     fprintf (stderr, DEBUG_FMT_S, "link_stack", "true");
@@ -2866,6 +2909,12 @@ rs6000_init_hard_regno_mode_ok (bool global_init_p)
   reg_class_to_reg_type[(int)CR_REGS] = CR_REG_TYPE;
   reg_class_to_reg_type[(int)CR0_REGS] = CR_REG_TYPE;
   reg_class_to_reg_type[(int)DMR_REGS] = DMR_REG_TYPE;
+  reg_class_to_reg_type[SPE_ACC_REGS] = SPR_REG_TYPE;
+  reg_class_to_reg_type[SPEFSCR_REGS] = SPR_REG_TYPE;
+  rs6000_regno_regclass[SPE_ACC_REGNO] = SPE_ACC_REGS;
+  rs6000_regno_regclass[SPEFSCR_REGNO] = SPEFSCR_REGS;
+  for (int regno = FIRST_SPE_HIGH_REGNO; regno <= LAST_SPE_HIGH_REGNO; ++regno)
+    rs6000_regno_regclass[regno] = SPE_HIGH_REGS;
 
   if (TARGET_VSX)
     {
@@ -3033,7 +3082,7 @@ rs6000_init_hard_regno_mode_ok (bool global_init_p)
 	wx - Float register if we can do 32-bit int stores.
 	wD - Dense math register if TARGET_DMF is enabled, else float register.  */
 
-  if (TARGET_HARD_FLOAT)
+  if (TARGET_HARD_FLOAT && TARGET_FPRS)
     rs6000_constraints[RS6000_CONSTRAINT_d] = FLOAT_REGS;
   if (TARGET_ALTIVEC)
     rs6000_constraints[RS6000_CONSTRAINT_v] = ALTIVEC_REGS;
@@ -3277,6 +3326,9 @@ rs6000_init_hard_regno_mode_ok (bool global_init_p)
 	    = (GET_MODE_SIZE (m2) + reg_size2 - 1) / reg_size2;
 	}
     }
+
+  if (TARGET_E500_DOUBLE)
+    rs6000_class_max_nregs[DFmode][GENERAL_REGS] = 1;
 
   /* Calculate which modes to automatically generate code to use a the
      reciprocal divide and square root instructions.  In the future, possibly
@@ -3865,12 +3917,47 @@ rs6000_option_override_internal (bool global_init_p)
   gcc_assert (tune_index >= 0);
   rs6000_tune = processor_target_table[tune_index].processor;
 
+  bool spe_cpu = (rs6000_cpu == PROCESSOR_PPC8540
+		  || rs6000_cpu == PROCESSOR_PPC8548);
+  if (!global_options_set.x_rs6000_spe)
+    rs6000_spe = spe_cpu;
+  if (!global_options_set.x_rs6000_spe_abi)
+    rs6000_spe_abi = rs6000_spe;
+  if (!global_options_set.x_rs6000_float_gprs)
+    rs6000_float_gprs = !rs6000_spe ? 0
+      : rs6000_cpu == PROCESSOR_PPC8548 ? 2 : 1;
+  if (TARGET_SPE && (TARGET_64BIT || TARGET_ALTIVEC || TARGET_VSX))
+    error ("SPE requires 32-bit code without AltiVec or VSX");
+  if (main_target_opt != NULL
+      && (main_target_opt->x_rs6000_spe != rs6000_spe
+	  || main_target_opt->x_rs6000_spe_abi != rs6000_spe_abi
+	  || main_target_opt->x_rs6000_float_gprs != rs6000_float_gprs))
+    error ("target attribute or pragma changes SPE ABI");
+  if (TARGET_SPE && TARGET_HARD_FLOAT && TARGET_FPRS)
+    error ("SPE does not support floating-point registers");
+  if (rs6000_float_gprs && !TARGET_SPE)
+    error ("%<-mfloat-gprs%> requires %<-mspe%>");
+#ifdef TARGET_AMIGAOS4
+  if ((TARGET_SPE || TARGET_SPE_ABI || rs6000_float_gprs)
+      && !(TARGET_SPE && TARGET_SPE_ABI && TARGET_E500_DOUBLE))
+    error ("AmigaOS4 SPE requires the hard-float double-precision SPE ABI");
+#endif
+
+
+
   if (rs6000_cpu == PROCESSOR_PPCE300C2 || rs6000_cpu == PROCESSOR_PPCE300C3
       || rs6000_cpu == PROCESSOR_PPCE500MC || rs6000_cpu == PROCESSOR_PPCE500MC64
       || rs6000_cpu == PROCESSOR_PPCE5500)
     {
       if (TARGET_ALTIVEC)
 	error ("AltiVec not supported in this target");
+      if (TARGET_SPE)
+	error ("SPE not supported in this target");
+    }
+  if (rs6000_cpu == PROCESSOR_PPCE6500)
+    {
+      if (TARGET_SPE)
+	error ("SPE not supported in this target");
     }
 
   /* If we are optimizing big endian systems for space, use the load/store
@@ -5240,6 +5327,15 @@ rs6000_builtin_vectorization_cost (enum vect_cost_for_stmt type_of_cost,
 static machine_mode
 rs6000_preferred_simd_mode (scalar_mode mode)
 {
+  if (TARGET_SPE)
+    {
+      if (mode == SFmode && TARGET_HARD_FLOAT)
+	return V2SFmode;
+      if (mode == SImode)
+	return V2SImode;
+      return word_mode;
+    }
+
   opt_machine_mode vmode = mode_for_vector (mode, 16 / GET_MODE_SIZE (mode));
 
   if (vmode.exists () && !VECTOR_MEM_NONE_P (vmode.require ()))
@@ -6765,7 +6861,7 @@ vspltisw_vupkhsw_constant_p (rtx op, machine_mode mode, int *constant_ptr)
 const char *
 output_vec_const_move (rtx *operands)
 {
-  int shift;
+  int cst, cst2, shift;
   machine_mode mode;
   rtx dest, vec;
 
@@ -6882,6 +6978,17 @@ output_vec_const_move (rtx *operands)
 	}
     }
 
+  if (TARGET_SPE && mode == V2SImode)
+    {
+      operands[1] = CONST_VECTOR_ELT (vec, 0);
+      operands[2] = CONST_VECTOR_ELT (vec, 1);
+      if (rtx_equal_p (operands[1], operands[2]))
+	return "li %0,%1\n\tevmergelo %0,%0,%0";
+      if (WORDS_BIG_ENDIAN)
+	return "li %0,%1\n\tevmergelo %0,%0,%0\n\tli %0,%2";
+      return "li %0,%2\n\tevmergelo %0,%0,%0\n\tli %0,%1";
+    }
+
   gcc_unreachable ();
 }
 
@@ -6932,6 +7039,16 @@ rs6000_expand_vector_init (rtx target, rtx vals)
 	  emit_move_insn (target, const_vec);
 	  return;
 	}
+    }
+
+  /* SPE can assemble two scalar floats directly from their GPR low halves.
+     Avoid the generic stack construction, including scalar splats.  */
+  if (TARGET_SPE && mode == V2SFmode)
+    {
+      rtx op0 = force_reg (SFmode, XVECEXP (vals, 0, 0));
+      rtx op1 = all_same ? op0 : force_reg (SFmode, XVECEXP (vals, 0, 1));
+      emit_insn (gen_spe_concat_v2sf (target, op0, op1));
+      return;
     }
 
   /* Double word values on VSX can use xxpermdi or lxvdsx.  */
@@ -8173,6 +8290,51 @@ rs6000_split_vec_extract_var (rtx dest, rtx src, rtx element, rtx tmp_gpr,
     gcc_unreachable ();
  }
 
+/* Return TRUE if OP is an invalid SUBREG operation on the e500.  */
+
+bool
+invalid_e500_subreg (rtx op, machine_mode mode)
+{
+  if (TARGET_E500_DOUBLE)
+    {
+      /* Reject (subreg:SI (reg:DF)); likewise with subreg:DI or
+	 subreg:TI and reg:TF.  Decimal float modes are like integer
+	 modes (only low part of each register used) for this
+	 purpose.  */
+      if (GET_CODE (op) == SUBREG
+	  && (mode == SImode || mode == DImode || mode == TImode
+	      || mode == DDmode || mode == TDmode || mode == PTImode)
+	  && REG_P (SUBREG_REG (op))
+	  && (GET_MODE (SUBREG_REG (op)) == DFmode
+	      || GET_MODE (SUBREG_REG (op)) == TFmode
+	      || GET_MODE (SUBREG_REG (op)) == IFmode
+	      || GET_MODE (SUBREG_REG (op)) == KFmode))
+	return true;
+
+      /* Reject (subreg:DF (reg:DI)); likewise with subreg:TF and
+	 reg:TI.  */
+      if (GET_CODE (op) == SUBREG
+	  && (mode == DFmode || mode == TFmode || mode == IFmode
+	      || mode == KFmode)
+	  && REG_P (SUBREG_REG (op))
+	  && (GET_MODE (SUBREG_REG (op)) == DImode
+	      || GET_MODE (SUBREG_REG (op)) == TImode
+	      || GET_MODE (SUBREG_REG (op)) == PTImode
+	      || GET_MODE (SUBREG_REG (op)) == DDmode
+	      || GET_MODE (SUBREG_REG (op)) == TDmode))
+	return true;
+    }
+
+  if (TARGET_SPE
+      && GET_CODE (op) == SUBREG
+      && mode == SImode
+      && REG_P (SUBREG_REG (op))
+      && SPE_VECTOR_MODE (GET_MODE (SUBREG_REG (op))))
+    return true;
+
+  return false;
+}
+
 /* Return alignment of TYPE.  Existing alignment is ALIGN.  HOW
    selects whether the alignment is abi mandated, optional, or
    both abi and optional alignment.  */
@@ -9023,6 +9185,8 @@ legitimate_small_data_p (machine_mode mode, rtx x)
 	  && small_data_operand (x, mode));
 }
 
+/* SPE offset addressing is limited to 5-bits worth of double words.  */
+
 bool
 rs6000_legitimate_offset_address_p (machine_mode mode, rtx x,
 				    bool strict, bool worst_case)
@@ -9046,6 +9210,13 @@ rs6000_legitimate_offset_address_p (machine_mode mode, rtx x,
     return false;
 
   offset = INTVAL (XEXP (x, 1));
+  if (TARGET_SPE && (SPE_VECTOR_MODE (mode)
+		    || (TARGET_E500_DOUBLE && FLOAT_MODE_P (mode)
+			&& !DECIMAL_FLOAT_MODE_P (mode)
+			&& GET_MODE_SIZE (mode) >= 8 && mode != SCmode)))
+    return (SPE_CONST_OFFSET_OK (offset)
+	    && (GET_MODE_SIZE (mode) <= 8
+		|| SPE_CONST_OFFSET_OK (offset + GET_MODE_SIZE (mode) - 8)));
   extra = 0;
   switch (mode)
     {
@@ -9150,6 +9321,12 @@ macho_lo_sum_memory_operand (rtx x, machine_mode mode)
 static bool
 legitimate_lo_sum_address_p (machine_mode mode, rtx x, int strict)
 {
+  if (TARGET_SPE && (SPE_VECTOR_MODE (mode)
+		    || (TARGET_E500_DOUBLE && FLOAT_MODE_P (mode)
+			&& !DECIMAL_FLOAT_MODE_P (mode)
+			&& GET_MODE_SIZE (mode) >= 8 && mode != SCmode)))
+    return false;
+
   if (GET_CODE (x) != LO_SUM)
     return false;
   if (!REG_P (XEXP (x, 0)))
@@ -9242,6 +9419,18 @@ static rtx
 rs6000_legitimize_address (rtx x, rtx oldx ATTRIBUTE_UNUSED,
 			   machine_mode mode)
 {
+  if (TARGET_SPE && (SPE_VECTOR_MODE (mode)
+		    || (TARGET_E500_DOUBLE && FLOAT_MODE_P (mode)
+			&& !DECIMAL_FLOAT_MODE_P (mode)
+			&& GET_MODE_SIZE (mode) >= 8 && mode != SCmode)))
+    {
+      if (legitimate_indirect_address_p (x, 0)
+	  || (GET_MODE_SIZE (mode) == 8 && legitimate_indexed_address_p (x, 0))
+	  || rs6000_legitimate_offset_address_p (mode, x, false, false))
+	return x;
+      return force_reg (Pmode, x);
+    }
+
   unsigned int extra;
 
   if (!reg_offset_addressing_ok_p (mode)
@@ -9983,6 +10172,15 @@ static bool
 rs6000_legitimate_address_p (machine_mode mode, rtx x, bool reg_ok_strict,
 			     code_helper ch = ERROR_MARK)
 {
+  if (TARGET_SPE && (SPE_VECTOR_MODE (mode)
+		    || (TARGET_E500_DOUBLE && FLOAT_MODE_P (mode)
+			&& !DECIMAL_FLOAT_MODE_P (mode)
+			&& GET_MODE_SIZE (mode) >= 8 && mode != SCmode)))
+    return (legitimate_indirect_address_p (x, reg_ok_strict)
+	    || (GET_MODE_SIZE (mode) == 8
+		&& legitimate_indexed_address_p (x, reg_ok_strict))
+	    || rs6000_legitimate_offset_address_p (mode, x, reg_ok_strict, false));
+
   bool reg_offset_p = reg_offset_addressing_ok_p (mode);
   bool quad_offset_p = mode_supports_dq_form (mode);
 
@@ -10294,7 +10492,7 @@ rs6000_conditional_register_usage (void)
     fixed_regs[13] = call_used_regs[13] = 1;
 
   /* Conditionally disable FPRs.  */
-  if (TARGET_SOFT_FLOAT)
+  if (TARGET_SOFT_FLOAT || !TARGET_FPRS)
     for (i = 32; i < 64; i++)
       fixed_regs[i] = call_used_regs[i] = 1;
 
@@ -11086,6 +11284,71 @@ rs6000_emit_move (rtx dest, rtx source, machine_mode mode)
     }
 #endif
 
+  /* Read a word of an SPE double without a read/write dependency on
+     either register.  This is also needed for LRA-generated bitcast
+     reloads; the older subreg moves have preservation constraints.  */
+  if (TARGET_HARD_FLOAT && TARGET_E500_DOUBLE && mode == SImode
+      && SUBREG_P (source) && REG_P (SUBREG_REG (source))
+      && GET_MODE (SUBREG_REG (source)) == DFmode
+      && (REG_P (dest) || can_create_pseudo_p ()))
+    {
+      if (!can_create_pseudo_p ())
+	gcc_checking_assert (REG_P (dest) && INT_REGNO_P (REGNO (dest)));
+      rtx value = REG_P (dest) ? dest : gen_reg_rtx (SImode);
+      emit_insn (gen_spe_extract_df (value, SUBREG_REG (source),
+				    GEN_INT (SUBREG_BYTE (source).to_constant ())));
+      if (value != dest)
+	emit_move_insn (dest, value);
+      return;
+    }
+
+  /* DF and DI have different hard-register layouts under the SPE ABI.
+     Express full-width packing as an operation, not a subreg that combine
+     could fold into arithmetic and force IRA to spill the DI pseudo.  */
+  if (TARGET_HARD_FLOAT && TARGET_E500_DOUBLE && mode == DFmode
+      && can_create_pseudo_p ())
+    {
+      if (SUBREG_P (source) && SUBREG_BYTE (source) == 0
+	  && REG_P (SUBREG_REG (source))
+	  && GET_MODE (SUBREG_REG (source)) == DImode)
+	{
+	  rtx value = gen_reg_rtx (DFmode);
+	  emit_insn (gen_spe_pack_df (value, SUBREG_REG (source)));
+	  emit_move_insn (dest, value);
+	  return;
+	}
+      if (SUBREG_P (dest) && SUBREG_BYTE (dest) == 0
+	  && REG_P (SUBREG_REG (dest))
+	  && GET_MODE (SUBREG_REG (dest)) == DImode)
+	{
+	  emit_insn (gen_spe_unpack_df (SUBREG_REG (dest),
+				      force_reg (DFmode, source)));
+	  return;
+	}
+    }
+
+  if (TARGET_HARD_FLOAT && TARGET_E500_DOUBLE && mode == DImode
+      && can_create_pseudo_p ())
+    {
+      if (SUBREG_P (source) && SUBREG_BYTE (source) == 0
+	  && REG_P (SUBREG_REG (source))
+	  && GET_MODE (SUBREG_REG (source)) == DFmode)
+	{
+	  rtx value = gen_reg_rtx (DImode);
+	  emit_insn (gen_spe_unpack_df (value, SUBREG_REG (source)));
+	  emit_move_insn (dest, value);
+	  return;
+	}
+      if (SUBREG_P (dest) && SUBREG_BYTE (dest) == 0
+	  && REG_P (SUBREG_REG (dest))
+	  && GET_MODE (SUBREG_REG (dest)) == DFmode)
+	{
+	  emit_insn (gen_spe_pack_df (SUBREG_REG (dest),
+				    force_reg (DImode, source)));
+	  return;
+	}
+    }
+
   /* See if we need to special case SImode/SFmode SUBREG moves.  */
   if ((mode == SImode || mode == SFmode) && SUBREG_P (source)
       && rs6000_emit_move_si_sf_subreg (dest, source, mode))
@@ -11509,6 +11772,14 @@ rs6000_emit_move (rtx dest, rtx source, machine_mode mode)
       rs6000_eliminate_indexed_memrefs (operands);
       break;
 
+    case E_V4HImode:
+    case E_V2SImode:
+    case E_V1DImode:
+    case E_V2SFmode:
+      if (CONSTANT_P (operands[1]))
+	operands[1] = force_const_mem (mode, operands[1]);
+      break;
+
     default:
       fatal_insn ("bad move", gen_rtx_SET (dest, source));
     }
@@ -11534,7 +11805,7 @@ init_float128_ibm (machine_mode mode)
       set_optab_libfunc (smul_optab, mode, "__gcc_qmul");
       set_optab_libfunc (sdiv_optab, mode, "__gcc_qdiv");
 
-      if (!TARGET_HARD_FLOAT)
+      if (!(TARGET_HARD_FLOAT && (TARGET_FPRS || TARGET_E500_DOUBLE)))
 	{
 	  set_optab_libfunc (neg_optab, mode, "__gcc_qneg");
 	  set_optab_libfunc (eq_optab, mode, "__gcc_qeq");
@@ -11543,7 +11814,6 @@ init_float128_ibm (machine_mode mode)
 	  set_optab_libfunc (ge_optab, mode, "__gcc_qge");
 	  set_optab_libfunc (lt_optab, mode, "__gcc_qlt");
 	  set_optab_libfunc (le_optab, mode, "__gcc_qle");
-	  set_optab_libfunc (unord_optab, mode, "__gcc_qunord");
 
 	  set_conv_libfunc (sext_optab, mode, SFmode, "__gcc_stoq");
 	  set_conv_libfunc (sext_optab, mode, DFmode, "__gcc_dtoq");
@@ -11554,6 +11824,9 @@ init_float128_ibm (machine_mode mode)
 	  set_conv_libfunc (sfloat_optab, mode, SImode, "__gcc_itoq");
 	  set_conv_libfunc (ufloat_optab, mode, SImode, "__gcc_utoq");
 	}
+
+      if (!(TARGET_HARD_FLOAT && TARGET_FPRS))
+	set_optab_libfunc (unord_optab, mode, "__gcc_qunord");
     }
   else
     {
@@ -13823,6 +14096,11 @@ rs6000_can_change_mode_class (machine_mode from,
 			      machine_mode to,
 			      reg_class_t rclass)
 {
+  if (TARGET_E500_DOUBLE && ((from == DFmode) != (to == DFmode)))
+    return false;
+  if (TARGET_SPE && (SPE_VECTOR_MODE (from) != SPE_VECTOR_MODE (to)))
+    return false;
+
   unsigned from_size = GET_MODE_SIZE (from);
   unsigned to_size = GET_MODE_SIZE (to);
 
@@ -14185,6 +14463,12 @@ ccr_bit (rtx op, int scc_p)
       default:
 	return -1;
       }
+
+  /* SPE scalar comparisons represent their boolean result as EQ/NE in
+     CCFPmode, but put that result in the GT bit.  This also applies when
+     if-conversion turns a branch into an isel.  */
+  if (TARGET_SPE && cc_mode == CCFPmode && (code == EQ || code == NE))
+    return base_bit + 1;
 
   switch (code)
     {
@@ -14810,6 +15094,25 @@ print_operand (FILE *file, rtx x, int code)
 	gcc_assert (MEM_P (x));
 
 	tmp = XEXP (x, 0);
+
+	/* SPE supports unsigned, scaled displacements as well as
+	   indexed addresses.  */
+	if (TARGET_SPE && GET_MODE_SIZE (GET_MODE (x)) == 8)
+	  {
+	    if (REG_P (tmp))
+	      {
+		fprintf (file, "0(%s)", reg_names[REGNO (tmp)]);
+		break;
+	      }
+	    if (GET_CODE (tmp) == PLUS && CONST_INT_P (XEXP (tmp, 1)))
+	      {
+		gcc_assert (REG_P (XEXP (tmp, 0)));
+		fprintf (file, HOST_WIDE_INT_PRINT_DEC "(%s)",
+			 INTVAL (XEXP (tmp, 1)),
+			 reg_names[REGNO (XEXP (tmp, 0))]);
+		break;
+	      }
+	  }
 
 	if (VECTOR_MEM_ALTIVEC_OR_VSX_P (GET_MODE (x))
 	    && GET_CODE (tmp) == AND
@@ -15601,9 +15904,187 @@ rs6000_generate_compare (rtx cmp, machine_mode mode)
   /* First, the compare.  */
   compare_result = gen_reg_rtx (comp_mode);
 
+  /* E500 FP compare instructions on the GPRs.  Yuck!  */
+  if ((!TARGET_FPRS && TARGET_HARD_FLOAT)
+      && FLOAT_MODE_P (mode))
+    {
+      rtx cmp, or_result, compare_result2;
+      machine_mode op_mode = GET_MODE (op0);
+      bool reverse_p;
+
+      if (op_mode == VOIDmode)
+	op_mode = GET_MODE (op1);
+
+      /* First reverse the condition codes that aren't directly supported.  */
+      switch (code)
+	{
+	  case NE:
+	  case UNLT:
+	  case UNLE:
+	  case UNGT:
+	  case UNGE:
+	    code = reverse_condition_maybe_unordered (code);
+	    reverse_p = true;
+	    break;
+
+	  case EQ:
+	  case LT:
+	  case LE:
+	  case GT:
+	  case GE:
+	    reverse_p = false;
+	    break;
+
+	  default:
+	    gcc_unreachable ();
+	}
+
+      /* The E500 FP compare instructions toggle the GT bit (CR bit 1) only.
+	 This explains the following mess.  */
+
+      switch (code)
+	{
+	case EQ:
+	  switch (op_mode)
+	    {
+	    case SFmode:
+	      cmp = (flag_finite_math_only && !flag_trapping_math)
+		? gen_tstsfeq_gpr (compare_result, op0, op1)
+		: gen_cmpsfeq_gpr (compare_result, op0, op1);
+	      break;
+
+	    case DFmode:
+	      cmp = (flag_finite_math_only && !flag_trapping_math)
+		? gen_tstdfeq_gpr (compare_result, op0, op1)
+		: gen_cmpdfeq_gpr (compare_result, op0, op1);
+	      break;
+
+	    case TFmode:
+	    case IFmode:
+	    case KFmode:
+	      cmp = (flag_finite_math_only && !flag_trapping_math)
+		? gen_tsttfeq_gpr (compare_result, op0, op1)
+		: gen_cmptfeq_gpr (compare_result, op0, op1);
+	      break;
+
+	    default:
+	      gcc_unreachable ();
+	    }
+	  break;
+
+	case GT:
+	case GE:
+	  switch (op_mode)
+	    {
+	    case SFmode:
+	      cmp = (flag_finite_math_only && !flag_trapping_math)
+		? gen_tstsfgt_gpr (compare_result, op0, op1)
+		: gen_cmpsfgt_gpr (compare_result, op0, op1);
+	      break;
+
+	    case DFmode:
+	      cmp = (flag_finite_math_only && !flag_trapping_math)
+		? gen_tstdfgt_gpr (compare_result, op0, op1)
+		: gen_cmpdfgt_gpr (compare_result, op0, op1);
+	      break;
+
+	    case TFmode:
+	    case IFmode:
+	    case KFmode:
+	      cmp = (flag_finite_math_only && !flag_trapping_math)
+		? gen_tsttfgt_gpr (compare_result, op0, op1)
+		: gen_cmptfgt_gpr (compare_result, op0, op1);
+	      break;
+
+	    default:
+	      gcc_unreachable ();
+	    }
+	  break;
+
+	case LT:
+	case LE:
+	  switch (op_mode)
+	    {
+	    case SFmode:
+	      cmp = (flag_finite_math_only && !flag_trapping_math)
+		? gen_tstsflt_gpr (compare_result, op0, op1)
+		: gen_cmpsflt_gpr (compare_result, op0, op1);
+	      break;
+
+	    case DFmode:
+	      cmp = (flag_finite_math_only && !flag_trapping_math)
+		? gen_tstdflt_gpr (compare_result, op0, op1)
+		: gen_cmpdflt_gpr (compare_result, op0, op1);
+	      break;
+
+	    case TFmode:
+	    case IFmode:
+	    case KFmode:
+	      cmp = (flag_finite_math_only && !flag_trapping_math)
+		? gen_tsttflt_gpr (compare_result, op0, op1)
+		: gen_cmptflt_gpr (compare_result, op0, op1);
+	      break;
+
+	    default:
+	      gcc_unreachable ();
+	    }
+	  break;
+
+	default:
+	  gcc_unreachable ();
+	}
+
+      /* Synthesize LE and GE from LT/GT || EQ.  */
+      if (code == LE || code == GE)
+	{
+	  emit_insn (cmp);
+
+	  compare_result2 = gen_reg_rtx (CCFPmode);
+
+	  /* Do the EQ.  */
+	  switch (op_mode)
+	    {
+	    case SFmode:
+	      cmp = (flag_finite_math_only && !flag_trapping_math)
+		? gen_tstsfeq_gpr (compare_result2, op0, op1)
+		: gen_cmpsfeq_gpr (compare_result2, op0, op1);
+	      break;
+
+	    case DFmode:
+	      cmp = (flag_finite_math_only && !flag_trapping_math)
+		? gen_tstdfeq_gpr (compare_result2, op0, op1)
+		: gen_cmpdfeq_gpr (compare_result2, op0, op1);
+	      break;
+
+	    case TFmode:
+	    case IFmode:
+	    case KFmode:
+	      cmp = (flag_finite_math_only && !flag_trapping_math)
+		? gen_tsttfeq_gpr (compare_result2, op0, op1)
+		: gen_cmptfeq_gpr (compare_result2, op0, op1);
+	      break;
+
+	    default:
+	      gcc_unreachable ();
+	    }
+
+	  emit_insn (cmp);
+
+	  /* OR them together.  */
+	  or_result = gen_reg_rtx (CCFPmode);
+	  cmp = gen_e500_cr_ior_compare (or_result, compare_result,
+					 compare_result2);
+	  compare_result = or_result;
+	}
+
+      code = reverse_p ? NE : EQ;
+
+      emit_insn (cmp);
+    }
+
   /* IEEE 128-bit support in VSX registers when we do not have hardware
      support.  */
-  if (!TARGET_FLOAT128_HW && FLOAT128_IEEE_P (mode))
+  else if (!TARGET_FLOAT128_HW && FLOAT128_IEEE_P (mode))
     {
       rtx libfunc = NULL_RTX;
       bool check_nan = false;
@@ -15718,7 +16199,7 @@ rs6000_generate_compare (rtx cmp, machine_mode mode)
 	 CLOBBERs to match cmptf_internal2 pattern.  */
       if (comp_mode == CCFPmode && TARGET_XL_COMPAT
 	  && FLOAT128_IBM_P (GET_MODE (op0))
-	  && TARGET_HARD_FLOAT)
+	  && TARGET_HARD_FLOAT && TARGET_FPRS)
 	emit_insn (gen_rtx_PARALLEL (VOIDmode,
 	  gen_rtvec (10,
 		     gen_rtx_SET (compare_result,
@@ -16090,6 +16571,16 @@ rs6000_emit_sCOND (machine_mode mode, rtx operands[])
   rtx condition_rtx = rs6000_generate_compare (operands[1], mode);
   rtx_code cond_code = GET_CODE (condition_rtx);
 
+  if (FLOAT_MODE_P (mode) && !TARGET_FPRS && TARGET_HARD_FLOAT)
+    {
+      rtx cc = XEXP (condition_rtx, 0);
+      gcc_assert (cond_code == NE || cond_code == EQ);
+      if (cond_code == NE)
+	emit_insn (gen_e500_flip_gt_bit (cc, cc));
+      emit_insn (gen_move_from_CR_gt_bit (operands[0], cc));
+      return;
+    }
+
   if (FLOAT_MODE_P (mode) && HONOR_NANS (mode)
       && !(FLOAT128_VECTOR_P (mode) && !TARGET_FLOAT128_HW))
     ;
@@ -16178,6 +16669,26 @@ output_cbranch (rtx op, const char *label, int reversed, rtx_insn *insn)
 	code = reverse_condition_maybe_unordered (code);
       else
 	code = reverse_condition (code);
+    }
+
+  if ((!TARGET_FPRS && TARGET_HARD_FLOAT) && mode == CCFPmode)
+    {
+      /* The efscmp/tst* instructions twiddle bit 2, which maps nicely
+	 to the GT bit.  */
+      switch (code)
+	{
+	case EQ:
+	  /* Opposite of GT.  */
+	  code = GT;
+	  break;
+
+	case NE:
+	  code = UNLE;
+	  break;
+
+	default:
+	  gcc_unreachable ();
+	}
     }
 
   switch (code)
@@ -21635,7 +22146,9 @@ rs6000_elf_file_end (void)
     {
       if (rs6000_passes_vector)
 	fprintf (asm_out_file, "\t.gnu_attribute 8, %d\n",
-		 (TARGET_ALTIVEC_ABI ? 2 : 1));
+		 (TARGET_ALTIVEC_ABI ? 2
+		  : TARGET_SPE_ABI ? 3
+		  : 1));
       if (rs6000_returns_struct)
 	fprintf (asm_out_file, "\t.gnu_attribute 12, %d\n",
 		 aix_struct_return ? 2 : 1);
@@ -22736,7 +23249,11 @@ rs6000_rtx_costs (rtx x, machine_mode mode, int outer_code,
       return false;
 
     case FLOAT_EXTEND:
-      if (mode == DFmode)
+      /* SPE needs an explicit conversion even for a memory operand.
+	 Do not price it as a conventional FPR load-and-extend.  */
+      if (TARGET_E500_DOUBLE && mode == DFmode)
+	*total = COSTS_N_INSNS (1);
+      else if (mode == DFmode)
 	*total = rs6000_cost->sfdf_convert;
       else
 	*total = rs6000_cost->fp;
@@ -22749,7 +23266,8 @@ rs6000_rtx_costs (rtx x, machine_mode mode, int outer_code,
 	  *total = COSTS_N_INSNS (1);
 	  return true;
 	}
-      else if (FLOAT_MODE_P (mode) && TARGET_PPC_GFXOPT && TARGET_HARD_FLOAT)
+      else if (FLOAT_MODE_P (mode)
+	       && TARGET_PPC_GFXOPT && TARGET_HARD_FLOAT && TARGET_FPRS)
 	{
 	  *total = rs6000_cost->fp;
 	  return false;
@@ -24022,7 +24540,8 @@ rs6000_vectorize_vec_perm_const (machine_mode vmode, machine_mode op_mode,
     op1 = force_reg (vmode, op1);
 
   /* Check for ps_merge* or xxpermdi insns.  */
-  if ((vmode == V2DFmode || vmode == V2DImode) && VECTOR_MEM_VSX_P (vmode))
+  if (((vmode == V2DFmode || vmode == V2DImode) && VECTOR_MEM_VSX_P (vmode))
+      || (TARGET_SPE && (vmode == V2SImode || vmode == V2SFmode)))
     {
       if (testing_p)
 	{
@@ -24124,7 +24643,7 @@ rs6000_complex_function_value (machine_mode mode)
 	  || (mode == TCmode && TARGET_IEEEQUAD)))
     regno = ALTIVEC_ARG_RETURN;
 
-  else if (FLOAT_MODE_P (mode) && TARGET_HARD_FLOAT)
+  else if (FLOAT_MODE_P (mode) && TARGET_HARD_FLOAT && TARGET_FPRS)
     regno = FP_ARG_RETURN;
 
   else
@@ -24243,10 +24762,10 @@ rs6000_function_value (const_tree valtype,
       || POINTER_TYPE_P (valtype))
     mode = TARGET_32BIT ? SImode : DImode;
 
-  if (DECIMAL_FLOAT_MODE_P (mode) && TARGET_HARD_FLOAT)
+  if (DECIMAL_FLOAT_MODE_P (mode) && TARGET_HARD_FLOAT && TARGET_FPRS)
     /* _Decimal128 must use an even/odd register pair.  */
     regno = (mode == TDmode) ? FP_ARG_RETURN + 1 : FP_ARG_RETURN;
-  else if (SCALAR_FLOAT_TYPE_P (valtype) && TARGET_HARD_FLOAT
+  else if (SCALAR_FLOAT_TYPE_P (valtype) && TARGET_HARD_FLOAT && TARGET_FPRS
 	   && !FLOAT128_VECTOR_P (mode))
     regno = FP_ARG_RETURN;
   else if (TREE_CODE (valtype) == COMPLEX_TYPE
@@ -24259,6 +24778,10 @@ rs6000_function_value (const_tree valtype,
 	   && TARGET_ALTIVEC && TARGET_ALTIVEC_ABI
 	   && ALTIVEC_OR_VSX_VECTOR_MODE (mode))
     regno = ALTIVEC_ARG_RETURN;
+  else if (TARGET_E500_DOUBLE && TARGET_HARD_FLOAT
+	   && (mode == DFmode || mode == DCmode
+	       || FLOAT128_IBM_P (mode) || mode == TCmode))
+    return spe_build_register_parallel (mode, GP_ARG_RETURN);
   else
     regno = GP_ARG_RETURN;
 
@@ -24276,10 +24799,10 @@ rs6000_libcall_value (machine_mode mode)
   if (TARGET_32BIT && TARGET_POWERPC64 && mode == DImode)
     return rs6000_parallel_return (mode, 2, SImode, GP_ARG_RETURN, 1);
 
-  if (DECIMAL_FLOAT_MODE_P (mode) && TARGET_HARD_FLOAT)
+  if (DECIMAL_FLOAT_MODE_P (mode) && TARGET_HARD_FLOAT && TARGET_FPRS)
     /* _Decimal128 must use an even/odd register pair.  */
     regno = (mode == TDmode) ? FP_ARG_RETURN + 1 : FP_ARG_RETURN;
-  else if (SCALAR_FLOAT_MODE_NOT_VECTOR_P (mode) && TARGET_HARD_FLOAT)
+  else if (SCALAR_FLOAT_MODE_NOT_VECTOR_P (mode) && TARGET_HARD_FLOAT && TARGET_FPRS)
     regno = FP_ARG_RETURN;
   /* VSX is a superset of Altivec and adds V2DImode/V2DFmode.  Since the same
      return register is used in both cases, and we won't see V2DImode/V2DFmode
@@ -24289,6 +24812,10 @@ rs6000_libcall_value (machine_mode mode)
     regno = ALTIVEC_ARG_RETURN;
   else if (COMPLEX_MODE_P (mode) && targetm.calls.split_complex_arg)
     return rs6000_complex_function_value (mode);
+  else if (TARGET_E500_DOUBLE && TARGET_HARD_FLOAT
+	   && (mode == DFmode || mode == DCmode
+	       || FLOAT128_IBM_P (mode) || mode == TCmode))
+    return spe_build_register_parallel (mode, GP_ARG_RETURN);
   else
     regno = GP_ARG_RETURN;
 
@@ -24312,7 +24839,7 @@ rs6000_compute_pressure_classes (enum reg_class *pressure_classes)
     pressure_classes[n++] = VSX_REGS;
   else
     {
-      if (TARGET_HARD_FLOAT)
+      if (TARGET_HARD_FLOAT && TARGET_FPRS)
 	pressure_classes[n++] = FLOAT_REGS;
     }
   if (TARGET_DMF)
@@ -24380,6 +24907,24 @@ rs6000_initial_elimination_offset (int from, int to)
 static void
 rs6000_init_dwarf_reg_sizes_extra (tree address)
 {
+  if (TARGET_SPE)
+    {
+      int i;
+      machine_mode mode = TYPE_MODE (char_type_node);
+      rtx addr = expand_expr (address, NULL_RTX, VOIDmode, EXPAND_NORMAL);
+      rtx mem = gen_rtx_MEM (BLKmode, addr);
+      rtx value = gen_int_mode (4, mode);
+
+      for (i = FIRST_SPE_HIGH_REGNO; i < LAST_SPE_HIGH_REGNO+1; i++)
+	{
+	  int column = DWARF_REG_TO_UNWIND_COLUMN
+		(DWARF2_FRAME_REG_OUT (DWARF_FRAME_REGNUM (i), true));
+	  HOST_WIDE_INT offset = column * GET_MODE_SIZE (mode);
+
+	  emit_move_insn (adjust_address (mem, mode, offset), value);
+	}
+    }
+
   if (TARGET_MACHO && ! TARGET_ALTIVEC)
     {
       int i;
@@ -24411,6 +24956,13 @@ rs6000_init_dwarf_reg_sizes_extra (tree address)
 unsigned int
 rs6000_debugger_regno (unsigned int regno, unsigned int format)
 {
+  if (SPE_HIGH_REGNO_P (regno))
+    return regno - FIRST_SPE_HIGH_REGNO + 1200;
+  if (regno == SPE_ACC_REGNO)
+    return 99;
+  if (regno == SPEFSCR_REGNO)
+    return 612;
+
   /* On some platforms, we use the standard DWARF register
      numbering for .debug_info and .debug_frame.  */
   if ((format == 0 && dwarf_debuginfo_p ()) || format == 1)
@@ -24558,6 +25110,9 @@ rs6000_libgcc_floating_mode_supported_p (scalar_float_mode mode)
 static bool
 rs6000_vector_mode_supported_p (machine_mode mode)
 {
+  if (TARGET_SPE && SPE_VECTOR_MODE (mode))
+    return true;
+
   /* There is no vector form for IEEE 128-bit.  If we return true for IEEE
      128-bit, the compiler might try to widen IEEE 128-bit to IBM
      double-double.  */
@@ -28437,7 +28992,7 @@ static GTY(()) tree atomic_update_decl;
 static void
 rs6000_atomic_assign_expand_fenv (tree *hold, tree *clear, tree *update)
 {
-  if (!TARGET_HARD_FLOAT)
+  if (!TARGET_HARD_FLOAT || !TARGET_FPRS)
     {
 #ifdef RS6000_GLIBC_ATOMIC_FENV
       if (atomic_hold_decl == NULL_TREE)
@@ -29651,5 +30206,71 @@ rs6000_opaque_type_invalid_use_p (gimple *stmt)
 #define TARGET_DOCUMENTATION_NAME "PowerPC"
 
 struct gcc_target targetm = TARGET_INITIALIZER;
+
+static bool
+rs6000_member_type_forces_blk (const_tree field, machine_mode mode)
+{
+  return ((TARGET_SPE && TREE_CODE (TREE_TYPE (field)) == VECTOR_TYPE)
+	  || (TARGET_E500_DOUBLE && mode == DFmode));
+}
+
+static rtx
+rs6000_dwarf_register_span (rtx reg)
+{
+  rtx parts[8];
+  int i, words;
+  unsigned regno = REGNO (reg);
+  machine_mode mode = GET_MODE (reg);
+
+  if (TARGET_SPE
+      && regno < 32
+      && (SPE_VECTOR_MODE (GET_MODE (reg))
+	  || (TARGET_E500_DOUBLE && FLOAT_MODE_P (mode)
+	      && mode != SFmode && mode != SDmode && mode != SCmode)))
+    ;
+  else
+    return NULL_RTX;
+
+  regno = REGNO (reg);
+
+  /* The duality of the SPE register size wreaks all kinds of havoc.
+     This is a way of distinguishing r0 in 32-bits from r0 in
+     64-bits.  */
+  words = (GET_MODE_SIZE (mode) + UNITS_PER_FP_WORD - 1) / UNITS_PER_FP_WORD;
+  gcc_assert (words <= 4);
+  for (i = 0; i < words; i++, regno++)
+    {
+      if (BYTES_BIG_ENDIAN)
+	{
+	  parts[2 * i] = gen_rtx_REG (SImode, regno + FIRST_SPE_HIGH_REGNO);
+	  parts[2 * i + 1] = gen_rtx_REG (SImode, regno);
+	}
+      else
+	{
+	  parts[2 * i] = gen_rtx_REG (SImode, regno);
+	  parts[2 * i + 1] = gen_rtx_REG (SImode, regno + FIRST_SPE_HIGH_REGNO);
+	}
+    }
+
+  return gen_rtx_PARALLEL (VOIDmode, gen_rtvec_v (words * 2, parts));
+}
+
+/* Return the string to flip the GT bit on a CR.  */
+char *
+output_e500_flip_gt_bit (rtx dst, rtx src)
+{
+  static char string[64];
+  int a, b;
+
+  gcc_assert (GET_CODE (dst) == REG && CR_REGNO_P (REGNO (dst))
+	      && GET_CODE (src) == REG && CR_REGNO_P (REGNO (src)));
+
+  /* GT bit.  */
+  a = 4 * (REGNO (dst) - CR0_REGNO) + 1;
+  b = 4 * (REGNO (src) - CR0_REGNO) + 1;
+
+  sprintf (string, "crnot %d,%d", a, b);
+  return string;
+}
 
 #include "gt-rs6000.h"

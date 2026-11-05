@@ -354,3 +354,8 @@ extern void rs6000_emit_xxspltidp_v2df (rtx, long value);
 extern gimple *currently_expanding_gimple_stmt;
 extern bool rs6000_opaque_type_invalid_use_p (gimple *);
 #endif  /* rs6000-protos.h */
+
+extern bool invalid_e500_subreg (rtx, machine_mode);
+extern char *output_e500_flip_gt_bit (rtx, rtx);
+
+extern rtx spe_build_register_parallel (machine_mode, int);

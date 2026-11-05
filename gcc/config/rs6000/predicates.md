@@ -612,7 +612,10 @@
 (define_predicate "easy_fp_constant"
   (match_code "const_double")
 {
-  gcc_assert (GET_MODE (op) == mode && SCALAR_FLOAT_MODE_P (mode));
+  /* CSE can probe a constant using a different candidate mode.  */
+  if (GET_MODE (op) != mode)
+    return false;
+  gcc_assert (SCALAR_FLOAT_MODE_P (mode));
 
   /* Consider all constants with -msoft-float to be easy when regs are
      32-bit and thus can be loaded with a maximum of 2 insns.  For
@@ -796,6 +799,32 @@
 	return true;
 
       return easy_altivec_constant (op, mode);
+    }
+
+  if (SPE_VECTOR_MODE (mode))
+    {
+      int cst, cst2;
+      if (zero_constant (op, mode))
+	return true;
+      if (GET_MODE_CLASS (mode) != MODE_VECTOR_INT)
+	return false;
+
+      /* Limit SPE vectors to 15 bits signed.  These we can generate with:
+	   li r0, CONSTANT1
+	   evmergelo r0, r0, r0
+	   li r0, CONSTANT2
+
+	 I don't know how efficient it would be to allow bigger constants,
+	 considering we'll have an extra 'ori' for every 'li'.  I doubt 5
+	 instructions is better than a 64-bit memory load, but I don't
+	 have the e500 timing specs.  */
+      if (mode == V2SImode)
+	{
+	  cst  = INTVAL (CONST_VECTOR_ELT (op, 0));
+	  cst2 = INTVAL (CONST_VECTOR_ELT (op, 1));
+	  return cst  >= -0x7fff && cst <= 0x7fff
+		 && cst2 >= -0x7fff && cst2 <= 0x7fff;
+	}
     }
 
   return false;
@@ -1345,6 +1374,12 @@
   if (GET_CODE (op) == CONST_VECTOR
       && easy_vector_constant (op, mode))
     return 1;
+
+  /* Do not allow invalid E500 subregs.  */
+  if ((TARGET_E500_DOUBLE || TARGET_SPE)
+      && GET_CODE (op) == SUBREG
+      && invalid_e500_subreg (op, mode))
+    return 0;
 
   /* For floating-point or multi-word mode, the only remaining valid type
      is a register.  */
@@ -2213,3 +2248,32 @@
 (define_predicate "lxvl_else_operand"
   (and (match_code "const_vector")
        (match_test "op == CONST0_RTX (GET_MODE (op))")))
+
+(define_predicate "rs6000_nonimmediate_operand"
+  (match_code "reg,subreg,mem")
+{
+  if ((TARGET_E500_DOUBLE || TARGET_SPE)
+      && GET_CODE (op) == SUBREG
+      && invalid_e500_subreg (op, mode))
+    return 0;
+
+  return nonimmediate_operand (op, mode);
+})
+
+;; Return true if operand is an operator used in rotate-and-mask instructions.
+(define_predicate "reg_or_none500mem_operand"
+  (if_then_else (match_code "mem")
+     (and (match_test "!TARGET_E500_DOUBLE")
+	  (ior (match_operand 0 "memory_operand")
+	       (ior (match_test "macho_lo_sum_memory_operand (op, mode)")
+		    (match_operand 0 "volatile_mem_operand"))))
+     (match_operand 0 "gpc_reg_operand")))
+
+;; Comparisons supported directly by the scalar floating-point hardware.
+(define_predicate "rs6000_cbranch_operator"
+  (if_then_else (match_test "TARGET_HARD_FLOAT && !TARGET_FPRS")
+		(if_then_else (match_test "flag_trapping_math")
+			      (match_operand 0 "ordered_comparison_operator")
+			      (ior (match_operand 0 "ordered_comparison_operator")
+				   (match_code ("unlt,unle,ungt,unge"))))
+		(match_operand 0 "comparison_operator")))

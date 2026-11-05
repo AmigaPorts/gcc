@@ -66,6 +66,9 @@
 #include "opts.h"
 
 #include "rs6000-internal.h"
+static rtx rs6000_spe_function_arg (const CUMULATIVE_ARGS *, machine_mode,
+				    const_tree);
+
 
 #ifndef TARGET_PROFILE_KERNEL
 #define TARGET_PROFILE_KERNEL 0
@@ -85,7 +88,7 @@
 #define USE_FP_FOR_ARG_P(CUM,MODE)		\
   (SCALAR_FLOAT_MODE_NOT_VECTOR_P (MODE)		\
    && (CUM)->fregno <= FP_ARG_MAX_REG		\
-   && TARGET_HARD_FLOAT)
+   && TARGET_HARD_FLOAT && TARGET_FPRS)
 
 /* Nonzero if we can use an AltiVec register to pass this arg.  */
 #define USE_ALTIVEC_FOR_ARG_P(CUM,MODE,NAMED)			\
@@ -737,7 +740,7 @@ is_complex_IBM_long_double (machine_mode mode)
 static bool
 abi_v4_pass_in_fpr (machine_mode mode, bool named)
 {
-  if (!TARGET_HARD_FLOAT)
+  if (!TARGET_HARD_FLOAT || !TARGET_FPRS)
     return false;
   if (mode == DFmode)
     return true;
@@ -832,6 +835,7 @@ rs6000_function_arg_boundary (machine_mode mode, const_tree type)
   if (DEFAULT_ABI == ABI_V4
       && (GET_MODE_SIZE (mode) == 8
 	  || (TARGET_HARD_FLOAT
+	      && TARGET_FPRS
 	      && !is_complex_IBM_long_double (mode)
 	      && FLOAT128_2REG_P (mode))))
     return 64;
@@ -1161,6 +1165,11 @@ rs6000_function_arg_advance_1 (CUMULATIVE_ARGS *cum, machine_mode mode,
 	    }
 	}
     }
+  else if (TARGET_SPE_ABI && TARGET_SPE && SPE_VECTOR_MODE (mode)
+	   && !cum->stdarg
+	   && cum->sysv_gregno <= GP_ARG_MAX_REG)
+    cum->sysv_gregno++;
+
   else if (TARGET_MACHO && rs6000_darwin64_struct_check_p (mode, type))
     {
       int size = int_size_in_bytes (type);
@@ -1261,7 +1270,7 @@ rs6000_function_arg_advance_1 (CUMULATIVE_ARGS *cum, machine_mode mode,
 
       cum->words = align_words + n_words;
 
-      if (SCALAR_FLOAT_MODE_P (elt_mode) && TARGET_HARD_FLOAT)
+      if (SCALAR_FLOAT_MODE_P (elt_mode) && TARGET_HARD_FLOAT && TARGET_FPRS)
 	{
 	  /* _Decimal128 must be passed in an even/odd float register pair.
 	     This assumes that the register number is odd when fregno is
@@ -1674,12 +1683,17 @@ rs6000_function_arg (cumulative_args_t cum_v, const function_arg_info &arg)
 	  && (cum->call_cookie & CALL_LIBCALL) == 0
 	  && (cum->stdarg
 	      || (cum->nargs_prototype < 0
-		  && (cum->prototype || TARGET_NO_PROTOTYPE)))
-	  && TARGET_HARD_FLOAT)
-	return GEN_INT (cum->call_cookie
-			| ((cum->fregno == FP_ARG_MIN_REG)
-			   ? CALL_V4_SET_FP_ARGS
-			   : CALL_V4_CLEAR_FP_ARGS));
+		  && (cum->prototype || TARGET_NO_PROTOTYPE))))
+	{
+	  /* For the SPE, we need to crxor CR6 always.  */
+	  if (TARGET_SPE_ABI)
+	    return GEN_INT (cum->call_cookie | CALL_V4_SET_FP_ARGS);
+	  else if (TARGET_HARD_FLOAT && TARGET_FPRS)
+	    return GEN_INT (cum->call_cookie
+			    | ((cum->fregno == FP_ARG_MIN_REG)
+			       ? CALL_V4_SET_FP_ARGS
+			       : CALL_V4_CLEAR_FP_ARGS));
+	}
 
       return GEN_INT (cum->call_cookie & ~CALL_LIBCALL);
     }
@@ -1764,6 +1778,13 @@ rs6000_function_arg (cumulative_args_t cum_v, const function_arg_info &arg)
 	  return gen_rtx_REG (part_mode, GP_ARG_MIN_REG + align_words);
 	}
     }
+  else if (TARGET_SPE_ABI && TARGET_SPE
+	   && (SPE_VECTOR_MODE (mode)
+	       || (TARGET_E500_DOUBLE && (mode == DFmode
+					  || mode == DCmode
+					  || mode == TFmode
+					  || mode == TCmode))))
+    return rs6000_spe_function_arg (cum, mode, type);
 
   else if (abi == ABI_V4)
     {
@@ -2297,7 +2318,7 @@ setup_incoming_varargs (cumulative_args_t cum,
 	     anything.  */
 	  if (cfun->va_list_gpr_size && first_reg_offset < GP_ARG_NUM_REG)
 	    gpr_reg_num = GP_ARG_NUM_REG - first_reg_offset;
-	  if (TARGET_HARD_FLOAT
+	  if (TARGET_HARD_FLOAT && TARGET_FPRS
 	      && next_cum.fregno <= FP_ARG_V4_MAX_REG
 	      && cfun->va_list_fpr_size)
 	    {
@@ -2393,7 +2414,7 @@ setup_incoming_varargs (cumulative_args_t cum,
 
   /* Save FP registers if needed.  */
   if (DEFAULT_ABI == ABI_V4
-      && TARGET_HARD_FLOAT
+      && TARGET_HARD_FLOAT && TARGET_FPRS
       && ! no_rtl
       && next_cum.fregno <= FP_ARG_V4_MAX_REG
       && cfun->va_list_fpr_size)
@@ -2769,7 +2790,9 @@ rs6000_gimplify_va_arg (tree valist, tree type, gimple_seq *pre_p,
 
       /* _Decimal32 varargs are located in the second word of the 64-bit
 	 FP register for 32-bit binaries.  */
-      if (TARGET_32BIT && TARGET_HARD_FLOAT && mode == SDmode)
+      if (TARGET_32BIT
+	  && TARGET_HARD_FLOAT && TARGET_FPRS
+	  && mode == SDmode)
 	t = fold_build_pointer_plus_hwi (t, size);
 
       /* Args are passed right-aligned.  */
@@ -3030,4 +3053,95 @@ rs6000_output_mi_thunk (FILE *file, tree thunk_fndecl ATTRIBUTE_UNUSED,
 
   reload_completed = 0;
   epilogue_completed = 0;
+}
+
+rtx
+spe_build_register_parallel (machine_mode mode, int gregno)
+{
+  rtx r1, r3, r5, r7;
+
+  switch (mode)
+    {
+    case DFmode:
+      r1 = gen_rtx_REG (DImode, gregno);
+      r1 = gen_rtx_EXPR_LIST (VOIDmode, r1, const0_rtx);
+      return gen_rtx_PARALLEL (mode, gen_rtvec (1, r1));
+
+    case DCmode:
+    case TFmode:
+      r1 = gen_rtx_REG (DImode, gregno);
+      r1 = gen_rtx_EXPR_LIST (VOIDmode, r1, const0_rtx);
+      r3 = gen_rtx_REG (DImode, gregno + 2);
+      r3 = gen_rtx_EXPR_LIST (VOIDmode, r3, GEN_INT (8));
+      return gen_rtx_PARALLEL (mode, gen_rtvec (2, r1, r3));
+
+    case TCmode:
+      r1 = gen_rtx_REG (DImode, gregno);
+      r1 = gen_rtx_EXPR_LIST (VOIDmode, r1, const0_rtx);
+      r3 = gen_rtx_REG (DImode, gregno + 2);
+      r3 = gen_rtx_EXPR_LIST (VOIDmode, r3, GEN_INT (8));
+      r5 = gen_rtx_REG (DImode, gregno + 4);
+      r5 = gen_rtx_EXPR_LIST (VOIDmode, r5, GEN_INT (16));
+      r7 = gen_rtx_REG (DImode, gregno + 6);
+      r7 = gen_rtx_EXPR_LIST (VOIDmode, r7, GEN_INT (24));
+      return gen_rtx_PARALLEL (mode, gen_rtvec (4, r1, r3, r5, r7));
+
+    default:
+      gcc_unreachable ();
+    }
+}
+
+/* Determine where to put a SIMD argument on the SPE.  */
+static rtx
+rs6000_spe_function_arg (const CUMULATIVE_ARGS *cum, machine_mode mode,
+			 const_tree type)
+{
+  int gregno = cum->sysv_gregno;
+
+  /* On E500 v2, double arithmetic is done on the full 64-bit GPR, but
+     are passed and returned in a pair of GPRs for ABI compatibility.  */
+  if (TARGET_E500_DOUBLE && (mode == DFmode || mode == TFmode
+			     || mode == DCmode || mode == TCmode))
+    {
+      int n_words = rs6000_arg_size (mode, type);
+
+      /* Doubles go in an odd/even register pair (r5/r6, etc).  */
+      if (mode == DFmode)
+	gregno += (1 - gregno) & 1;
+
+      /* Multi-reg args are not split between registers and stack.  */
+      if (gregno + n_words - 1 > GP_ARG_MAX_REG)
+	return NULL_RTX;
+
+      return spe_build_register_parallel (mode, gregno);
+    }
+  if (cum->stdarg)
+    {
+      int n_words = rs6000_arg_size (mode, type);
+
+      /* SPE vectors are put in odd registers.  */
+      if (n_words == 2 && (gregno & 1) == 0)
+	gregno += 1;
+
+      if (gregno + n_words - 1 <= GP_ARG_MAX_REG)
+	{
+	  rtx r1, r2;
+	  machine_mode m = SImode;
+
+	  r1 = gen_rtx_REG (m, gregno);
+	  r1 = gen_rtx_EXPR_LIST (m, r1, const0_rtx);
+	  r2 = gen_rtx_REG (m, gregno + 1);
+	  r2 = gen_rtx_EXPR_LIST (m, r2, GEN_INT (4));
+	  return gen_rtx_PARALLEL (mode, gen_rtvec (2, r1, r2));
+	}
+      else
+	return NULL_RTX;
+    }
+  else
+    {
+      if (gregno <= GP_ARG_MAX_REG)
+	return gen_rtx_REG (mode, gregno);
+      else
+	return NULL_RTX;
+    }
 }

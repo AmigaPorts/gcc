@@ -239,6 +239,7 @@ enum bif_stanza
  BSTZ_FUTURE_ALTIVEC,
  BSTZ_FUTURE_VSX,
  BSTZ_DM,
+ BSTZ_SPE,
  NUMBIFSTANZAS
 };
 
@@ -276,7 +277,8 @@ static stanza_entry stanza_map[NUMBIFSTANZAS] =
     { "future",	BSTZ_FUTURE	},
     { "future-altivec", BSTZ_FUTURE_ALTIVEC },
     { "future-vsx",	BSTZ_FUTURE_VSX	},
-    { "dm",		BSTZ_DM		}
+    { "dm",		BSTZ_DM		},
+    { "spe", BSTZ_SPE }
   };
 
 static const char *enable_string[NUMBIFSTANZAS] =
@@ -305,7 +307,8 @@ static const char *enable_string[NUMBIFSTANZAS] =
     "ENB_FUTURE",
     "ENB_FUTURE_ALTIVEC",
     "ENB_FUTURE_VSX",
-    "ENB_DM"
+    "ENB_DM",
+    "ENB_SPE"
   };
 
 /* Function modifiers provide special handling for const, pure, and fpmath
@@ -340,7 +343,9 @@ enum basetype
   BT_IBM128,
   BT_VPAIR,
   BT_VQUAD,
-  BT_DMR
+  BT_DMR,
+  BT_SPEV2SI,
+  BT_SPEV2SF
 };
 
 /* Ways in which a const int value can be restricted.  RES_BITS indicates
@@ -566,6 +571,8 @@ static typemap type_map[] =
     { "pv1ti",		"ptr_V1TI" },
     { "pv2df",		"ptr_V2DF" },
     { "pv2di",		"ptr_V2DI" },
+    { "pv2sf", "ptr_spe_V2SF" },
+    { "pv2si", "ptr_spe_V2SI" },
     { "pv4sf",		"ptr_V4SF" },
     { "pv4si",		"ptr_V4SI" },
     { "pv8hi",		"ptr_V8HI" },
@@ -597,6 +604,8 @@ static typemap type_map[] =
     { "v1ti",		"V1TI" },
     { "v2df",		"V2DF" },
     { "v2di",		"V2DI" },
+    { "v2sf", "spe_V2SF" },
+    { "v2si", "spe_V2SI" },
     { "v4sf",		"V4SF" },
     { "v4si",		"V4SI" },
     { "v8hi",		"V8HI" },
@@ -1153,6 +1162,13 @@ match_type (typeinfo *typedata, int voidok)
       handle_pointer (typedata);
       return 1;
     }
+  else if (!strcmp (token, "spev2si") || !strcmp (token, "spev2sf"))
+    {
+      typedata->isvector = 1;
+      typedata->base = !strcmp (token, "spev2si") ? BT_SPEV2SI : BT_SPEV2SF;
+      handle_pointer (typedata);
+      return 1;
+    }
   else if (!strcmp (token, "vsi"))
     {
       typedata->isvector = 1;
@@ -1564,6 +1580,14 @@ complete_vector_type (typeinfo *typeptr, char *buf, int *bufi)
       break;
     case BT_FLOAT128:
       memcpy (&buf[*bufi], "1tf", 3);
+      *bufi += 3;
+      break;
+    case BT_SPEV2SI:
+      memcpy (&buf[*bufi], "2si", 3);
+      *bufi += 3;
+      break;
+    case BT_SPEV2SF:
+      memcpy (&buf[*bufi], "2sf", 3);
       *bufi += 3;
       break;
     case BT_VPAIR:
@@ -2293,7 +2317,7 @@ write_decls (void)
   fprintf (header_file, "  ENB_FUTURE,\n");
   fprintf (header_file, "  ENB_FUTURE_ALTIVEC,\n");
   fprintf (header_file, "  ENB_FUTURE_VSX,\n");
-  fprintf (header_file, "  ENB_DM\n");
+  fprintf (header_file, "  ENB_DM,\n  ENB_SPE\n");
   fprintf (header_file, "};\n\n");
 
   fprintf (header_file, "#define PPC_MAXRESTROPNDS 3\n");
