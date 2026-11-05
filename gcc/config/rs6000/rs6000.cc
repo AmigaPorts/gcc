@@ -7035,6 +7035,16 @@ rs6000_expand_vector_init (rtx target, rtx vals)
 	}
     }
 
+  /* SPE can assemble two scalar floats directly from their GPR low halves.
+     Avoid the generic stack construction, including scalar splats.  */
+  if (TARGET_SPE && mode == V2SFmode)
+    {
+      rtx op0 = force_reg (SFmode, XVECEXP (vals, 0, 0));
+      rtx op1 = all_same ? op0 : force_reg (SFmode, XVECEXP (vals, 0, 1));
+      emit_insn (gen_spe_concat_v2sf (target, op0, op1));
+      return;
+    }
+
   /* Double word values on VSX can use xxpermdi or lxvdsx.  */
   if (VECTOR_MEM_VSX_P (mode) && (mode == V2DFmode || mode == V2DImode))
     {
@@ -24523,7 +24533,7 @@ rs6000_vectorize_vec_perm_const (machine_mode vmode, machine_mode op_mode,
 
   /* Check for ps_merge* or xxpermdi insns.  */
   if (((vmode == V2DFmode || vmode == V2DImode) && VECTOR_MEM_VSX_P (vmode))
-      || (TARGET_SPE && vmode == V2SImode))
+      || (TARGET_SPE && (vmode == V2SImode || vmode == V2SFmode)))
     {
       if (testing_p)
 	{
