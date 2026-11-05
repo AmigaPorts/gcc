@@ -27,6 +27,15 @@ if { ![istarget m68k-*-amigaos*] } {
     return
 }
 
+# Whether libgcc has the amigaos thread model's key code: only a gcc
+# configured with --enable-threads=amigaos builds it.
+proc check_effective_target_amigaos_gthreads { } {
+    return [check_no_compiler_messages amigaos_gthreads executable {
+	extern const void *const *__gthread_amigaos_values;
+	int main (void) { return !__gthread_amigaos_values; }
+    }]
+}
+
 # Codegen (scan-assembler) tests.  Each fixes its own -O and CPU via
 # dg-options, so a single run is enough.  The board's cflags come after
 # dg-options on the command line, so a board that pins a CPU or FPU

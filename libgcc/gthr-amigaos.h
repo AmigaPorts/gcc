@@ -17,10 +17,12 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
    once flags and condition variables can be static and std::mutex keeps
    its constexpr constructor.  The rest is in libgcc's gthr-amigaos*.c.
 
-   Only one CPU, and only tasks, not interrupt code.  Threads should be
-   started with __gthread_create() (std::thread): their keys are cleaned up
-   when they end.  A task started another way gets its keys on first use,
-   but nothing frees them or runs their destructors when it ends.  */
+   Only one CPU, and only tasks, not interrupt code.  The tasks that use
+   keys, and so thread-local variables, must be the main task and threads
+   started with __gthread_create() (std::thread), or by a thread library
+   that calls __gthread_amigaos_task_new(), _start() and _end() for each
+   (libpthread, see amigaos-task-end.c).  Another task reads the keys of
+   whichever of those ran before it.  */
 
 #include <benaphore.h>
 
@@ -205,9 +207,20 @@ __gthread_cond_destroy (__gthread_cond_t *__cond __attribute__ ((__unused__)))
 int __gthread_key_create (__gthread_key_t *__key, void (*__destroy) (void *))
   __GTHREAD_NOTHROW;
 int __gthread_key_delete (__gthread_key_t __key) __GTHREAD_NOTHROW;
-void *__gthread_getspecific (__gthread_key_t __key) __GTHREAD_NOTHROW;
 int __gthread_setspecific (__gthread_key_t __key, const void *__v)
   __GTHREAD_NOTHROW;
+
+/* The running task's key values, which its tc_Launch sets each time it
+   gets the CPU, see gthr-amigaos.c.  While a task runs, the pointer is
+   always its own, so it needs no volatile.  Keys come from
+   __gthread_key_create(), so the index needs no check.  */
+extern const void *const *__gthread_amigaos_values;
+
+__GTHREAD_INLINE void *
+__gthread_getspecific (__gthread_key_t __key)
+{
+  return (void *) __gthread_amigaos_values[__key];
+}
 
 int __gthread_cond_signal (__gthread_cond_t *__cond) __GTHREAD_NOTHROW;
 int __gthread_cond_broadcast (__gthread_cond_t *__cond) __GTHREAD_NOTHROW;
