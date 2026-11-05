@@ -3017,19 +3017,17 @@
 ;; ??? Could use evstwwe for memory stores in some cases, depending on
 ;; the offset.
 (define_insn "*mov_si<mode>_e500_subreg0_2_be"
-  [(set (match_operand:SI 0 "rs6000_nonimmediate_operand" "+r,m")
-	(subreg:SI (match_operand:SPE64TF 1 "register_operand" "+r,&r") 0))]
+  [(set (match_operand:SI 0 "gpc_reg_operand" "=r")
+	(subreg:SI (match_operand:SPE64TF 1 "register_operand" "r") 0))]
   "WORDS_BIG_ENDIAN
    && ((TARGET_E500_DOUBLE && (<MODE>mode == DFmode || <MODE>mode == TFmode))
        || (TARGET_SPE && <MODE>mode != DFmode && <MODE>mode != TFmode))"
-  "@
-   evmergehi %0,%0,%1
-   evmergelohi %1,%1,%1\;stw%U0%X0 %1,%0"
-  [(set_attr "length" "4,8")])
+  "evmergehi %0,%1,%1"
+  [(set_attr "length" "4")])
 
 (define_insn "*mov_si<mode>_e500_subreg0_2_le"
-  [(set (match_operand:SI 0 "rs6000_nonimmediate_operand" "+r,m")
-	(subreg:SI (match_operand:SPE64TF 1 "register_operand" "+r,r") 0))]
+  [(set (match_operand:SI 0 "rs6000_nonimmediate_operand" "=r,m")
+	(subreg:SI (match_operand:SPE64TF 1 "register_operand" "r,r") 0))]
   "!WORDS_BIG_ENDIAN
    && ((TARGET_E500_DOUBLE && (<MODE>mode == DFmode || <MODE>mode == TFmode))
        || (TARGET_SPE && <MODE>mode != DFmode && <MODE>mode != TFmode))"
@@ -3088,7 +3086,7 @@
   [(set_attr "length" "8")])
 
 (define_insn "*mov_si<mode>_e500_subreg4_2_be"
-  [(set (match_operand:SI 0 "rs6000_nonimmediate_operand" "+r,m")
+  [(set (match_operand:SI 0 "rs6000_nonimmediate_operand" "=r,m")
 	(subreg:SI (match_operand:SPE64TF 1 "register_operand" "r,r") 4))]
   "WORDS_BIG_ENDIAN
    && ((TARGET_E500_DOUBLE && (<MODE>mode == DFmode || <MODE>mode == TFmode))
@@ -3098,15 +3096,13 @@
    stw%U0%X0 %1,%0")
 
 (define_insn "*mov_si<mode>_e500_subreg4_2_le"
-  [(set (match_operand:SI 0 "rs6000_nonimmediate_operand" "+r,m")
-	(subreg:SI (match_operand:SPE64TF 1 "register_operand" "+r,&r") 4))]
+  [(set (match_operand:SI 0 "gpc_reg_operand" "=r")
+	(subreg:SI (match_operand:SPE64TF 1 "register_operand" "r") 4))]
   "!WORDS_BIG_ENDIAN
    && ((TARGET_E500_DOUBLE && (<MODE>mode == DFmode || <MODE>mode == TFmode))
        || (TARGET_SPE && <MODE>mode != DFmode && <MODE>mode != TFmode))"
-  "@
-   evmergehi %0,%0,%1
-   evmergelohi %1,%1,%1\;stw%U0%X0 %1,%0"
-  [(set_attr "length" "4,8")])
+  "evmergehi %0,%1,%1"
+  [(set_attr "length" "4")])
 
 (define_insn "*mov_sitf_e500_subreg8_be"
   [(set (subreg:SI (match_operand:TF 0 "register_operand" "+r,&r") 8)
@@ -3126,16 +3122,14 @@
    lwz%U1%X1 %L0,%1")
 
 (define_insn "*mov_sitf_e500_subreg8_2_be"
-  [(set (match_operand:SI 0 "rs6000_nonimmediate_operand" "+r,m")
-	(subreg:SI (match_operand:TF 1 "register_operand" "+r,&r") 8))]
+  [(set (match_operand:SI 0 "gpc_reg_operand" "=r")
+	(subreg:SI (match_operand:TF 1 "register_operand" "r") 8))]
   "WORDS_BIG_ENDIAN && TARGET_E500_DOUBLE"
-  "@
-   evmergehi %0,%0,%L1
-   evmergelohi %L1,%L1,%L1\;stw%U0%X0 %L1,%0"
-  [(set_attr "length" "4,8")])
+  "evmergehi %0,%L1,%L1"
+  [(set_attr "length" "4")])
 
 (define_insn "*mov_sitf_e500_subreg8_2_le"
-  [(set (match_operand:SI 0 "rs6000_nonimmediate_operand" "+r,m")
+  [(set (match_operand:SI 0 "rs6000_nonimmediate_operand" "=r,m")
 	(subreg:SI (match_operand:TF 1 "register_operand" "r,r") 8))]
   "!WORDS_BIG_ENDIAN && TARGET_E500_DOUBLE"
   "@
@@ -3160,7 +3154,7 @@
   [(set_attr "length" "4,12")])
 
 (define_insn "*mov_sitf_e500_subreg12_2_be"
-  [(set (match_operand:SI 0 "rs6000_nonimmediate_operand" "+r,m")
+  [(set (match_operand:SI 0 "rs6000_nonimmediate_operand" "=r,m")
 	(subreg:SI (match_operand:TF 1 "register_operand" "r,r") 12))]
   "WORDS_BIG_ENDIAN && TARGET_E500_DOUBLE"
   "@
@@ -3168,13 +3162,11 @@
    stw%U0%X0 %L1,%0")
 
 (define_insn "*mov_sitf_e500_subreg12_2_le"
-  [(set (match_operand:SI 0 "rs6000_nonimmediate_operand" "+r,m")
-	(subreg:SI (match_operand:TF 1 "register_operand" "+r,&r") 12))]
+  [(set (match_operand:SI 0 "gpc_reg_operand" "=r")
+	(subreg:SI (match_operand:TF 1 "register_operand" "r") 12))]
   "!WORDS_BIG_ENDIAN && TARGET_E500_DOUBLE"
-  "@
-   evmergehi %0,%0,%L1
-   evmergelohi %L1,%L1,%L1\;stw%U0%X0 %L1,%0"
-  [(set_attr "length" "4,8")])
+  "evmergehi %0,%L1,%L1"
+  [(set_attr "length" "4")])
 
 ;; FIXME: Allow r=CONST0.
 (define_insn "*movdf_e500_double"
