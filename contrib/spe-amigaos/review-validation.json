@@ -1,0 +1,202 @@
+{
+  "compiler": "xgcc (GCC) 16.2.1b 20261010182711",
+  "source": "/private/tmp/gcc16-spe",
+  "compiled": [
+    "scalar-O0.elf",
+    "vector-O0.elf",
+    "alias-O0.elf",
+    "cxx-O0.elf",
+    "bridge-O0.elf",
+    "optimize-O0.elf",
+    "permute-O0.elf",
+    "dwarf-spe-O0.elf",
+    "dwarf-conventional-O0.elf",
+    "libgcc-O0.elf",
+    "scalar-O2.elf",
+    "vector-O2.elf",
+    "alias-O2.elf",
+    "cxx-O2.elf",
+    "bridge-O2.elf",
+    "optimize-O2.elf",
+    "permute-O2.elf",
+    "dwarf-spe-O2.elf",
+    "dwarf-conventional-O2.elf",
+    "libgcc-O2.elf",
+    "scalar-O3.elf",
+    "vector-O3.elf",
+    "alias-O3.elf",
+    "cxx-O3.elf",
+    "bridge-O3.elf",
+    "optimize-O3.elf",
+    "permute-O3.elf",
+    "dwarf-spe-O3.elf",
+    "dwarf-conventional-O3.elf",
+    "libgcc-O3.elf",
+    "scalar-Os.elf",
+    "vector-Os.elf",
+    "alias-Os.elf",
+    "cxx-Os.elf",
+    "bridge-Os.elf",
+    "optimize-Os.elf",
+    "permute-Os.elf",
+    "dwarf-spe-Os.elf",
+    "dwarf-conventional-Os.elf",
+    "libgcc-Os.elf"
+  ],
+  "runtime": [
+    "scalar-O0.elf",
+    "vector-O0.elf",
+    "alias-O0.elf",
+    "cxx-O0.elf",
+    "bridge-O0.elf",
+    "optimize-O0.elf",
+    "permute-O0.elf",
+    "dwarf-spe-O0.elf",
+    "dwarf-conventional-O0.elf",
+    "libgcc-O0.elf",
+    "scalar-O2.elf",
+    "vector-O2.elf",
+    "alias-O2.elf",
+    "cxx-O2.elf",
+    "bridge-O2.elf",
+    "optimize-O2.elf",
+    "permute-O2.elf",
+    "dwarf-spe-O2.elf",
+    "dwarf-conventional-O2.elf",
+    "libgcc-O2.elf",
+    "scalar-O3.elf",
+    "vector-O3.elf",
+    "alias-O3.elf",
+    "cxx-O3.elf",
+    "bridge-O3.elf",
+    "optimize-O3.elf",
+    "permute-O3.elf",
+    "dwarf-spe-O3.elf",
+    "dwarf-conventional-O3.elf",
+    "libgcc-O3.elf",
+    "scalar-Os.elf",
+    "vector-Os.elf",
+    "alias-Os.elf",
+    "cxx-Os.elf",
+    "bridge-Os.elf",
+    "optimize-Os.elf",
+    "permute-Os.elf",
+    "dwarf-spe-Os.elf",
+    "dwarf-conventional-Os.elf",
+    "libgcc-Os.elf"
+  ],
+  "loop_corpus_compile_count": 6,
+  "builtin_compile_count": 228,
+  "base_commit": "5f61c4b95c724e04ff8d49c7afd9ae9b4b761e36",
+  "focused_dejagnu_passes": 43,
+  "library_builds": "libgcc and libstdc++: all eight supported multilib configurations passed",
+  "options": {
+    "multilibs": [
+      ".;",
+      "clib2;@mcrt=clib2",
+      "clib4;@mcrt=clib4",
+      "spe;@mcpu=8548",
+      "newlib/spe;@mcrt=newlib@mcpu=8548",
+      "clib2/soft-float;@mcrt=clib2@msoft-float",
+      "clib2/spe;@mcrt=clib2@mcpu=8548",
+      "clib4/spe;@mcrt=clib4@mcpu=8548"
+    ],
+    "accepted": [
+      [
+        [],
+        "."
+      ],
+      [
+        [
+          "-mcpu=750"
+        ],
+        "."
+      ],
+      [
+        [
+          "-mcrt=clib2",
+          "-msoft-float"
+        ],
+        "clib2/soft-float"
+      ],
+      [
+        [
+          "-mcpu=8548"
+        ],
+        "spe"
+      ],
+      [
+        [
+          "-mcpu=8540",
+          "-mspe",
+          "-mabi=spe",
+          "-mfloat-gprs=double"
+        ],
+        "spe"
+      ],
+      [
+        [
+          "-mcpu=8548",
+          "-mcrt=newlib"
+        ],
+        "spe"
+      ],
+      [
+        [
+          "-mcpu=8548",
+          "-mcrt=clib2"
+        ],
+        "clib2/spe"
+      ],
+      [
+        [
+          "-mcpu=8548",
+          "-mcrt=clib4"
+        ],
+        "clib4/spe"
+      ]
+    ],
+    "rejected_at_compile_and_link": [
+      [
+        "-mcpu=8540"
+      ],
+      [
+        "-mspe"
+      ],
+      [
+        "-mabi=spe"
+      ],
+      [
+        "-mcpu=8548",
+        "-msoft-float"
+      ],
+      [
+        "-mcpu=8548",
+        "-mcrt=clib2",
+        "-msoft-float"
+      ],
+      [
+        "-mcpu=8548",
+        "-mabi=no-spe"
+      ],
+      [
+        "-mcpu=8548",
+        "-mno-spe"
+      ],
+      [
+        "-mcpu=8548",
+        "-mfloat-gprs=single"
+      ]
+    ]
+  },
+  "alignment": {
+    "peeled_and_versioned_loops": 3,
+    "vectorized_loops": 3,
+    "unwind_sizes": {
+      "conventional": "#define __LIBGCC_DWARF_FRAME_REGISTERS__ 119",
+      "750": "#define __LIBGCC_DWARF_FRAME_REGISTERS__ 119",
+      "spe": "#define __LIBGCC_DWARF_FRAME_REGISTERS__ 153"
+    }
+  },
+  "os4_shared_unwind_test": "not run; conventional table count and bounds preserved, older SDK shared-runtime integration remains unvalidated"
+}

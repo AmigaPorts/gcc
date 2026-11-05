@@ -19,7 +19,8 @@ Completed:
 - Conventional scalar test assembly matches the installed compiler for
   default, 750, 7400/AltiVec, and soft-float options.
 - SDK `<stdint.h>` plus `<spe.h>` compiles for newlib/clib2/clib4 in C/C++.
-- SPEv1 scalar source compiles, using software for double precision.
+- Historical SPEv1 compile checks are superseded: unsupported SPEv1 and
+  soft-float SPE selections now produce diagnostics.
 - Invalid intrinsic immediates and ABI-changing function attributes emit
   diagnostics without an internal compiler error.
 
@@ -40,3 +41,19 @@ corpus also passed at `-O2`, `-O3`, and `-Os`, with and without
 `-ffast-math`.
 `optimization-validation.json` records its runtime and code-generation
 results. `validation.json` preserves the original restoration results.
+
+## Consolidated review update
+
+The current branch combines restoration and both optimization follow-ups
+on AmigaPorts `amiga16.2` at
+`5f61c4b95c724e04ff8d49c7afd9ae9b4b761e36`. The nine-multilib build results
+above are historical: that set included an unintended clib2 soft-float SPE
+variant. The current supported set has eight directories. Earlier JSON
+records retain their original results; see `review-validation.json` for
+the review update and `REVIEW.md` for scope and remaining OS4 checks.
+
+The consolidated branch passes 43 focused DejaGNU checks, 40 freestanding
+QEMU images, 228 builtin compile checks, six loop-corpus compilations,
+and the compile/link driver-option matrix. All eight libgcc and libstdc++
+multilib builds pass. The new runtime images check conventional and SPE
+unwind-table initialization and bounds at all four optimization levels.

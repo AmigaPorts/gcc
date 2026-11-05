@@ -3937,6 +3937,12 @@ rs6000_option_override_internal (bool global_init_p)
     error ("SPE does not support floating-point registers");
   if (rs6000_float_gprs && !TARGET_SPE)
     error ("%<-mfloat-gprs%> requires %<-mspe%>");
+#ifdef TARGET_AMIGAOS4
+  if ((TARGET_SPE || TARGET_SPE_ABI || rs6000_float_gprs)
+      && !(TARGET_SPE && TARGET_SPE_ABI && TARGET_E500_DOUBLE))
+    error ("AmigaOS4 SPE requires the hard-float double-precision SPE ABI");
+#endif
+
 
 
   if (rs6000_cpu == PROCESSOR_PPCE300C2 || rs6000_cpu == PROCESSOR_PPCE300C3
@@ -11286,6 +11292,8 @@ rs6000_emit_move (rtx dest, rtx source, machine_mode mode)
       && GET_MODE (SUBREG_REG (source)) == DFmode
       && (REG_P (dest) || can_create_pseudo_p ()))
     {
+      if (!can_create_pseudo_p ())
+	gcc_checking_assert (REG_P (dest) && INT_REGNO_P (REGNO (dest)));
       rtx value = REG_P (dest) ? dest : gen_reg_rtx (SImode);
       emit_insn (gen_spe_extract_df (value, SUBREG_REG (source),
 				    GEN_INT (SUBREG_BYTE (source).to_constant ())));

@@ -776,6 +776,11 @@ enum data_align { align_abi, align_opt, align_both };
 
 #define FIRST_PSEUDO_REGISTER 153
 
+/* Keep the conventional unwinder layout unchanged when SPE is disabled.
+   SPE_ACC_REGNO is the first register added by the SPE port.  */
+#define DWARF_FRAME_REGISTERS \
+  (TARGET_SPE ? FIRST_PSEUDO_REGISTER : SPE_ACC_REGNO)
+
 #define DWARF_REG_TO_UNWIND_COLUMN(R) \
   ((R) >= 1200 ? (R) - 1200 + FIRST_SPE_HIGH_REGNO : (R))
 

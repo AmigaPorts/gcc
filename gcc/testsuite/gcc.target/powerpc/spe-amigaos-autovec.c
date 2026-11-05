@@ -1,6 +1,7 @@
 /* { dg-do compile { target powerpc*-*-amigaos* } } */
 /* { dg-options "-O3 -mcpu=8548 -fdump-tree-vect-details" } */
 /* { dg-final { scan-tree-dump-times "LOOP VECTORIZED" 2 "vect" } } */
+/* { dg-final { scan-tree-dump-times "Both peeling and versioning will be applied" 2 "vect" } } */
 /* { dg-final { scan-assembler "\\tevfsadd " } } */
 /* { dg-final { scan-assembler "\\tevaddw " } } */
 

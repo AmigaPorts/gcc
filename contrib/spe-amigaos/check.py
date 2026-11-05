@@ -49,7 +49,9 @@ cases = [('scalar', ['scalar.c', 'scalar-run.c']),
          ('alias', ['alias.c']), ('cxx', ['cxx.cc']),
          ('bridge', ['bridge-kernel.c', 'bridge-run.c']),
          ('optimize', ['optimize-kernels.c', 'optimize-run.c']),
-         ('permute', ['permute-kernels.c', 'permute-run.c'])]
+         ('permute', ['permute-kernels.c', 'permute-run.c']),
+         ('dwarf-spe', ['dwarf-regs.c']),
+         ('dwarf-conventional', ['dwarf-regs.c'])]
 if a.libgcc:
     cases.append(('libgcc', ['libgcc.c', 'libgcc-ops.c']))
 for opt in ['-O0', '-O2', '-O3', '-Os']:
@@ -58,8 +60,9 @@ for opt in ['-O0', '-O2', '-O3', '-Os']:
         for name in sources:
             obj = out / (name + opt + '.o')
             compiler = cc if not name.endswith('.cc') else [str(build / 'xg++')] + cc[1:]
-            cpu = '-mcpu=750' if name == 'bridge-run.c' else '-mcpu=8548'
-            run(compiler + [cpu, opt, '-c', str(tests / name), '-o', str(obj)])
+            cpu = '-mcpu=750' if name == 'bridge-run.c' or label == 'dwarf-conventional' else '-mcpu=8548'
+            extra = ['-fbuilding-libgcc'] if name == 'dwarf-regs.c' else []
+            run(compiler + [cpu, opt] + extra + ['-c', str(tests / name), '-o', str(obj)])
             objects.append(str(obj))
         elf = out / (label + opt + '.elf')
         run([ld, '-Ttext=0x100000', '-e', '_start', '-o', str(elf),

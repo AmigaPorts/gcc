@@ -24,7 +24,7 @@ this source branch without maintaining a patch in that repository:
 
 ```sh
 ./build.sh --target ppc-amigaos \
-  --version 16.2:stefan/ppc-spe-optimize \
+  --version 16.2:stefan/ppc-amigaos-spe \
   --workdir /tmp/amiga-spe-build --prefix /tmp/amiga-spe-install
 ```
 
@@ -38,6 +38,14 @@ ppc-amigaos-gcc -mcpu=8548 -O2 -c kernel.c
 floating point, and the SPE library directory. The GCC6 spelling
 `-mcpu=8540 -mspe -mabi=spe -mfloat-gprs=double` also selects the double
 precision SPE library variant through `-mfloat-gprs=double`.
+
+This changes the meaning of an existing `-mcpu=8548` command line: it now
+selects native SPE floating point and the GPR ABI automatically. Rebuild
+matching objects together and keep conventional SDK boundaries separate.
+Plain `-mcpu=8540`/SPEv1 and soft-float SPE combinations are rejected,
+including link-only invocations, because no matching runtime is provided.
+The supported set contains eight multilib directories; the conventional
+clib2 soft-float directory remains available.
 
 ## AmigaOS4 interface boundaries
 
@@ -106,11 +114,16 @@ The port also fixes issues found while adapting the old implementation:
 
 The compiler exposes standard two-float vector arithmetic and selects
 8-byte SPE vectors for float and integer loops. Unaligned pointers use
-alignment checks and scalar fallback where required; `-msoft-float` does
-not enable automatic hardware floating-point vector operations.
+alignment checks, scalar peeling and scalar fallback where required.
+Conventional `-msoft-float` remains available; combining it with SPE is
+rejected because the port has no soft-float SPE runtime.
 
 Double argument/return packing uses explicit register operations, and the
-scheduler models the e500v2 double-precision pipeline. In small functions
+scheduler models the e500v2 double-precision pipeline. This `vecdouble`
+reservation is new modeling: the GCC6 scheduler had no such reservation.
+Table 4-8 of E500CORERM Rev. 1 gives double arithmetic a 6:1
+latency:throughput and division 32 cycles. The table omits `efdcfs` and
+`efscfd`; their six-cycle reservation is an explicit modeling assumption. In small functions
 compiled with `-mcpu=8548 -O3`, two-float addition falls from 14 instructions
 to 2 and double division from 22 to 6, including return. Both lose their
 32-byte stack frames. These are code-generation results, not measured
@@ -127,3 +140,10 @@ follow-up results; `validation.json` retains the initial port's results.
 - [SPE integration and AmigaOS4 ABI boundaries](https://keasigmadelta.com/blog/taborizing-drivers-libraries-a-k-a-optimizing-code-for-the-e500-spe/)
 - [NXP e500 core reference manual](https://www.nxp.com/docs/en/reference-manual/E500CORERM.pdf)
 - [GCC6 rs6000 source](https://github.com/AmigaPorts/gcc/tree/amiga6/gcc/config/rs6000)
+
+## Review checks
+
+See [REVIEW.md](REVIEW.md) for the multilib corrections, conventional
+unwinder layout preservation, static alignment audit, and scheduler
+references. Run `check-options.py --gcc-build BUILD --output OUTPUT` to
+check supported driver options and all eight multilib selections.

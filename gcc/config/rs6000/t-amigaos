@@ -24,3 +24,6 @@ MULTILIB_EXCEPTIONS = msoft-float* mcrt=newlib/msoft-float* mcrt=clib4/msoft-flo
 MULTILIB_OPTIONS += mcpu=8548
 MULTILIB_DIRNAMES += spe
 MULTILIB_MATCHES += mcpu?8548=mfloat-gprs?double
+
+# No soft-float SPE runtime is supported by the A1222 port.
+MULTILIB_EXCEPTIONS += *msoft-float*mcpu=8548*
