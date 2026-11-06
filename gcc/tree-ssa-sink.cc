@@ -22,6 +22,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "system.h"
 #include "coretypes.h"
 #include "backend.h"
+#include "rtl.h"
 #include "tree.h"
 #include "gimple.h"
 #include "cfghooks.h"
@@ -173,11 +174,79 @@ nearest_common_dominator_of_uses (def_operand_p def_p, bool *debug_stmts)
   return commondom;
 }
 
+/* Return true if STMT is an increment placed immediately after a load that
+   can use post-increment addressing.  Late sinking must not separate the
+   increment from the load after IVOPTs has selected this placement.  */
+
+static bool
+preserve_postinc_p (gimple *stmt)
+{
+  if (!flag_auto_inc_dec
+      || !(cfun->curr_properties & PROP_loop_opts_done)
+      || !is_gimple_assign (stmt)
+      || (gimple_assign_rhs_code (stmt) != PLUS_EXPR
+	  && gimple_assign_rhs_code (stmt) != POINTER_PLUS_EXPR))
+    return false;
+
+  tree base = gimple_assign_rhs1 (stmt);
+  tree step = gimple_assign_rhs2 (stmt);
+  if (TREE_CODE (base) != SSA_NAME || !tree_fits_uhwi_p (step))
+    return false;
+
+  gimple_stmt_iterator gsi = gsi_for_stmt (stmt);
+  gsi_prev_nondebug (&gsi);
+  if (gsi_end_p (gsi))
+    return false;
+  gimple *load = gsi_stmt (gsi);
+  if (!gimple_assign_load_p (load) || gimple_has_volatile_ops (load))
+    return false;
+  tree ref = gimple_assign_rhs1 (load);
+  tree ptr;
+  if (TREE_CODE (ref) == MEM_REF)
+    {
+      if (!integer_zerop (TREE_OPERAND (ref, 1)))
+	return false;
+      ptr = TREE_OPERAND (ref, 0);
+    }
+  else if (TREE_CODE (ref) == TARGET_MEM_REF)
+    {
+      if (!integer_zerop (TMR_OFFSET (ref))
+	  || TMR_INDEX (ref) || TMR_INDEX2 (ref))
+	return false;
+      ptr = TMR_BASE (ref);
+    }
+  else
+    return false;
+  if (!ptr)
+    return false;
+  if (ptr != base && TREE_CODE (ptr) == SSA_NAME)
+    {
+      gimple *def = SSA_NAME_DEF_STMT (ptr);
+      if (gimple_assign_cast_p (def))
+	ptr = gimple_assign_rhs1 (def);
+    }
+  if (ptr != base)
+    return false;
+
+  machine_mode mode = TYPE_MODE (TREE_TYPE (ref));
+  return SCALAR_INT_MODE_P (mode)
+	 && USE_LOAD_POST_INCREMENT (mode)
+	 && known_eq (GET_MODE_SIZE (mode), tree_to_uhwi (step));
+}
+
 /* Return whether sinking STMT from EARLY_BB to BEST_BB should be avoided.  */
 
 static bool
 do_not_sink (gimple *stmt, basic_block early_bb, basic_block best_bb)
 {
+  /* Keep post-increment loads selected by IVOPTs in the same block as
+     their increments.  Sinking the increment across a conditional makes
+     RTL auto-inc-dec unable to combine them.  */
+  if (best_bb->loop_father == early_bb->loop_father
+      && loop_outer (early_bb->loop_father)
+      && preserve_postinc_p (stmt))
+    return true;
+
   /* Placing a statement before a setjmp-like function would be invalid
      (it cannot be reevaluated when execution follows an abnormal edge).
      If we selected a block with abnormal predecessors, just punt.  */
