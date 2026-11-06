@@ -1,13 +1,25 @@
-/* m68k-costs.cc - unified m68k RTX cost model.
+/* m68k-costs.cc - m68k RTX cost model.
 
-   One engine, one pair of tables (speed, size) per CPU.
-   The active pair is chosen once from TUNE_68000_10 / m68k_tune.
+   Per-family tables (speed, size) select the cost model for the active
+   CPU. Five families are supported:
 
-   Overrides are loaded from the file named by M68K_COSTS_FILE, into
-   the active CPU's active table only. No fallback filenames.
+     68000/010                    distinct (2-cycle shifts, no cache)
+     68020/020_40/030             shared (Volamos does not model 68030
+                                  caches, so the 68030 grid scores
+                                  identically to 68020)
+     68040                        distinct (barrel shifter, caches)
+     68060                        distinct (superscalar, deeper pipeline)
+     68080                        distinct (Apollo); uses 68060 values
+                                  as a starting point (untuned) / unused
 
-   Adding a new CPU means adding one speed table and one size table,
-   plus a case in m68k_cost_select(). The engine does not change. */
+   The values were derived by CMA-ES tuning against a benchmark suite
+   executed on a cycle-accurate simulator. See
+   gcc/config/m68k/m68k-costs-tuning.md for the external harness and
+   reproduction instructions.
+
+   The M68K_COSTS_FILE environment variable can override the active
+   table for tuning and diagnostics. This is not a supported feature;
+   the .txt format is not stable and may change between GCC releases. */
 
 #define IN_TARGET_CODE 1
 
@@ -25,14 +37,15 @@
    Cost index enum - order must match cost_map[]
    ============================================ */
 enum m68k_cost_idx {
-    IDX_REG,
+    IDX_REG_SRC,
+    IDX_REG_DST,
     IDX_MEM_PLUS_REG_DISP,
     IDX_MEM_PLUS_REG_REG,
     IDX_MEM_OTHER,
     IDX_CONST_INT_Q,
     IDX_CONST_INT_W,
-    IDX_CONST_INT_L,
-    IDX_CONST_DOUBLE,
+    IDX_CONST_INT_L_1,
+    IDX_CONST_INT_L_2,
     IDX_SYMBOL,
     IDX_PLUS_REG_REG,
     IDX_PLUS_REG_CONSTQ,
@@ -45,360 +58,494 @@ enum m68k_cost_idx {
     IDX_BRANCH,
     IDX_SET_REG_REG,
     IDX_CALL_OTHER,
-    IDX_MULU_L,
-    IDX_MULU_W,
+    IDX_DIV_L,
+    IDX_DIV_W,
     IDX_ADD_L,
     IDX_SUB_L,
-    IDX_MOVE_L,
     IDX_MOVEQ,
     IDX_LSL_SHIFT,
+    IDX_LSL_SHIFT_STEP,
+
+    /* SBF structural constants */
+    IDX_MEM_LONG_EXTRA,
+    IDX_MEM_PREDEC_EXTRA,
+    IDX_CLR_LONG_PENALTY,
+    IDX_CLR_WORD_PENALTY,
+    IDX_PLUS_LEA_OFFSET,
+    IDX_PLUS_LONG_EXTRA,
+    IDX_PLUS_SHORT_EXTRA,
+    IDX_LOGIC_LONG_EXTRA,
+    IDX_LOGIC_WORD_EXTRA,
+    IDX_MULT_68000_BASE,
+    IDX_MULT_68000_BITS,
+    IDX_MULT_68000_TRANS,
+    IDX_MULT_68000_WORD_BASE,
+    IDX_MULT_68000_LONG_MUL,
+    IDX_MULT_68000_WORD_MUL,
+    IDX_EXTEND_EXTRA,
+
     IDX_COUNT
 };
 
-/* ============================================
-   68000/010 - SPEED
-   ============================================ */
-static int cost_speed_68000_10[IDX_COUNT] = {
-    [IDX_REG]                   = 13,
-    [IDX_MEM_PLUS_REG_DISP]     = 7,
-    [IDX_MEM_PLUS_REG_REG]      = 6,
-    [IDX_MEM_OTHER]             = 0,
-    [IDX_CONST_INT_Q]           = 3,
-    [IDX_CONST_INT_W]           = 11,
-    [IDX_CONST_INT_L]           = 5,
-    [IDX_CONST_DOUBLE]          = 0,
-    [IDX_SYMBOL]                = 18,
-    [IDX_PLUS_REG_REG]          = 10,
-    [IDX_PLUS_REG_CONSTQ]       = 4,
-    [IDX_PLUS_REG_CONSTW]       = 0,
-    [IDX_PLUS_REG_CONSTL]       = 0,
-    [IDX_PLUS_OTHER]            = 21,
-    [IDX_LOGIC_REG_CONST]       = 9,
-    [IDX_SHIFT_CONST]           = 6,
-    [IDX_SHIFT_CONST_W]         = 7,
-    [IDX_BRANCH]                = 0,
-    [IDX_SET_REG_REG]           = 3,
-    [IDX_CALL_OTHER]            = 16,
-    /* 68000 uses a shift-based MULT formula, not the mulu_l/w fallbacks. */
-    [IDX_MULU_L]                = 180,
-    [IDX_MULU_W]                = 0,
-    [IDX_ADD_L]                 = 0,
-    [IDX_SUB_L]                 = 0,
-    [IDX_MOVE_L]                = 0,
-    [IDX_MOVEQ]                 = 0,
-    [IDX_LSL_SHIFT]             = 12,
-};
+/* Runtime table buffers. The active pair is selected once in
+   m68k_select_cost_tables(), then overridden from M68K_COSTS_FILE if set. */
+static int cost_speed_68000_10[IDX_COUNT];
+static int cost_size_68000_10[IDX_COUNT];
+
+static int cost_speed_68020_30[IDX_COUNT];
+static int cost_size_68020_30[IDX_COUNT];
+
+static int cost_speed_68040[IDX_COUNT];
+static int cost_size_68040[IDX_COUNT];
+
+static int cost_speed_68060[IDX_COUNT];
+static int cost_size_68060[IDX_COUNT];
+#if 0
+static int cost_speed_68080[IDX_COUNT];
+static int cost_size_68080[IDX_COUNT];
+#endif
+static inline void
+set_cost (int t[IDX_COUNT], enum m68k_cost_idx idx, int val)
+{
+    t[idx] = val;
+}
 
 /* ============================================
-   68000/010 - SIZE
+   68000/010 - SPEED / SIZE
+   Winner: m68k-costs-speed.68000.winner.txt (0.859205)
    ============================================ */
-static int cost_size_68000_10[IDX_COUNT] = {
-    [IDX_REG]                   = 5,
-    [IDX_MEM_PLUS_REG_DISP]     = 1,
-    [IDX_MEM_PLUS_REG_REG]      = 0,
-    [IDX_MEM_OTHER]             = 1,
-    [IDX_CONST_INT_Q]           = 20,
-    [IDX_CONST_INT_W]           = 1,
-    [IDX_CONST_INT_L]           = 0,
-    [IDX_CONST_DOUBLE]          = 9,
-    [IDX_SYMBOL]                = 12,
-    [IDX_PLUS_REG_REG]          = 5,
-    [IDX_PLUS_REG_CONSTQ]       = 20,
-    [IDX_PLUS_REG_CONSTW]       = 0,
-    [IDX_PLUS_REG_CONSTL]       = 1,
-    [IDX_PLUS_OTHER]            = 12,
-    [IDX_LOGIC_REG_CONST]       = 8,
-    [IDX_SHIFT_CONST]           = 2,
-    [IDX_SHIFT_CONST_W]         = 0,
-    [IDX_BRANCH]                = 0,
-    [IDX_SET_REG_REG]           = 1,
-    [IDX_CALL_OTHER]            = 11,
-    [IDX_MULU_L]                = 180,
-    [IDX_MULU_W]                = 0,
-    [IDX_ADD_L]                 = 0,
-    [IDX_SUB_L]                 = 0,
-    [IDX_MOVE_L]                = 0,
-    [IDX_MOVEQ]                 = 0,
-    [IDX_LSL_SHIFT]             = 8,
-};
+static void
+init_cost_speed_68000_10 (int t[IDX_COUNT])
+{
+    for (int i = 0; i < IDX_COUNT; ++i) t[i] = -1;
+
+    set_cost (t, IDX_REG_SRC,                2);
+    set_cost (t, IDX_REG_DST,               38);
+    set_cost (t, IDX_MEM_PLUS_REG_DISP,      5);
+    set_cost (t, IDX_MEM_PLUS_REG_REG,      12);
+    set_cost (t, IDX_MEM_OTHER,              0);
+    set_cost (t, IDX_CONST_INT_Q,            2);
+    set_cost (t, IDX_CONST_INT_W,           34);
+    set_cost (t, IDX_CONST_INT_L_1,         26);
+    set_cost (t, IDX_CONST_INT_L_2,          4);
+    set_cost (t, IDX_SYMBOL,                34);
+    set_cost (t, IDX_PLUS_REG_REG,          23);
+    set_cost (t, IDX_PLUS_REG_CONSTQ,        6);
+    set_cost (t, IDX_PLUS_REG_CONSTW,       40);
+    set_cost (t, IDX_PLUS_REG_CONSTL,        9);
+    set_cost (t, IDX_PLUS_OTHER,            13);
+    set_cost (t, IDX_LOGIC_REG_CONST,       38);
+    set_cost (t, IDX_SHIFT_CONST,            2);
+    set_cost (t, IDX_SHIFT_CONST_W,         36);
+    set_cost (t, IDX_LSL_SHIFT,              2);
+    set_cost (t, IDX_LSL_SHIFT_STEP,         1);
+    set_cost (t, IDX_CALL_OTHER,            17);
+    set_cost (t, IDX_DIV_L,                 23);
+    set_cost (t, IDX_DIV_W,                 18);
+
+    set_cost (t, IDX_MEM_LONG_EXTRA,         0);
+    set_cost (t, IDX_MEM_PREDEC_EXTRA,      18);
+    set_cost (t, IDX_CLR_LONG_PENALTY,      14);
+    set_cost (t, IDX_CLR_WORD_PENALTY,      15);
+    set_cost (t, IDX_PLUS_LEA_OFFSET,        6);
+    set_cost (t, IDX_PLUS_LONG_EXTRA,        0);
+    set_cost (t, IDX_PLUS_SHORT_EXTRA,      10);
+    set_cost (t, IDX_LOGIC_LONG_EXTRA,       7);
+    set_cost (t, IDX_LOGIC_WORD_EXTRA,       4);
+    set_cost (t, IDX_MULT_68000_BASE,        3);
+    set_cost (t, IDX_MULT_68000_BITS,       40);
+    set_cost (t, IDX_MULT_68000_TRANS,       9);
+    set_cost (t, IDX_MULT_68000_WORD_BASE,  38);
+    set_cost (t, IDX_MULT_68000_LONG_MUL,   39);
+    set_cost (t, IDX_MULT_68000_WORD_MUL,   37);
+    set_cost (t, IDX_EXTEND_EXTRA,          33);
+}
+
+static void
+init_cost_size_68000_10 (int t[IDX_COUNT])
+{
+    for (int i = 0; i < IDX_COUNT; ++i) t[i] = -1;
+
+    /* Size not tuned; SBF baseline. */
+    set_cost (t, IDX_REG_SRC,                4);
+    set_cost (t, IDX_REG_DST,                0);
+    set_cost (t, IDX_MEM_PLUS_REG_DISP,      4);
+    set_cost (t, IDX_MEM_PLUS_REG_REG,       8);
+    set_cost (t, IDX_MEM_OTHER,             12);
+    set_cost (t, IDX_CONST_INT_Q,            4);
+    set_cost (t, IDX_CONST_INT_W,            8);
+    set_cost (t, IDX_CONST_INT_L_1,         10);
+    set_cost (t, IDX_CONST_INT_L_2,         12);
+    set_cost (t, IDX_SYMBOL,                12);
+    set_cost (t, IDX_PLUS_REG_REG,           4);
+    set_cost (t, IDX_PLUS_REG_CONSTQ,        4);
+    set_cost (t, IDX_PLUS_REG_CONSTW,        8);
+    set_cost (t, IDX_PLUS_REG_CONSTL,        8);
+    set_cost (t, IDX_PLUS_OTHER,            12);
+    set_cost (t, IDX_LOGIC_REG_CONST,        8);
+    set_cost (t, IDX_SHIFT_CONST,            8);
+    set_cost (t, IDX_SHIFT_CONST_W,          6);
+    set_cost (t, IDX_CALL_OTHER,            22);
+    set_cost (t, IDX_DIV_L,                108);
+    set_cost (t, IDX_DIV_W,                 36);
+    set_cost (t, IDX_LSL_SHIFT,              8);
+    set_cost (t, IDX_LSL_SHIFT_STEP,         2);
+
+    set_cost (t, IDX_MEM_LONG_EXTRA,         4);
+    set_cost (t, IDX_MEM_PREDEC_EXTRA,       2);
+    set_cost (t, IDX_CLR_LONG_PENALTY,       8);
+    set_cost (t, IDX_CLR_WORD_PENALTY,       4);
+    set_cost (t, IDX_PLUS_LEA_OFFSET,        8);
+    set_cost (t, IDX_PLUS_LONG_EXTRA,        6);
+    set_cost (t, IDX_PLUS_SHORT_EXTRA,       4);
+    set_cost (t, IDX_LOGIC_LONG_EXTRA,       6);
+    set_cost (t, IDX_LOGIC_WORD_EXTRA,       6);
+    set_cost (t, IDX_MULT_68000_BASE,       24);
+    set_cost (t, IDX_MULT_68000_BITS,        6);
+    set_cost (t, IDX_MULT_68000_TRANS,       7);
+    set_cost (t, IDX_MULT_68000_WORD_BASE,  38);
+    set_cost (t, IDX_MULT_68000_LONG_MUL,   48);
+    set_cost (t, IDX_MULT_68000_WORD_MUL,   16);
+    set_cost (t, IDX_EXTEND_EXTRA,           8);
+}
 
 /* ============================================
-   68020 - SPEED / SIZE
-   Speed values from CMA run, then shrunk to the equivalence-class
-   edges with `driver.py shrink`. Parameters that shrank to 0 stay at 0;
-   exception: cost_mulu_w, which is a plausible codegen choice for other
-   programs and would otherwise be treated as free.
+   68020/030 - SPEED / SIZE
+   Winner: m68k-costs-speed.68020.winner.txt (0.988126)
+   (identical to 68030 winner - Volamos doesn't model 68030 caches)
    ============================================ */
-static int cost_speed_68020[IDX_COUNT] = {
-    [IDX_REG]                   =  20,
-    [IDX_MEM_PLUS_REG_DISP]     =  11,
-    [IDX_MEM_PLUS_REG_REG]      =  4,
-    [IDX_MEM_OTHER]             =  3,
-    [IDX_CONST_INT_Q]           =  0,
-    [IDX_CONST_INT_W]           = 15,
-    [IDX_CONST_INT_L]           = 16,
-    [IDX_CONST_DOUBLE]          =  0,
-    [IDX_SYMBOL]                =  7,
-    [IDX_PLUS_REG_REG]          =  5,
-    [IDX_PLUS_REG_CONSTQ]       =  1,
-    [IDX_PLUS_REG_CONSTW]       =  0,
-    [IDX_PLUS_REG_CONSTL]       =  5,
-    [IDX_PLUS_OTHER]            = 14,
-    [IDX_LOGIC_REG_CONST]       =  7,
-    [IDX_SHIFT_CONST]           =  4,
-    [IDX_SHIFT_CONST_W]         =  0,
-    [IDX_BRANCH]                =  0,
-    [IDX_SET_REG_REG]           =  1,
-    [IDX_CALL_OTHER]            =  8,
-    [IDX_MULU_L]                = 43,
-    [IDX_MULU_W]                = 27,
-    [IDX_ADD_L]                 =  0,
-    [IDX_SUB_L]                 =  0,
-    [IDX_MOVE_L]                =  0,
-    [IDX_MOVEQ]                 =  0,
-    [IDX_LSL_SHIFT]             =  4,
-};
+static void
+init_cost_speed_68020_30 (int t[IDX_COUNT])
+{
+    for (int i = 0; i < IDX_COUNT; ++i) t[i] = 0;
 
-static int cost_size_68020[IDX_COUNT] = {
-    [IDX_REG]                   = 5,
-    [IDX_MEM_PLUS_REG_DISP]     = 1,
-    [IDX_MEM_PLUS_REG_REG]      = 0,
-    [IDX_MEM_OTHER]             = 1,
-    [IDX_CONST_INT_Q]           = 20,
-    [IDX_CONST_INT_W]           = 1,
-    [IDX_CONST_INT_L]           = 0,
-    [IDX_CONST_DOUBLE]          = 9,
-    [IDX_SYMBOL]                = 12,
-    [IDX_PLUS_REG_REG]          = 5,
-    [IDX_PLUS_REG_CONSTQ]       = 20,
-    [IDX_PLUS_REG_CONSTW]       = 0,
-    [IDX_PLUS_REG_CONSTL]       = 1,
-    [IDX_PLUS_OTHER]            = 12,
-    [IDX_LOGIC_REG_CONST]       = 8,
-    [IDX_SHIFT_CONST]           = 2,
-    [IDX_SHIFT_CONST_W]         = 0,
-    [IDX_BRANCH]                = 0,
-    [IDX_SET_REG_REG]           = 1,
-    [IDX_CALL_OTHER]            = 11,
-    [IDX_MULU_L]                = 43,
-    [IDX_MULU_W]                = 27,
-    [IDX_ADD_L]                 = 2,
-    [IDX_SUB_L]                 = 2,
-    [IDX_MOVE_L]                = 2,
-    [IDX_MOVEQ]                 = 2,
-    [IDX_LSL_SHIFT]             = 2,
-};
+    set_cost (t, IDX_REG_SRC,               10);
+    set_cost (t, IDX_REG_DST,               36);
+    set_cost (t, IDX_MEM_PLUS_REG_DISP,     10);
+    set_cost (t, IDX_MEM_PLUS_REG_REG,      33);
+    set_cost (t, IDX_MEM_OTHER,              0);
+    set_cost (t, IDX_CONST_INT_Q,            3);
+    set_cost (t, IDX_CONST_INT_W,            9);
+    set_cost (t, IDX_CONST_INT_L_1,          4);
+    set_cost (t, IDX_CONST_INT_L_2,          4);
+    set_cost (t, IDX_SYMBOL,                10);
+    set_cost (t, IDX_PLUS_REG_REG,          14);
+    set_cost (t, IDX_PLUS_REG_CONSTQ,        0);
+    set_cost (t, IDX_PLUS_REG_CONSTW,       33);
+    set_cost (t, IDX_PLUS_REG_CONSTL,       18);
+    set_cost (t, IDX_PLUS_OTHER,             9);
+    set_cost (t, IDX_LOGIC_REG_CONST,       15);
+    set_cost (t, IDX_SHIFT_CONST,            6);
+    set_cost (t, IDX_SHIFT_CONST_W,         16);
+    set_cost (t, IDX_SET_REG_REG,            0);
+    set_cost (t, IDX_CALL_OTHER,            18);
+    set_cost (t, IDX_DIV_L,                 39);
+    set_cost (t, IDX_DIV_W,                  9);
+    set_cost (t, IDX_LSL_SHIFT,             27);
+    set_cost (t, IDX_LSL_SHIFT_STEP,         3);
 
-/* ============================================
-   68030 - SPEED / SIZE
-   ============================================ */
-static int cost_speed_68030[IDX_COUNT] = {
-    [IDX_REG]                   =  20,
-    [IDX_MEM_PLUS_REG_DISP]     =  11,
-    [IDX_MEM_PLUS_REG_REG]      =  4,
-    [IDX_MEM_OTHER]             =  3,
-    [IDX_CONST_INT_Q]           =  0,
-    [IDX_CONST_INT_W]           = 15,
-    [IDX_CONST_INT_L]           = 16,
-    [IDX_CONST_DOUBLE]          =  0,
-    [IDX_SYMBOL]                =  7,
-    [IDX_PLUS_REG_REG]          =  5,
-    [IDX_PLUS_REG_CONSTQ]       =  1,
-    [IDX_PLUS_REG_CONSTW]       =  0,
-    [IDX_PLUS_REG_CONSTL]       =  5,
-    [IDX_PLUS_OTHER]            = 14,
-    [IDX_LOGIC_REG_CONST]       =  7,
-    [IDX_SHIFT_CONST]           =  4,
-    [IDX_SHIFT_CONST_W]         =  0,
-    [IDX_BRANCH]                =  0,
-    [IDX_SET_REG_REG]           =  1,
-    [IDX_CALL_OTHER]            =  8,
-    [IDX_MULU_L]                = 43,
-    [IDX_MULU_W]                = 27,
-    [IDX_ADD_L]                 =  0,
-    [IDX_SUB_L]                 =  0,
-    [IDX_MOVE_L]                =  0,
-    [IDX_MOVEQ]                 =  0,
-    [IDX_LSL_SHIFT]             =  4,
-};
+    set_cost (t, IDX_MEM_LONG_EXTRA,        12);
+    set_cost (t, IDX_MEM_PREDEC_EXTRA,      10);
+    set_cost (t, IDX_CLR_LONG_PENALTY,      31);
+    set_cost (t, IDX_CLR_WORD_PENALTY,       0);
+    set_cost (t, IDX_PLUS_LEA_OFFSET,       22);
+    set_cost (t, IDX_PLUS_LONG_EXTRA,        1);
+    set_cost (t, IDX_PLUS_SHORT_EXTRA,       2);
+    set_cost (t, IDX_LOGIC_LONG_EXTRA,       7);
+    set_cost (t, IDX_LOGIC_WORD_EXTRA,      11);
+    set_cost (t, IDX_MULT_68000_BASE,        6);
+    set_cost (t, IDX_MULT_68000_BITS,       28);
+    set_cost (t, IDX_MULT_68000_TRANS,      23);
+    set_cost (t, IDX_MULT_68000_WORD_BASE,   4);
+    set_cost (t, IDX_MULT_68000_LONG_MUL,   32);
+    set_cost (t, IDX_MULT_68000_WORD_MUL,    0);
+    set_cost (t, IDX_EXTEND_EXTRA,           8);
+}
 
-static int cost_size_68030[IDX_COUNT] = {
-    [IDX_REG]                   = 5,
-    [IDX_MEM_PLUS_REG_DISP]     = 1,
-    [IDX_MEM_PLUS_REG_REG]      = 0,
-    [IDX_MEM_OTHER]             = 1,
-    [IDX_CONST_INT_Q]           = 20,
-    [IDX_CONST_INT_W]           = 1,
-    [IDX_CONST_INT_L]           = 0,
-    [IDX_CONST_DOUBLE]          = 9,
-    [IDX_SYMBOL]                = 12,
-    [IDX_PLUS_REG_REG]          = 5,
-    [IDX_PLUS_REG_CONSTQ]       = 20,
-    [IDX_PLUS_REG_CONSTW]       = 0,
-    [IDX_PLUS_REG_CONSTL]       = 1,
-    [IDX_PLUS_OTHER]            = 12,
-    [IDX_LOGIC_REG_CONST]       = 8,
-    [IDX_SHIFT_CONST]           = 2,
-    [IDX_SHIFT_CONST_W]         = 0,
-    [IDX_BRANCH]                = 0,
-    [IDX_SET_REG_REG]           = 1,
-    [IDX_CALL_OTHER]            = 11,
-    [IDX_MULU_L]                = 44,
-    [IDX_MULU_W]                = 27,
-    [IDX_ADD_L]                 = 2,
-    [IDX_SUB_L]                 = 2,
-    [IDX_MOVE_L]                = 2,
-    [IDX_MOVEQ]                 = 2,
-    [IDX_LSL_SHIFT]             = 4,
-};
+static void
+init_cost_size_68020_30 (int t[IDX_COUNT])
+{
+    for (int i = 0; i < IDX_COUNT; ++i) t[i] = 0;
+
+    /* Size not tuned; SBF baseline. */
+    set_cost (t, IDX_REG_SRC,                4);
+    set_cost (t, IDX_REG_DST,                0);
+    set_cost (t, IDX_MEM_PLUS_REG_DISP,      1);
+    set_cost (t, IDX_MEM_OTHER,              1);
+    set_cost (t, IDX_CONST_INT_Q,           20);
+    set_cost (t, IDX_CONST_INT_W,            1);
+    set_cost (t, IDX_CONST_INT_L_1,          0);
+    set_cost (t, IDX_CONST_INT_L_2,          0);
+    set_cost (t, IDX_SYMBOL,                12);
+    set_cost (t, IDX_PLUS_REG_REG,           5);
+    set_cost (t, IDX_PLUS_REG_CONSTQ,       20);
+    set_cost (t, IDX_PLUS_REG_CONSTL,        1);
+    set_cost (t, IDX_PLUS_OTHER,            12);
+    set_cost (t, IDX_LOGIC_REG_CONST,        8);
+    set_cost (t, IDX_SHIFT_CONST,            2);
+    set_cost (t, IDX_SET_REG_REG,            1);
+    set_cost (t, IDX_CALL_OTHER,            11);
+    set_cost (t, IDX_DIV_L,                 43);
+    set_cost (t, IDX_DIV_W,                 27);
+    set_cost (t, IDX_ADD_L,                  2);
+    set_cost (t, IDX_SUB_L,                  2);
+    set_cost (t, IDX_MOVEQ,                  2);
+    set_cost (t, IDX_LSL_SHIFT,              2);
+    set_cost (t, IDX_LSL_SHIFT_STEP,         2);
+
+    set_cost (t, IDX_MEM_LONG_EXTRA,         2);
+    set_cost (t, IDX_MEM_PREDEC_EXTRA,       2);
+    set_cost (t, IDX_CLR_LONG_PENALTY,       8);
+    set_cost (t, IDX_CLR_WORD_PENALTY,       4);
+    set_cost (t, IDX_PLUS_LEA_OFFSET,        8);
+    set_cost (t, IDX_PLUS_LONG_EXTRA,        4);
+    set_cost (t, IDX_PLUS_SHORT_EXTRA,       4);
+    set_cost (t, IDX_LOGIC_LONG_EXTRA,       4);
+    set_cost (t, IDX_LOGIC_WORD_EXTRA,       4);
+    set_cost (t, IDX_MULT_68000_BASE,       24);
+    set_cost (t, IDX_MULT_68000_BITS,        6);
+    set_cost (t, IDX_MULT_68000_TRANS,       7);
+    set_cost (t, IDX_MULT_68000_WORD_BASE,  38);
+    set_cost (t, IDX_MULT_68000_LONG_MUL,   43);
+    set_cost (t, IDX_MULT_68000_WORD_MUL,   27);
+    set_cost (t, IDX_EXTEND_EXTRA,           8);
+}
 
 /* ============================================
    68040 - SPEED / SIZE
+   Winner: m68k-costs-speed.68040.winner.txt (0.990612)
    ============================================ */
-static int cost_speed_68040[IDX_COUNT] = {
-    [IDX_REG]                   = 20,
-    /* At 3 or less, (d16,An) stack values get parked in address
-       registers and copied to data registers before each use: SHA-512
-       runs 8% slower than with the 68020 tables.  */
-    [IDX_MEM_PLUS_REG_DISP]     = 5,
-    [IDX_MEM_PLUS_REG_REG]      = 5,
-    [IDX_MEM_OTHER]             = 3,
-    [IDX_CONST_INT_Q]           = 4,
-    [IDX_CONST_INT_W]           = 19,
-    [IDX_CONST_INT_L]           = 4,
-    [IDX_CONST_DOUBLE]          = 4,
-    [IDX_SYMBOL]                = 26,
-    [IDX_PLUS_REG_REG]          = 13,
-    [IDX_PLUS_REG_CONSTQ]       = 1,
-    [IDX_PLUS_REG_CONSTW]       = 2,
-    [IDX_PLUS_REG_CONSTL]       = 15,
-    [IDX_PLUS_OTHER]            = 8,
-    [IDX_LOGIC_REG_CONST]       = 11,
-    [IDX_SHIFT_CONST]           = 8,
-    [IDX_SHIFT_CONST_W]         = 1,
-    [IDX_BRANCH]                = 0,
-    [IDX_SET_REG_REG]           = 13,
-    [IDX_CALL_OTHER]            = 0,
-    [IDX_MULU_L]                = 20,   /* mul.l */
-    [IDX_MULU_W]                = 14,   /* mul.w */
-    [IDX_ADD_L]                 = 0,
-    [IDX_SUB_L]                 = 0,
-    [IDX_MOVE_L]                = 0,
-    [IDX_MOVEQ]                 = 0,
-    [IDX_LSL_SHIFT]             = 22,
-};
+static void
+init_cost_speed_68040 (int t[IDX_COUNT])
+{
+    for (int i = 0; i < IDX_COUNT; ++i) t[i] = 0;
 
-static int cost_size_68040[IDX_COUNT] = {
-    [IDX_REG]                   = 5,
-    [IDX_MEM_PLUS_REG_DISP]     = 1,
-    [IDX_MEM_PLUS_REG_REG]      = 0,
-    [IDX_MEM_OTHER]             = 1,
-    [IDX_CONST_INT_Q]           = 20,
-    [IDX_CONST_INT_W]           = 1,
-    [IDX_CONST_INT_L]           = 0,
-    [IDX_CONST_DOUBLE]          = 9,
-    [IDX_SYMBOL]                = 12,
-    [IDX_PLUS_REG_REG]          = 5,
-    [IDX_PLUS_REG_CONSTQ]       = 20,
-    [IDX_PLUS_REG_CONSTW]       = 0,
-    [IDX_PLUS_REG_CONSTL]       = 1,
-    [IDX_PLUS_OTHER]            = 12,
-    [IDX_LOGIC_REG_CONST]       = 8,
-    [IDX_SHIFT_CONST]           = 2,
-    [IDX_SHIFT_CONST_W]         = 0,
-    [IDX_BRANCH]                = 0,
-    [IDX_SET_REG_REG]           = 1,
-    [IDX_CALL_OTHER]            = 11,
-    [IDX_MULU_L]                = 20,
-    [IDX_MULU_W]                = 14,
-    [IDX_ADD_L]                 = 1,
-    [IDX_SUB_L]                 = 1,
-    [IDX_MOVE_L]                = 1,
-    [IDX_MOVEQ]                 = 1,
-    [IDX_LSL_SHIFT]             = 2,
-};
+    set_cost (t, IDX_REG_SRC,                9);
+    set_cost (t, IDX_REG_DST,               40);
+    set_cost (t, IDX_MEM_PLUS_REG_DISP,     17);
+    set_cost (t, IDX_MEM_PLUS_REG_REG,      23);
+    set_cost (t, IDX_MEM_OTHER,              0);
+    set_cost (t, IDX_CONST_INT_Q,            1);
+    set_cost (t, IDX_CONST_INT_W,           12);
+    set_cost (t, IDX_CONST_INT_L_1,          0);
+    set_cost (t, IDX_CONST_INT_L_2,         27);
+    set_cost (t, IDX_SYMBOL,                 1);
+    set_cost (t, IDX_PLUS_REG_REG,          14);
+    set_cost (t, IDX_PLUS_REG_CONSTQ,        0);
+    set_cost (t, IDX_PLUS_REG_CONSTW,        6);
+    set_cost (t, IDX_PLUS_REG_CONSTL,        1);
+    set_cost (t, IDX_PLUS_OTHER,            14);
+    set_cost (t, IDX_LOGIC_REG_CONST,        5);
+    set_cost (t, IDX_SHIFT_CONST,            3);
+    set_cost (t, IDX_SHIFT_CONST_W,         27);
+    set_cost (t, IDX_LSL_SHIFT,              0);
+    set_cost (t, IDX_LSL_SHIFT_STEP,         2);
+    set_cost (t, IDX_CALL_OTHER,            27);
+    set_cost (t, IDX_DIV_L,                 20);
+    set_cost (t, IDX_DIV_W,                  0);
 
+    set_cost (t, IDX_MEM_LONG_EXTRA,        10);
+    set_cost (t, IDX_MEM_PREDEC_EXTRA,       0);
+    set_cost (t, IDX_CLR_LONG_PENALTY,      27);
+    set_cost (t, IDX_CLR_WORD_PENALTY,       0);
+    set_cost (t, IDX_PLUS_LEA_OFFSET,        1);
+    set_cost (t, IDX_PLUS_LONG_EXTRA,        5);
+    set_cost (t, IDX_PLUS_SHORT_EXTRA,      20);
+    set_cost (t, IDX_LOGIC_LONG_EXTRA,       6);
+    set_cost (t, IDX_LOGIC_WORD_EXTRA,       0);
+    set_cost (t, IDX_MULT_68000_BASE,       10);
+    set_cost (t, IDX_MULT_68000_BITS,        0);
+    set_cost (t, IDX_MULT_68000_TRANS,       0);
+    set_cost (t, IDX_MULT_68000_WORD_BASE,   7);
+    set_cost (t, IDX_MULT_68000_LONG_MUL,   30);
+    set_cost (t, IDX_MULT_68000_WORD_MUL,   26);
+    set_cost (t, IDX_EXTEND_EXTRA,          24);
+}
+
+static void
+init_cost_size_68040 (int t[IDX_COUNT])
+{
+    for (int i = 0; i < IDX_COUNT; ++i) t[i] = 0;
+
+    /* Size not tuned; SBF baseline. */
+    set_cost (t, IDX_REG_SRC,                4);
+    set_cost (t, IDX_REG_DST,                0);
+    set_cost (t, IDX_MEM_PLUS_REG_DISP,      1);
+    set_cost (t, IDX_MEM_OTHER,              1);
+    set_cost (t, IDX_CONST_INT_Q,           20);
+    set_cost (t, IDX_CONST_INT_W,            1);
+    set_cost (t, IDX_CONST_INT_L_1,          0);
+    set_cost (t, IDX_CONST_INT_L_2,          0);
+    set_cost (t, IDX_SYMBOL,                12);
+    set_cost (t, IDX_PLUS_REG_REG,           5);
+    set_cost (t, IDX_PLUS_REG_CONSTQ,       20);
+    set_cost (t, IDX_PLUS_REG_CONSTL,        1);
+    set_cost (t, IDX_PLUS_OTHER,            12);
+    set_cost (t, IDX_LOGIC_REG_CONST,        8);
+    set_cost (t, IDX_SHIFT_CONST,            2);
+    set_cost (t, IDX_SET_REG_REG,            1);
+    set_cost (t, IDX_CALL_OTHER,            11);
+    set_cost (t, IDX_DIV_L,                 10);
+    set_cost (t, IDX_DIV_W,                  5);
+    set_cost (t, IDX_ADD_L,                  1);
+    set_cost (t, IDX_SUB_L,                  1);
+    set_cost (t, IDX_MOVEQ,                  1);
+    set_cost (t, IDX_LSL_SHIFT,              2);
+    set_cost (t, IDX_LSL_SHIFT_STEP,         0);
+
+    set_cost (t, IDX_MEM_LONG_EXTRA,         2);
+    set_cost (t, IDX_MEM_PREDEC_EXTRA,       2);
+    set_cost (t, IDX_CLR_LONG_PENALTY,       8);
+    set_cost (t, IDX_CLR_WORD_PENALTY,       4);
+    set_cost (t, IDX_PLUS_LEA_OFFSET,        8);
+    set_cost (t, IDX_PLUS_LONG_EXTRA,        4);
+    set_cost (t, IDX_PLUS_SHORT_EXTRA,       4);
+    set_cost (t, IDX_LOGIC_LONG_EXTRA,       4);
+    set_cost (t, IDX_LOGIC_WORD_EXTRA,       4);
+    set_cost (t, IDX_MULT_68000_BASE,       24);
+    set_cost (t, IDX_MULT_68000_BITS,        6);
+    set_cost (t, IDX_MULT_68000_TRANS,       7);
+    set_cost (t, IDX_MULT_68000_WORD_BASE,  38);
+    set_cost (t, IDX_MULT_68000_LONG_MUL,   20);
+    set_cost (t, IDX_MULT_68000_WORD_MUL,   14);
+    set_cost (t, IDX_EXTEND_EXTRA,           8);
+}
+
+/* ============================================
+   68060 - SPEED / SIZE
+   Winner: m68k-costs-speed.68060.winner.txt (0.981251)
+   ============================================ */
+static void
+init_cost_speed_68060 (int t[IDX_COUNT])
+{
+    for (int i = 0; i < IDX_COUNT; ++i) t[i] = 0;
+
+    set_cost (t, IDX_REG_SRC,               14);
+    set_cost (t, IDX_REG_DST,               40);
+    set_cost (t, IDX_MEM_PLUS_REG_DISP,     13);
+    set_cost (t, IDX_MEM_PLUS_REG_REG,      28);
+    set_cost (t, IDX_MEM_OTHER,              1);
+    set_cost (t, IDX_CONST_INT_Q,            3);
+    set_cost (t, IDX_CONST_INT_W,            9);
+    set_cost (t, IDX_CONST_INT_L_1,          1);
+    set_cost (t, IDX_CONST_INT_L_2,         28);
+    set_cost (t, IDX_SYMBOL,                 1);
+    set_cost (t, IDX_PLUS_REG_REG,          21);
+    set_cost (t, IDX_PLUS_REG_CONSTQ,        2);
+    set_cost (t, IDX_PLUS_REG_CONSTW,        3);
+    set_cost (t, IDX_PLUS_REG_CONSTL,       17);
+    set_cost (t, IDX_PLUS_OTHER,            21);
+    set_cost (t, IDX_LOGIC_REG_CONST,        6);
+    set_cost (t, IDX_SHIFT_CONST,            7);
+    set_cost (t, IDX_SHIFT_CONST_W,         25);
+    set_cost (t, IDX_SET_REG_REG,            0);
+    set_cost (t, IDX_CALL_OTHER,            28);
+    set_cost (t, IDX_DIV_L,                 16);
+    set_cost (t, IDX_DIV_W,                 12);
+    set_cost (t, IDX_LSL_SHIFT,              1);
+    set_cost (t, IDX_LSL_SHIFT_STEP,         3);
+
+    set_cost (t, IDX_MEM_LONG_EXTRA,         0);
+    set_cost (t, IDX_MEM_PREDEC_EXTRA,      11);
+    set_cost (t, IDX_CLR_LONG_PENALTY,      36);
+    set_cost (t, IDX_CLR_WORD_PENALTY,      10);
+    set_cost (t, IDX_PLUS_LEA_OFFSET,        2);
+    set_cost (t, IDX_PLUS_LONG_EXTRA,        5);
+    set_cost (t, IDX_PLUS_SHORT_EXTRA,      22);
+    set_cost (t, IDX_LOGIC_LONG_EXTRA,       8);
+    set_cost (t, IDX_LOGIC_WORD_EXTRA,      13);
+    set_cost (t, IDX_MULT_68000_BASE,       32);
+    set_cost (t, IDX_MULT_68000_BITS,       15);
+    set_cost (t, IDX_MULT_68000_TRANS,      12);
+    set_cost (t, IDX_MULT_68000_WORD_BASE,   0);
+    set_cost (t, IDX_MULT_68000_LONG_MUL,   24);
+    set_cost (t, IDX_MULT_68000_WORD_MUL,   40);
+    set_cost (t, IDX_EXTEND_EXTRA,          31);
+}
+
+static void
+init_cost_size_68060 (int t[IDX_COUNT])
+{
+    for (int i = 0; i < IDX_COUNT; ++i) t[i] = 0;
+
+    /* Size not tuned; SBF baseline. */
+    set_cost (t, IDX_REG_SRC,                4);
+    set_cost (t, IDX_REG_DST,                0);
+    set_cost (t, IDX_MEM_PLUS_REG_DISP,      1);
+    set_cost (t, IDX_MEM_OTHER,              1);
+    set_cost (t, IDX_CONST_INT_Q,           20);
+    set_cost (t, IDX_CONST_INT_W,            1);
+    set_cost (t, IDX_CONST_INT_L_1,          0);
+    set_cost (t, IDX_CONST_INT_L_2,          0);
+    set_cost (t, IDX_SYMBOL,                12);
+    set_cost (t, IDX_PLUS_REG_REG,           5);
+    set_cost (t, IDX_PLUS_REG_CONSTQ,       20);
+    set_cost (t, IDX_PLUS_REG_CONSTL,        1);
+    set_cost (t, IDX_PLUS_OTHER,            12);
+    set_cost (t, IDX_LOGIC_REG_CONST,        8);
+    set_cost (t, IDX_SHIFT_CONST,            2);
+    set_cost (t, IDX_SET_REG_REG,            1);
+    set_cost (t, IDX_CALL_OTHER,            11);
+    set_cost (t, IDX_DIV_L,                 10);
+    set_cost (t, IDX_DIV_W,                  5);
+    set_cost (t, IDX_ADD_L,                  1);
+    set_cost (t, IDX_SUB_L,                  1);
+    set_cost (t, IDX_MOVEQ,                  1);
+    set_cost (t, IDX_LSL_SHIFT,              2);
+    set_cost (t, IDX_LSL_SHIFT_STEP,         0);
+
+    set_cost (t, IDX_MEM_LONG_EXTRA,         2);
+    set_cost (t, IDX_MEM_PREDEC_EXTRA,       2);
+    set_cost (t, IDX_CLR_LONG_PENALTY,       8);
+    set_cost (t, IDX_CLR_WORD_PENALTY,       4);
+    set_cost (t, IDX_PLUS_LEA_OFFSET,        8);
+    set_cost (t, IDX_PLUS_LONG_EXTRA,        4);
+    set_cost (t, IDX_PLUS_SHORT_EXTRA,       4);
+    set_cost (t, IDX_LOGIC_LONG_EXTRA,       4);
+    set_cost (t, IDX_LOGIC_WORD_EXTRA,       4);
+    set_cost (t, IDX_MULT_68000_BASE,       24);
+    set_cost (t, IDX_MULT_68000_BITS,        6);
+    set_cost (t, IDX_MULT_68000_TRANS,       7);
+    set_cost (t, IDX_MULT_68000_WORD_BASE,  38);
+    set_cost (t, IDX_MULT_68000_LONG_MUL,   24);
+    set_cost (t, IDX_MULT_68000_WORD_MUL,   40);
+    set_cost (t, IDX_EXTEND_EXTRA,           8);
+}
+#if 0
 /* ============================================
    68080 (Apollo) - SPEED / SIZE
+   No tuning data - uses 68060 values as starting point.
+   Update when 68080 hardware/simulator becomes available.
    ============================================ */
-static int cost_speed_68080[IDX_COUNT] = {
-    [IDX_REG]                   = 0,
-    [IDX_MEM_PLUS_REG_DISP]     = 0,
-    [IDX_MEM_PLUS_REG_REG]      = 3,
-    [IDX_MEM_OTHER]             = 5,
-    [IDX_CONST_INT_Q]           = 8,
-    [IDX_CONST_INT_W]           = 0,
-    [IDX_CONST_INT_L]           = 3,
-    [IDX_CONST_DOUBLE]          = 0,
-    [IDX_SYMBOL]                = 0,
-    [IDX_PLUS_REG_REG]          = 13,
-    [IDX_PLUS_REG_CONSTQ]       = 0,
-    [IDX_PLUS_REG_CONSTW]       = 0,
-    [IDX_PLUS_REG_CONSTL]       = 2,
-    [IDX_PLUS_OTHER]            = 23,
-    [IDX_LOGIC_REG_CONST]       = 0,
-    [IDX_SHIFT_CONST]           = 2,
-    [IDX_SHIFT_CONST_W]         = 10,
-    [IDX_BRANCH]                = 10,
-    [IDX_SET_REG_REG]           = 5,
-    [IDX_CALL_OTHER]            = 0,
-    [IDX_MULU_L]                = 4,
-    [IDX_MULU_W]                = 3,
-    [IDX_ADD_L]                 = 0,
-    [IDX_SUB_L]                 = 0,
-    [IDX_MOVE_L]                = 0,
-    [IDX_MOVEQ]                 = 0,
-    [IDX_LSL_SHIFT]             = 1,
-};
+static void
+init_cost_speed_68080 (int t[IDX_COUNT])
+{
+    /* Copy from 68060: no 68080 tuning exists yet, and the 68080
+       architecture is closest to the 68060 (superscalar, caches). */
+    init_cost_speed_68060 (t);
+}
 
-static int cost_size_68080[IDX_COUNT] = {
-    [IDX_REG]                   = 5,
-    [IDX_MEM_PLUS_REG_DISP]     = 1,
-    [IDX_MEM_PLUS_REG_REG]      = 0,
-    [IDX_MEM_OTHER]             = 1,
-    [IDX_CONST_INT_Q]           = 20,
-    [IDX_CONST_INT_W]           = 1,
-    [IDX_CONST_INT_L]           = 0,
-    [IDX_CONST_DOUBLE]          = 9,
-    [IDX_SYMBOL]                = 12,
-    [IDX_PLUS_REG_REG]          = 5,
-    [IDX_PLUS_REG_CONSTQ]       = 20,
-    [IDX_PLUS_REG_CONSTW]       = 0,
-    [IDX_PLUS_REG_CONSTL]       = 1,
-    [IDX_PLUS_OTHER]            = 12,
-    [IDX_LOGIC_REG_CONST]       = 8,
-    [IDX_SHIFT_CONST]           = 2,
-    [IDX_SHIFT_CONST_W]         = 0,
-    [IDX_BRANCH]                = 0,
-    [IDX_SET_REG_REG]           = 1,
-    [IDX_CALL_OTHER]            = 11,
-    [IDX_MULU_L]                = 4,
-    [IDX_MULU_W]                = 3,
-    [IDX_ADD_L]                 = 0,
-    [IDX_SUB_L]                 = 0,
-    [IDX_MOVE_L]                = 0,
-    [IDX_MOVEQ]                 = 0,
-    [IDX_LSL_SHIFT]             = 1,
-};
+static void
+init_cost_size_68080 (int t[IDX_COUNT])
+{
+    init_cost_size_68060 (t);
+}
+#endif
 
 /* ============================================
-   Cost file (name -> index in the active table)
+   Cost map for M68K_COSTS_FILE overrides (tuning only)
    ============================================ */
-
-struct cost_map_entry {
-    const char *name;
-    int         index;
-};
-
+struct cost_map_entry { const char *name; int index; };
 static const struct cost_map_entry cost_map[] = {
-    { "cost_reg",               IDX_REG },
+    { "cost_reg_src",           IDX_REG_SRC },
+    { "cost_reg_dst",           IDX_REG_DST },
     { "cost_mem_plus_reg_disp", IDX_MEM_PLUS_REG_DISP },
     { "cost_mem_plus_reg_reg",  IDX_MEM_PLUS_REG_REG },
     { "cost_mem_other",         IDX_MEM_OTHER },
     { "cost_const_int_q",       IDX_CONST_INT_Q },
     { "cost_const_int_w",       IDX_CONST_INT_W },
-    { "cost_const_int_l",       IDX_CONST_INT_L },
-    { "cost_const_double",      IDX_CONST_DOUBLE },
+    { "cost_const_int_l_1",     IDX_CONST_INT_L_1 },
+    { "cost_const_int_l_2",     IDX_CONST_INT_L_2 },
     { "cost_symbol",            IDX_SYMBOL },
     { "cost_plus_reg_reg",      IDX_PLUS_REG_REG },
     { "cost_plus_reg_constq",   IDX_PLUS_REG_CONSTQ },
@@ -411,68 +558,107 @@ static const struct cost_map_entry cost_map[] = {
     { "cost_branch",            IDX_BRANCH },
     { "cost_set_reg_reg",       IDX_SET_REG_REG },
     { "cost_call_other",        IDX_CALL_OTHER },
-    { "cost_mulu_l",            IDX_MULU_L },
-    { "cost_mulu_w",            IDX_MULU_W },
+    { "cost_div_l",             IDX_DIV_L },
+    { "cost_div_w",             IDX_DIV_W },
     { "cost_add_l",             IDX_ADD_L },
     { "cost_sub_l",             IDX_SUB_L },
-    { "cost_move_l",            IDX_MOVE_L },
     { "cost_moveq",             IDX_MOVEQ },
     { "cost_lsl_shift",         IDX_LSL_SHIFT },
-};
+    { "cost_lsl_shift_step",    IDX_LSL_SHIFT_STEP },
 
-/* ============================================
-   Active table selection
-   ============================================ */
+    { "cost_mem_long_extra",    IDX_MEM_LONG_EXTRA },
+    { "cost_mem_predec_extra",  IDX_MEM_PREDEC_EXTRA },
+    { "cost_clr_long_penalty",  IDX_CLR_LONG_PENALTY },
+    { "cost_clr_word_penalty",  IDX_CLR_WORD_PENALTY },
+    { "cost_plus_lea_offset",   IDX_PLUS_LEA_OFFSET },
+    { "cost_plus_long_extra",   IDX_PLUS_LONG_EXTRA },
+    { "cost_plus_short_extra",  IDX_PLUS_SHORT_EXTRA },
+    { "cost_logic_long_extra",  IDX_LOGIC_LONG_EXTRA },
+    { "cost_logic_word_extra",  IDX_LOGIC_WORD_EXTRA },
+    { "cost_mult_68000_base",   IDX_MULT_68000_BASE },
+    { "cost_mult_68000_bits",   IDX_MULT_68000_BITS },
+    { "cost_mult_68000_trans",  IDX_MULT_68000_TRANS },
+    { "cost_mult_68000_word_base", IDX_MULT_68000_WORD_BASE },
+    { "cost_mult_68000_long_mul",  IDX_MULT_68000_LONG_MUL },
+    { "cost_mult_68000_word_mul",  IDX_MULT_68000_WORD_MUL },
+    { "cost_extend_extra",      IDX_EXTEND_EXTRA },
+};
 
 static int *active_speed;
 static int *active_size;
 
+/* Cost-table selection by m68k_tune value.
+
+   m68k_tune is one of: u68000, u68010, u68020, u68030, u68040,
+   u68060, u68020_40, u68020_60, u68080.
+
+   The tables are grouped by architectural family:
+
+     68000/010      -> 68000_10   (distinct: 2-cycle shifts, emulated mul/div)
+     68020, 68030   -> 68020_30   (shared: Volamos does not model 68030 caches)
+     68040, 68060   -> 68040_60   (shared: 68060 superscalar needs a similar mix)
+     u68020_40      -> 68040_60   (tune for 68040; the target is the 68040)
+     u68020_60      -> 68040_60   (tune for 68060; the target is the 68060)
+     68080          -> 68080      (distinct: Apollo)  */
+
 static void
 m68k_select_cost_tables (void)
 {
-    if (TUNE_68000_10)
+    if (m68k_tune == u68000 || m68k_tune == u68010)
       {
+        init_cost_speed_68000_10 (cost_speed_68000_10);
+        init_cost_size_68000_10  (cost_size_68000_10);
         active_speed = cost_speed_68000_10;
         active_size  = cost_size_68000_10;
       }
-    else if (m68k_tune == u68020 || m68k_tune == u68020_40)
+    else if (m68k_tune == u68020 || m68k_tune == u68030)
       {
-        active_speed = cost_speed_68020;
-        active_size  = cost_size_68020;
+        init_cost_speed_68020_30 (cost_speed_68020_30);
+        init_cost_size_68020_30  (cost_size_68020_30);
+        active_speed = cost_speed_68020_30;
+        active_size  = cost_size_68020_30;
       }
-    else if (m68k_tune == u68030)
+    else if (m68k_tune == u68040  || m68k_tune == u68020_40)
       {
-        active_speed = cost_speed_68030;
-        active_size  = cost_size_68030;
-      }
-    /* The 68060 has no table of its own; its pipeline is closer to the
-       68040's than to the 68080's.  TUNE_68060 includes -m68020-60.  */
-    else if (m68k_tune == u68040 || TUNE_68060)
-      {
+        init_cost_speed_68040 (cost_speed_68040);
+        init_cost_size_68040  (cost_size_68040);
         active_speed = cost_speed_68040;
         active_size  = cost_size_68040;
       }
-    else
+    else if (m68k_tune == u68060 || m68k_tune == u68020_60)
       {
+        init_cost_speed_68060 (cost_speed_68060);
+        init_cost_size_68060  (cost_size_68060);
+        active_speed = cost_speed_68060;
+        active_size  = cost_size_68060;
+      }
+#if 0
+    else if (m68k_tune == u68080)
+      {
+        init_cost_speed_68080 (cost_speed_68080);
+        init_cost_size_68080  (cost_size_68080);
         active_speed = cost_speed_68080;
         active_size  = cost_size_68080;
       }
+#endif
+    else
+      {
+        /* Unreachable given all current m68k_tune values, but keeps
+           active_speed / active_size valid if a future GCC adds one. */
+        init_cost_speed_68020_30 (cost_speed_68020_30);
+        init_cost_size_68020_30  (cost_size_68020_30);
+        active_speed = cost_speed_68020_30;
+        active_size  = cost_size_68020_30;
+      }
 }
 
-/* ============================================
-   Override loader - fills the active table only.
-   A tuning aid: compiled in only with M68K_SWITCHES_MODE, like the
-   M68K_SW switches, so a release compiler reads no files or environment
-   variables that could change its code generation.
-   ============================================ */
-
-#if M68K_SWITCHES_MODE
+/* Override loader - for tuning and diagnostics only. Not a supported
+   user-facing feature; the .txt format is not stable across releases. */
 static void
 load_cost_overrides (const char *filename, int table[])
 {
     FILE *f = fopen (filename, "r");
-    if (!f)
-        return;
+    if (!f) return;
 
     char line[256];
     int  lineno = 0;
@@ -481,85 +667,52 @@ load_cost_overrides (const char *filename, int table[])
       {
         char *p = line;
         lineno++;
-
-        while (*p == ' ' || *p == '\t')
-          p++;
-
-        if (*p == '#' || *p == '\n' || *p == '\r' || *p == 0)
-          continue;
+        while (*p == ' ' || *p == '\t') p++;
+        if (*p == '#' || *p == '\n' || *p == '\r' || *p == 0) continue;
 
         char name[128];
         int  value;
-
-        if (sscanf (p, " %127[^= \t] = %d", name, &value) != 2)
-          {
+        if (sscanf (p, " %127[^= \t] = %d", name, &value) != 2) {
             fprintf (stderr, "%s:%d: syntax error: %s", filename, lineno, line);
             continue;
-          }
+        }
 
-        for (char *q = name; *q; q++)
-          if (*q >= 'A' && *q <= 'Z')
-            *q += 0x20;
+        for (char *q = name; *q; q++) if (*q >= 'A' && *q <= 'Z') *q += 0x20;
 
         int found = 0;
-        for (size_t i = 0; i < sizeof (cost_map) / sizeof (cost_map[0]); i++)
-          {
-            if (strcmp (cost_map[i].name, name) == 0)
-              {
+        for (size_t i = 0; i < sizeof (cost_map) / sizeof (cost_map[0]); i++) {
+            if (strcmp (cost_map[i].name, name) == 0) {
                 table[cost_map[i].index] = value;
                 found = 1;
                 break;
-              }
-          }
-
-        if (!found)
-          fprintf (stderr, "%s:%d: unknown cost name '%s'\n",
-                   filename, lineno, name);
+            }
+        }
+        if (!found) fprintf (stderr, "%s:%d: unknown cost name '%s'\n", filename, lineno, name);
       }
-
     fclose (f);
 }
-#endif
-
-/* ============================================
-   One-time initialisation
-   ============================================ */
 
 static void
-m68k_init_costs (bool speed)
+m68k_init_costs (bool speed ATTRIBUTE_UNUSED)
 {
     m68k_select_cost_tables ();
 
-#if M68K_SWITCHES_MODE
-    /* Overrides apply to whichever table is active for this build. */
+    /* Opt-in override for tuning: M68K_COSTS_FILE points to a text file
+       of "name = value" pairs. No fallback filenames. */
     const char *env = getenv ("M68K_COSTS_FILE");
     if (env && *env)
       {
         load_cost_overrides (env, active_speed);
         load_cost_overrides (env, active_size);
-        return;
       }
-
-    /* Look for override files in the current directory */
-    load_cost_overrides ("m68k-costs-speed.txt", active_speed);
-    load_cost_overrides ("m68k-costs-size.txt",  active_size);
-#endif
 }
 
-/* ============================================
-   Drop-in access macros - read from active table
-   ============================================ */
-
 #define COST_TABLE  (speed ? active_speed : active_size)
+#define COST_IS_UNDEFINED(idx)  (COST_TABLE[idx] < 0)
 
-#define COST_REG                (COST_TABLE[IDX_REG])
-#define COST_MEM_PLUS_REG_DISP  (COST_TABLE[IDX_MEM_PLUS_REG_DISP])
-#define COST_MEM_PLUS_REG_REG   (COST_TABLE[IDX_MEM_PLUS_REG_REG])
-#define COST_MEM_OTHER          (COST_TABLE[IDX_MEM_OTHER])
-#define COST_CONST_INT_Q        (COST_TABLE[IDX_CONST_INT_Q])
 #define COST_CONST_INT_W        (COST_TABLE[IDX_CONST_INT_W])
-#define COST_CONST_INT_L        (COST_TABLE[IDX_CONST_INT_L])
-#define COST_CONST_DOUBLE       (COST_TABLE[IDX_CONST_DOUBLE])
+#define COST_CONST_INT_L_1      (COST_TABLE[IDX_CONST_INT_L_1])
+#define COST_CONST_INT_L_2      (COST_TABLE[IDX_CONST_INT_L_2])
 #define COST_SYMBOL             (COST_TABLE[IDX_SYMBOL])
 #define COST_PLUS_REG_REG       (COST_TABLE[IDX_PLUS_REG_REG])
 #define COST_PLUS_REG_CONSTQ    (COST_TABLE[IDX_PLUS_REG_CONSTQ])
@@ -573,415 +726,383 @@ m68k_init_costs (bool speed)
 #define COST_SET_REG_REG        (COST_TABLE[IDX_SET_REG_REG])
 #define COST_CALL_OTHER         (COST_TABLE[IDX_CALL_OTHER])
 
-#define COST_MULU_L             (COST_TABLE[IDX_MULU_L])
-#define COST_MULU_W             (COST_TABLE[IDX_MULU_W])
+/* Divide cost table holds divide-cost / 4; multiply by 4 to get
+   the actual cost. This normalizes the range for CMA-ES (the raw
+   divide costs are > 100, which is out of scale with the
+   other entries). */
+#define COST_DIV_L              (COST_TABLE[IDX_DIV_L]*4)
+#define COST_DIV_W              (COST_TABLE[IDX_DIV_W]*4)
 #define COST_ADD_L              (COST_TABLE[IDX_ADD_L])
 #define COST_SUB_L              (COST_TABLE[IDX_SUB_L])
-#define COST_MOVE_L             (COST_TABLE[IDX_MOVE_L])
 #define COST_MOVEQ              (COST_TABLE[IDX_MOVEQ])
-
-/* Base + per-shift term; the per-shift constant is CPU-specific. */
-#define COST_LSL_SHIFT(shift)   \
-    (COST_TABLE[IDX_LSL_SHIFT] + (shift) * m68k_lsl_shift_per_step ())
+#define COST_LSL_SHIFT(shift)   (COST_TABLE[IDX_LSL_SHIFT] + (shift) * COST_TABLE[IDX_LSL_SHIFT_STEP])
 
 static int
-m68k_lsl_shift_per_step (void)
+const_int_cost (HOST_WIDE_INT i)
 {
-    if (TUNE_68000_10)                      return 2;
-    if (m68k_tune == u68020 || m68k_tune == u68020_40) return 2;
-    if (m68k_tune == u68030)                return 2;
-    if (m68k_tune == u68040 || TUNE_68060)  return 0;
-    return 1;                               /* 68080 */
+  switch (m68k_const_method (i))
+    {
+    case MVZ: case MVS: case NOTB: case NOTW: case NEGW: case SWAP: return 1;
+    case MOVL: return 2;
+    }
+  // case MOVQ:
+  return 0;
 }
+
 
 /* ============================================
-   MULT helpers - the two different formulas
+   SBF Engine (Fully table-driven)
    ============================================ */
-
-/* 68020/030/040/080 form: exact power-of-2 -> lsl, 2^n +/- 1 -> lsl+add/sub,
-   otherwise popcount-based estimate. */
-static int
-m68k_mult_const_cost_common (HOST_WIDE_INT n, rtx dst, machine_mode mode, bool speed)
-{
-    if (n == 0 || n == 1)
-        return COST_MOVEQ;
-
-    unsigned HOST_WIDE_INT un = (n < 0) ? -(unsigned HOST_WIDE_INT) n
-                                        : (unsigned HOST_WIDE_INT) n;
-
-    if (n > 0)
-      {
-        int shift = exact_log2 (un);
-        if (shift >= 0)
-            return COST_LSL_SHIFT (shift);
-      }
-
-    if (n > 0 && un > 1 && (un & (un - 1)) == 1)
-      {
-        int shift = exact_log2 (un - 1);
-        if (shift >= 0)
-            return COST_LSL_SHIFT (shift) + COST_ADD_L;
-      }
-
-    if (n > 0 && un > 2 && (un & (un + 1)) == 0)
-      {
-        int shift = exact_log2 (un + 1);
-        if (shift >= 0)
-            return COST_LSL_SHIFT (shift) + COST_SUB_L;
-      }
-
-    int bits = 0;
-    int l = 0;
-    HOST_WIDE_INT nn = n;
-
-    if (nn > 0)
-      {
-        if (GET_CODE (dst) == ZERO_EXTEND || REG_P (dst))
-          {
-            while (nn)
-              {
-                if (nn & 1) ++bits;
-                nn >>= 1;
-              }
-            if (bits == 1 && REG_P (dst))
-                return COST_MOVEQ;
-          }
-        else
-          {
-            while (nn || l)
-              {
-                if ((nn & 1) != l) { l = !l; ++bits; }
-                nn >>= 1;
-              }
-          }
-        return 12 + bits;
-      }
-    return -1;
-}
-
-/* 68000 form: use the shift-based formula; fall back to COST_MULU_L
-   for the general case. */
-static int
-m68k_mult_const_cost_68000 (HOST_WIDE_INT n, rtx a, machine_mode mode, bool speed)
-{
-    if (n > 0)
-      {
-        int shift = exact_log2 (n);
-        if (shift >= 0)
-            return COST_LSL_SHIFT (shift);
-      }
-
-    int f = (GET_MODE_SIZE (mode) > 2) ? 180 : 0;
-    HOST_WIDE_INT i = n;
-
-    if (i > 0)
-      {
-        int bits = 0;
-        int transitions = 0;
-        int last = 0;
-        HOST_WIDE_INT t = i;
-
-        if (GET_CODE (a) == ZERO_EXTEND)
-          {
-            while (t) { bits += t & 1; t >>= 1; }
-            f = 24 + bits * 6;
-          }
-        else
-          {
-            while (t || last)
-              {
-                int bit = t & 1;
-                if (bit != last) { transitions++; last = bit; }
-                t >>= 1;
-              }
-            f = 28 + transitions * 7;
-          }
-
-        if (GET_MODE_SIZE (mode) > 2)
-            f = (f * 3) / 2;
-      }
-    return f;
-}
-
-/* ============================================
-   Shared engine
-   ============================================ */
-
-static bool
-m68k_costs_engine (rtx x,
-                   machine_mode mode,
-                   int outer_code ATTRIBUTE_UNUSED,
-                   int opno ATTRIBUTE_UNUSED,
-                   int *total,
-                   bool speed)
+   static bool
+m68k_costs_engine (rtx x, machine_mode mode, int outer_code,
+                            int opno, int *total, bool speed)
 {
     int code = GET_CODE (x);
-    int total2;
+    int total2 = 0;
 
     switch (code)
       {
-      case PRE_DEC:
+      case CALL:
+        {
+          if (COST_IS_UNDEFINED (IDX_CALL_OTHER)) return false;
+          *total = COST_CALL_OTHER;
+          return true;
+        }
+      case EQ: case NE: case GE: case GT: case GTU: case LE: case LT:
+        if (COST_IS_UNDEFINED (IDX_BRANCH)) return false;
+        *total = COST_BRANCH;
+        return true;
+      case ZERO_EXTRACT:
+        if (outer_code == COMPARE && GET_CODE (XEXP (x, 1)) == CONST_INT && INTVAL (XEXP (x, 1)) == 1) {
+            *total = 2; return true;
+        }
+        return false;
       case POST_INC:
-      case IF_THEN_ELSE:
-      case ZERO_EXTEND:
-      case SIGN_EXTEND:
       case TRUNCATE:
-      case ROTATE:
-      case ROTATERT:
-      case LABEL_REF:
-      case SUBREG:
-      case STRICT_LOW_PART:
-      case NEG:
-      case NOT:
         *total = 0;
         return true;
-
-      case CONST_INT:
-        {
-          HOST_WIDE_INT v = INTVAL (x);
-          if (USE_MOVQ (v))
-              *total = COST_CONST_INT_Q;
-          else if (v >= -32768 && v <= 32767)
-              *total = COST_CONST_INT_W;
-          else
-              *total = COST_CONST_INT_L;
-          return true;
-        }
-
-      case CONST_DOUBLE:
-        *total = COST_CONST_DOUBLE;
+      case PRE_DEC:
+        *total = 2;
         return true;
-
+      case REG:
+        if (opno) {
+            if (COST_IS_UNDEFINED (IDX_REG_SRC)) return false;
+            *total = COST_TABLE[IDX_REG_SRC];
+        } else {
+            if (COST_IS_UNDEFINED (IDX_REG_DST)) return false;
+            *total = COST_TABLE[IDX_REG_DST];
+        }
+        return true;
       case SYMBOL_REF:
+        if (COST_IS_UNDEFINED (IDX_SYMBOL)) return false;
         *total = COST_SYMBOL;
         return true;
-
+      case IF_THEN_ELSE:
+        *total = 10;
+        return true;
+      case SET:
+        {
+          rtx a = XEXP(x, 0);
+          rtx b = XEXP(x, 1);
+          if (m68k_costs_engine (a, mode, code, 0, total, speed)
+              && m68k_costs_engine (b, mode, code, 1, &total2, speed))
+            {
+              *total += total2;
+              if (MEM_P(a) && GET_CODE(b) == CONST_INT && INTVAL(b) == 0) {
+                  *total += GET_MODE_SIZE(mode) > 2 ? COST_TABLE[IDX_CLR_LONG_PENALTY] : COST_TABLE[IDX_CLR_WORD_PENALTY];
+                  if (GET_CODE(XEXP(a, 0)) == PRE_DEC) *total += 2;
+              }
+              return true;
+            }
+          break;
+        }
       case CONST:
         {
-          rtx inner = XEXP (x, 0);
-          if (GET_CODE (inner) == PLUS
-              && SYMBOL_REF_P (XEXP (inner, 0))
-              && CONST_INT_P (XEXP (inner, 1)))
+          rtx a = XEXP(x, 0);
+          if (GET_CODE(a) == PLUS && SYMBOL_REF_P(XEXP(a,0)) && GET_CODE(XEXP(a, 1)) == CONST_INT) {
+              if (COST_IS_UNDEFINED (IDX_SYMBOL)) return false;
               *total = COST_SYMBOL;
-          else
-              *total = 0;
-          return true;
-        }
-
-      case REG:
-        *total = COST_REG;
-        return true;
-
-      case MEM:
-        {
-          rtx addr = XEXP (x, 0);
-          switch (GET_CODE (addr))
-            {
-            case REG:
-            case POST_INC:
-            case PRE_DEC:
-              *total = 0;
-              break;
-
-            case PLUS:
-              {
-                rtx a = XEXP (addr, 0);
-                rtx b = XEXP (addr, 1);
-                if (REG_P (a) && CONST_INT_P (b))
-                  {
-                    HOST_WIDE_INT off = INTVAL (b);
-                    if (off >= -32768 && off <= 32767)
-                        *total = COST_MEM_PLUS_REG_DISP;
-                    else
-                        *total = COST_MEM_PLUS_REG_REG;
-                  }
-                else if (REG_P (a) && REG_P (b))
-                    *total = COST_MEM_PLUS_REG_REG;
-                else
-                    *total = COST_MEM_OTHER;
-                break;
-              }
-
-            default:
-              *total = COST_MEM_OTHER;
-              break;
-            }
-
-          if (GET_MODE_SIZE (mode) > 2)
-              *total += 2;
-          return true;
-        }
-
-      case PLUS:
-      case MINUS:
-        {
-          rtx a = XEXP (x, 0);
-          rtx b = XEXP (x, 1);
-
-          if (REG_P (a) && REG_P (b))
-            {
-              *total = COST_PLUS_REG_REG;
               return true;
-            }
-
-          if (REG_P (a) && CONST_INT_P (b))
-            {
-              HOST_WIDE_INT v = INTVAL (b);
-              if (v >= -8 && v <= 8)
-                {
-                  *total = COST_PLUS_REG_CONSTQ;
-                  return true;
-                }
-              if (REGNO (a) == SP_REG)
-                {
-                  *total = 8;
-                  return true;
-                }
-              *total = GET_MODE_SIZE (mode) > 2
-                       ? COST_PLUS_REG_CONSTL
-                       : COST_PLUS_REG_CONSTW;
-              return true;
-            }
-
-          *total = (GET_CODE (a) == PLUS)
-                   ? COST_PLUS_OTHER
-                   : COST_PLUS_OTHER / 2;
-          return true;
-        }
-
-      case AND:
-      case IOR:
-      case XOR:
-      case COMPARE:
-        {
-          rtx a = XEXP (x, 0);
-          rtx b = XEXP (x, 1);
-
-          if (REG_P (a) && REG_P (b))
-            {
-              *total = (code == XOR) ? 0 : 1;
-              return true;
-            }
-          if ((REG_P (a) && CONST_INT_P (b))
-              || (REG_P (b) && CONST_INT_P (a)))
-            {
-              *total = GET_MODE_SIZE (mode) > 2
-                       ? COST_LOGIC_REG_CONST + 2
-                       : COST_LOGIC_REG_CONST;
-              return true;
-            }
+          }
           *total = 0;
-          return true;
+          break;
         }
-
-      case ASHIFT:
-      case ASHIFTRT:
-      case LSHIFTRT:
-        {
-          rtx a = XEXP (x, 0);
-          rtx b = XEXP (x, 1);
-          if (REG_P (a) && CONST_INT_P (b))
-            {
-              *total = GET_MODE_SIZE (mode) > 2
-                       ? COST_SHIFT_CONST
-                       : COST_SHIFT_CONST_W;
-              return true;
-            }
-          *total = 0;
-          return true;
-        }
-
       case MULT:
         {
-          rtx dst = XEXP (x, 0);
-          rtx src = XEXP (x, 1);
+          rtx a = XEXP(x, 0);
+          rtx b = XEXP(x, 1);
 
-          if (CONST_INT_P (src))
+          if (GET_CODE(b) == CONST_INT)
             {
-              HOST_WIDE_INT n = INTVAL (src);
-              int c = TUNE_68000_10
-                        ? m68k_mult_const_cost_68000 (n, dst, mode, speed)
-                        : m68k_mult_const_cost_common (n, dst, mode, speed);
-              if (c >= 0)
-                {
-                  *total = c;
+              int n = INTVAL(b);
+              if (n < 0) n = -n;
+              int x_shift = 0;
+              unsigned y = 1;
+              for (; y < (unsigned)n; y += y, ++x_shift) ;
+              if (y == (unsigned)n) {
+                  *total = (GET_MODE_SIZE(mode) > 2 ? COST_SHIFT_CONST : COST_SHIFT_CONST_W);
+                  *total += COST_TABLE[IDX_LSL_SHIFT_STEP] * x_shift;
                   return true;
-                }
+              }
             }
 
-          *total = GET_MODE_SIZE (mode) > 2 ? COST_MULU_L : COST_MULU_W;
+          if (GET_CODE (a) == ZERO_EXTEND || GET_CODE (a) == SIGN_EXTEND) {
+              *total = 0;
+              mode = HImode;
+          } else if (!m68k_costs_engine (a, mode, code, 0, total, speed)) {
+              break;
+          }
+
+          if (speed) {
+              int f = (GET_MODE_SIZE(mode) > 2) ? COST_TABLE[IDX_MULT_68000_LONG_MUL] : COST_TABLE[IDX_MULT_68000_WORD_MUL];
+              if (GET_CODE(b) == CONST_INT && GET_MODE_SIZE(mode) == 2) {
+                  int i = INTVAL(b);
+                  if (i < 0) i = -i;
+                  int bits = 0, l = 0;
+                  if (i > 0) {
+                      if (GET_CODE (a) == ZERO_EXTEND) {
+                          while (i) { ++bits; i>>=1; }
+                      } else {
+                          while (i || l) { if ((i&1) != l) { l = !l; ++bits; } i >>= 1; }
+                      }
+                      f = COST_TABLE[IDX_MULT_68000_WORD_BASE] + 2 * bits;
+                  }
+              }
+              *total += f;
+          } else {
+              *total = GET_MODE_SIZE(mode) > 2 ? COST_TABLE[IDX_MULT_68000_LONG_MUL] : COST_TABLE[IDX_MULT_68000_WORD_MUL];
+          }
           return true;
         }
-
       case DIV:
       case UDIV:
       case MOD:
       case UMOD:
-        /* 68000 and 68020 have no div-specific cost; reuse 260 / 0 as before. */
-        if (TUNE_68000_10 || m68k_tune == u68020 || m68k_tune == u68020_40
-            || m68k_tune == u68030)
-            *total = GET_MODE_SIZE (mode) > 2 ? 260 : 0;
-        else if (m68k_tune == u68040 || TUNE_68060)
-            *total = GET_MODE_SIZE (mode) > 2 ? 38 : 44;
-        else
-            *total = GET_MODE_SIZE (mode) > 2 ? 6 : 4;
-        return true;
-
-      case EQ:
-      case NE:
-      case LT:
-      case LE:
-      case GT:
-      case GE:
-      case LTU:
-      case LEU:
-      case GTU:
-      case GEU:
-        *total = COST_BRANCH;
-        return true;
-
-      case SET:
         {
-          rtx dest = XEXP (x, 0);
-          rtx src = XEXP (x, 1);
-
-          if (REG_P (dest) && REG_P (src))
-            {
-              *total = COST_SET_REG_REG;
+          rtx a = XEXP(x, 0);
+          if (m68k_costs_engine (a, mode, code, 0, total, speed)) {
+              if (speed) *total += GET_MODE_SIZE(mode) > 2 ? COST_DIV_L : COST_DIV_W;
+              else *total += GET_MODE_SIZE(mode) > 2 ? COST_DIV_L : COST_DIV_W;
               return true;
-            }
-
-          if (!m68k_costs_engine (dest, mode, code, 0, total, speed))
-              return false;
-          if (!m68k_costs_engine (src, mode, code, 1, &total2, speed))
-              return false;
-          *total += total2;
-
-          if (CONST_INT_P (src) && INTVAL (src) == 0)
-            {
-              if (REG_P (dest))
-                  *total = 0;
-              else if (MEM_P (dest))
-                  *total = 0;
-            }
-          return true;
+          }
+          break;
         }
-
-      case CALL:
+      case ASHIFT:
+      case ASHIFTRT:
+      case LSHIFTRT:
         {
-          rtx mem = XEXP (x, 0);
-          rtx b = XEXP (mem, 0);
-          if (REG_P (b) || GET_CODE (b) == PLUS)
-              *total = 0;
-          else
-              *total = COST_CALL_OTHER;
+          rtx a = XEXP(x, 0);
+          rtx b = XEXP(x, 1);
+
+          if (REG_P(a) || SUBREG_P(a)) {
+
+              if (GET_CODE(b) == CONST_INT) {
+                  int sv = INTVAL(b);
+                  *total = (GET_MODE_SIZE(mode) > 2 ? COST_SHIFT_CONST : COST_SHIFT_CONST_W);
+
+                  // non linear - based on swap
+                  if (sv < 16) {
+                      *total += COST_TABLE[IDX_LSL_SHIFT_STEP] * sv;
+                  } else {
+                      *total += COST_TABLE[IDX_LSL_SHIFT_STEP] * (4 + (sv - 16));
+                  }
+                  return true;
+              }
+              *total = (GET_MODE_SIZE(mode) > 2 ? COST_SHIFT_CONST : COST_SHIFT_CONST_W) ;
+              if (speed) *total += 16;
+              return true;
+          }
+          if (m68k_costs_engine (XEXP(x, 0), mode, code, 0, total, speed)) {
+              *total += 8;
+              return true;
+          }
+          break;
+        }
+      case SUBREG:
+      case STRICT_LOW_PART:
+        if (GET_CODE (XEXP(x, 0)) == SUBREG || GET_CODE (XEXP(x, 0)) == STRICT_LOW_PART) return false;
+        return m68k_costs_engine (XEXP(x, 0), GET_MODE(XEXP(x, 0)), outer_code, 0, total, speed);
+      case ZERO_EXTEND:
+      case SIGN_EXTEND:
+        if (GET_CODE (XEXP(x, 0)) == ZERO_EXTEND || GET_CODE (XEXP(x, 0)) == SIGN_EXTEND) return false;
+        if (m68k_costs_engine (XEXP(x, 0), GET_MODE(XEXP(x, 0)), outer_code, 0, total, speed)) {
+            *total += COST_TABLE[IDX_EXTEND_EXTRA];
+            return true;
+        }
+        return false;
+      case CONST_INT:
+        {
+          int kind = const_int_cost (INTVAL (x));
+          bool is_long = GET_MODE_SIZE (mode) > 2;
+          if (kind == 0) {
+            if (COST_IS_UNDEFINED (IDX_CONST_INT_Q)) return false;
+            *total = COST_TABLE[IDX_CONST_INT_Q];
+          } else if (!is_long) {
+            if (COST_IS_UNDEFINED (IDX_CONST_INT_W)) return false;
+            *total = COST_TABLE[IDX_CONST_INT_W];
+          } else if (kind == 1) {
+            if (COST_IS_UNDEFINED (IDX_CONST_INT_L_1)) return false;
+            *total = COST_TABLE[IDX_CONST_INT_L_1];
+          } else {
+            if (COST_IS_UNDEFINED (IDX_CONST_INT_L_2)) return false;
+            *total = COST_TABLE[IDX_CONST_INT_L_2];
+          }
           return true;
         }
+      case NEG:
+      case NOT:
+        {
+          rtx a = XEXP(x, 0);
+          if (REG_P(a) || SUBREG_P(a)) {
+              *total = GET_MODE_SIZE(mode) > 2 ? 6 : 4;
+              return true;
+          }
+          if (m68k_costs_engine (a, mode, code, 0, total, speed)) {
+              *total += GET_MODE_SIZE(mode) > 2 ? 12 : 8;
+              return true;
+          }
+          break;
+        }
+      case MINUS:
+      case PLUS:
+        {
+          rtx a = XEXP(x, 0);
+          rtx b = XEXP(x, 1);
 
+          if (GET_CODE(a) == PLUS && GET_CODE(b) == CONST_INT && (unsigned)(INTVAL(b) + 128) < 255) {
+              if (REG_P(XEXP(a,0)) && REG_P(XEXP(a,1))) {
+                  if (COST_IS_UNDEFINED (IDX_PLUS_REG_REG)) return false;
+                  *total = COST_PLUS_REG_REG + COST_TABLE[IDX_PLUS_LEA_OFFSET];
+                  return true;
+              }
+          }
+
+          if (SUBREG_P(a)) a = XEXP(a, 0);
+          if (SUBREG_P(b)) b = XEXP(b, 0);
+
+          if (REG_P(a) && REGNO(a) >= 8 && REGNO(a) < 16) {
+              if (GET_CODE(b) == CONST && GET_CODE(XEXP(b, 0)) == UNSPEC) { *total = 8; return true; }
+              if (GET_CODE(b) == CONST_INT && (unsigned)(INTVAL(b) + 32768) < 65535) { *total = 8; return true; }
+          }
+
+          if (REG_P(a) && REG_P(b)) {
+              if (COST_IS_UNDEFINED (IDX_PLUS_REG_REG)) return false;
+              *total = GET_MODE_SIZE(mode) > 2 ? COST_PLUS_REG_REG + 4 : COST_PLUS_REG_REG;
+              return true;
+          }
+
+          if (GET_CODE(b) == CONST_INT) {
+              int i = INTVAL(b);
+              if (REG_P(a) && (USE_MOVQ(i) || (REGNO(a) >= 8 && REGNO(a) < 16 && (unsigned)(INTVAL(b) + 32768) < 65535))) {
+                  if (COST_IS_UNDEFINED (IDX_PLUS_REG_CONSTQ)) return false;
+                  *total = GET_MODE_SIZE(mode) > 2 ? COST_PLUS_REG_CONSTQ + 4 : COST_PLUS_REG_CONSTQ;
+              } else {
+                  if (COST_IS_UNDEFINED (IDX_PLUS_OTHER)) return false;
+                  *total = GET_MODE_SIZE(mode) > 2 ? COST_PLUS_OTHER + 4 : COST_PLUS_OTHER;
+              }
+              return true;
+          }
+
+          if (GET_CODE(b) == SYMBOL_REF || (GET_CODE(b) == CONST && GET_CODE(XEXP(b,0)) == PLUS && GET_CODE(XEXP(XEXP(b,0),0)) == SYMBOL_REF)) {
+              if (COST_IS_UNDEFINED (IDX_PLUS_OTHER)) return false;
+              *total = COST_PLUS_OTHER + 4;
+              return true;
+          }
+
+          if (!m68k_costs_engine (a, mode, code, 0, total, speed)) break;
+          if (!m68k_costs_engine (b, mode, code, 1, &total2, speed)) break;
+
+          *total += total2 + (GET_MODE_SIZE(mode) > 2 ? COST_TABLE[IDX_PLUS_LONG_EXTRA] : COST_TABLE[IDX_PLUS_SHORT_EXTRA]);
+          return true;
+        }
+      case COMPARE:
+      case AND:
+      case XOR:
+      case IOR:
+        {
+          rtx a = XEXP(x, 0);
+          rtx b = XEXP(x, 1);
+          if (GET_CODE(b) == CONST_INT) {
+              if (REG_P(a)) {
+                  if (COST_IS_UNDEFINED (IDX_LOGIC_REG_CONST)) return false;
+                  *total = GET_MODE_SIZE(mode) > 2 ? COST_LOGIC_REG_CONST + 6 : COST_LOGIC_REG_CONST;
+                  return true;
+              }
+              if (m68k_costs_engine (a, mode, code, 0, total, speed)) {
+                  *total += GET_MODE_SIZE(mode) > 2 ? 20 : 12;
+                  return true;
+              }
+          } else if (REG_P(a)) {
+              if (m68k_costs_engine (b, mode, code, 1, total, speed)) {
+                  *total += GET_MODE_SIZE(mode) > 2 ? 4 : (code == XOR ? 8 : 6);
+                  return true;
+              }
+          } else if (REG_P(b)) {
+              if (m68k_costs_engine (a, mode, code, 1, total, speed)) {
+                  *total += GET_MODE_SIZE(mode) > 2 ? 12 : 8;
+                  return true;
+              }
+          }
+
+          if (m68k_costs_engine (a, mode, code, 0, total, speed)
+              && m68k_costs_engine (b, mode, code, 1, &total2, speed)) {
+              *total += total2 + (GET_MODE_SIZE(mode) > 2 ? 4 : (code == XOR ? 8 : 6));
+              return true;
+          }
+          break;
+        }
+      case MEM:
+        {
+          rtx y = XEXP (x, 0);
+          int yc = GET_CODE (y);
+          int idx = IDX_MEM_OTHER;
+
+          if (yc == REG || yc == PRE_INC || yc == POST_INC || yc == POST_DEC || yc == PRE_DEC)
+            idx = IDX_MEM_PLUS_REG_DISP;
+          else if (yc == CONST_INT || yc == SYMBOL_REF
+                   || (yc == PLUS && GET_CODE (XEXP (y, 0)) == SYMBOL_REF))
+            idx = IDX_MEM_OTHER;
+          else if (yc == PLUS)
+            {
+              rtx a0 = XEXP (y, 0);
+              rtx a1 = XEXP (y, 1);
+              if (REG_P (a0) && CONST_INT_P (a1))
+                {
+                  HOST_WIDE_INT off = INTVAL (a1);
+                  idx = (off >= -32768 && off <= 32767)
+                          ? IDX_MEM_PLUS_REG_DISP     /* (d16,An) - same cost as (An) */
+                          : IDX_MEM_PLUS_REG_REG;     /* out-of-range: needs extra add */
+                }
+              else
+                idx = IDX_MEM_PLUS_REG_REG;       /* (An,Xn) or (plus (plus reg reg) c) */
+            }
+          else
+            idx = IDX_MEM_PLUS_REG_REG;
+
+          if (COST_IS_UNDEFINED (idx)) return false;
+          *total = COST_TABLE[idx];
+          if (mode != QImode && mode != HImode)
+            *total += COST_TABLE[IDX_MEM_LONG_EXTRA];
+          if (opno && yc == PRE_DEC)
+            *total += COST_TABLE[IDX_MEM_PREDEC_EXTRA];
+          return true;
+        }
       default:
-        *total = 4;
-        return true;
+        break;
       }
+    return false;
+}
+   
+/* DImode wrapper: SBF was designed for 32-bit operands; on DImode
+   (emulated 64-bit) the cost is approximately doubled. */
+static bool
+m68k_costs_engine_di (rtx x, machine_mode mode, int outer_code,
+                      int opno, int *total, bool speed)
+{
+  bool r = m68k_costs_engine (x, mode, outer_code, opno, total, speed);
+  if (r && mode == DImode)
+    *total *= 2;
+  return r;
 }
 
 /* ============================================
@@ -991,8 +1112,8 @@ m68k_costs_engine (rtx x,
 bool
 m68k_costs (rtx x,
 	    machine_mode mode,
-	    int outer_code ATTRIBUTE_UNUSED,
-	    int opno ATTRIBUTE_UNUSED,
+	    int outer_code,
+	    int opno,
 	    int *total,
 	    bool speed)
 {
@@ -1002,14 +1123,6 @@ m68k_costs (rtx x,
         initialized = true;
         m68k_init_costs (speed);
       }
-    bool done = m68k_costs_engine (x, mode, outer_code, opno, total, speed);
 
-    /* The cost tables describe one register-sized operation.  An integer
-       value wider than a word takes one per word; without this, lower-subreg
-       never finds it worth splitting DImode values.  FP modes live in a
-       single FPU register and are not scaled.  */
-    if (GET_MODE_CLASS (mode) == MODE_INT
-	&& GET_MODE_SIZE (mode) > UNITS_PER_WORD)
-      *total *= GET_MODE_SIZE (mode) / UNITS_PER_WORD;
-    return done;
+    return m68k_costs_engine_di (x, mode, outer_code, opno, total, speed);
 }
