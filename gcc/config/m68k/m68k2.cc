@@ -117,11 +117,58 @@ struct m68k_args
 static struct m68k_args mycum, othercum;
 
 bool m68k_is_ok_for_sibcall(tree decl, tree exp);
+static void m68k_init_arg_regs (struct m68k_args *cum, const_tree fntype);
+static int m68k_place_next_arg (struct m68k_args *cum, const_tree type);
+
+/* Whether every argument of call EXP through FNTYPE that goes in a register
+   of MASK is the incoming value of a parameter of the current function in
+   that same register, unchanged.  The sibcall epilogue restores such a
+   register to its incoming value before the jump, or leaves it alone when
+   the prologue did not save it, and either way it holds the argument.  */
+
+static bool
+m68k_sibcall_args_are_incoming (tree exp, const_tree fntype, long mask)
+{
+  struct m68k_args cum;
+  long found = 0;
+  int i = 0;
+
+  m68k_init_arg_regs (&cum, fntype);
+  for (const_tree t = TYPE_ARG_TYPES (fntype);
+       t && TREE_VALUE (t) != void_type_node && i < call_expr_nargs (exp);
+       t = TREE_CHAIN (t), i++)
+    {
+      int regno = m68k_place_next_arg (&cum, TREE_VALUE (t));
+      if (regno < 0 || !(mask & (1L << regno)))
+	continue;
+
+      tree arg = CALL_EXPR_ARG (exp, i);
+      if (regno >= 16
+	  || regno == FRAME_POINTER_REGNUM
+	  || call_used_or_fixed_reg_p (regno)
+	  || TYPE_MODE (TREE_TYPE (arg)) != SImode
+	  || TREE_CODE (arg) != SSA_NAME
+	  || !SSA_NAME_IS_DEFAULT_DEF (arg)
+	  || !SSA_NAME_VAR (arg)
+	  || TREE_CODE (SSA_NAME_VAR (arg)) != PARM_DECL
+	  || DECL_CONTEXT (SSA_NAME_VAR (arg)) != current_function_decl)
+	return false;
+
+      rtx incoming = DECL_INCOMING_RTL (SSA_NAME_VAR (arg));
+      if (!incoming || !REG_P (incoming) || REGNO (incoming) != (unsigned) regno
+	  || GET_MODE (incoming) != SImode)
+	return false;
+      found |= 1L << regno;
+    }
+  return found == mask;
+}
 
 /**
  * Sibcall is only ok, if max regs d0/d1/a0/a1 (and fp0) are used; they are
  * call clobbered and the sibcall epilogue leaves them alone, while any other
- * register may be restored from the stack before the jump.
+ * register may be restored from the stack before the jump.  An argument in
+ * any other register is ok when it is the incoming value of the same
+ * register (m68k_sibcall_args_are_incoming).
  * A target that is not a direct call m68k_symbolic_jump can branch to (an
  * indirect call, or a direct one with -m68000 -fbaserel, -resident or
  * -mpcrel) is loaded into an address register of its own by
@@ -153,7 +200,9 @@ bool m68k_is_ok_for_sibcall(tree decl, tree exp)
 	      = STATIC_CHAIN_REGNUM == A0_REG ? A1_REG : A0_REG;
 	  allowed &= ~(1L << m68k_sibcall_target_regno);
 	}
-      return (cum->regs_already_used & ~allowed) == 0;
+      long others = cum->regs_already_used & ~allowed;
+      return others == 0
+	     || m68k_sibcall_args_are_incoming (exp, fntype, others);
     }
   return false;
 }
