@@ -5987,10 +5987,11 @@ m68k_hard_regno_mode_ok (unsigned int regno, machine_mode mode)
   else if (FP_REGNO_P (regno))
     {
       /* FPU registers, hold float or complex float of long double or
-	 smaller.  */
+	 smaller.  A complex float takes two of them, both in fp0-fp7.  */
       if ((GET_MODE_CLASS (mode) == MODE_FLOAT
 	   || GET_MODE_CLASS (mode) == MODE_COMPLEX_FLOAT)
-	  && GET_MODE_UNIT_SIZE (mode) <= TARGET_FP_REG_SIZE)
+	  && GET_MODE_UNIT_SIZE (mode) <= TARGET_FP_REG_SIZE
+	  && regno + GET_MODE_NUNITS (mode) <= FP0_REG + 8)
 	return true;
     }
   return false;

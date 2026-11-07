@@ -461,18 +461,10 @@ rtx m68k_function_arg (cumulative_args_t cum_v, const function_arg_info & ai)
       if (!this_arg_type)
         unpromoted_mode = TYPE_MODE(ai.type);
 
-      /* An FP register holds any float mode on its own.  */
-      if (FP_REGNO_P (cum->last_arg_reg))
-	cum->last_arg_len = hard_regno_nregs (cum->last_arg_reg,
-					      unpromoted_mode);
-      else
-      if (unpromoted_mode == XFmode)
-    	  cum->last_arg_len = 3;
-      else
-      if (unpromoted_mode == DImode || unpromoted_mode == DFmode)
-    	  cum->last_arg_len = 2;
-      else
-    	  cum->last_arg_len = 1;
+      /* A data or address register holds 4 bytes, an FP register a float
+	 of any mode.  */
+      cum->last_arg_len = hard_regno_nregs (cum->last_arg_reg,
+					    unpromoted_mode);
 
       int arg_nregs = hard_regno_nregs (cum->last_arg_reg, ai.mode);
       location_t loc = cum->current_parm_decl
@@ -480,12 +472,15 @@ rtx m68k_function_arg (cumulative_args_t cum_v, const function_arg_info & ai)
 		       : input_location;
 
       /* Without an FPU the FP registers are fixed and no move pattern
-	 reaches them, so LRA would loop on the copy in or out.  */
+	 reaches them, so LRA would loop on the copy in or out.  BLKmode has
+	 size 0, which hard_regno_mode_ok accepts in any register.  */
       if ((FP_REGNO_P (cum->last_arg_reg) && !TARGET_HARD_FLOAT)
+	  || unpromoted_mode == BLKmode
 	  || !targetm.hard_regno_mode_ok (cum->last_arg_reg, unpromoted_mode))
 	{
 	  error_at (loc, "register %qs cannot hold an argument of type %qT",
-		    reg_names[cum->last_arg_reg], ai.type);
+		    reg_names[cum->last_arg_reg],
+		    TYPE_MAIN_VARIANT (ai.type));
 	  return 0;
 	}
 
