@@ -1,9 +1,9 @@
 /* Amiga register-parameter ABI: functions that only read their arguments
    in call-saved registers do not save them, and a forwarder that passes
-   them on unchanged, long or short, tail-jumps.  Each call goes through
-   call_kept, which loads d2, d3, d4 and a2 itself and compares all 32
-   bits of each after the call, so a callee that changes one of them
-   fails whatever the caller's register allocation.  */
+   them on unchanged, long or short, leaves them as they came.  Each call
+   goes through call_kept, which loads d2, d3, d4 and a2 itself and
+   compares all 32 bits of each after the call, so a callee that changes
+   one of them fails whatever the caller's register allocation.  */
 
 /* { dg-do run } */
 /* { dg-skip-if "amiga register-parameter ABI" { ! { m68k-*-amigaos* } } } */

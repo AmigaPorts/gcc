@@ -117,62 +117,11 @@ struct m68k_args
 static struct m68k_args mycum, othercum;
 
 bool m68k_is_ok_for_sibcall(tree decl, tree exp);
-static void m68k_init_arg_regs (struct m68k_args *cum, const_tree fntype);
-static int m68k_place_next_arg (struct m68k_args *cum, const_tree type);
-
-/* Whether every argument of call EXP through FNTYPE that goes in a register
-   of MASK is the incoming value of a parameter of the current function in
-   that same register, unchanged.  The sibcall epilogue restores such a
-   register to its incoming value before the jump, or leaves it alone when
-   the prologue did not save it, and either way it holds the argument.  */
-
-static bool
-m68k_sibcall_args_are_incoming (tree exp, const_tree fntype, long mask)
-{
-  struct m68k_args cum;
-  long found = 0;
-  int i = 0;
-
-  m68k_init_arg_regs (&cum, fntype);
-  for (const_tree t = TYPE_ARG_TYPES (fntype);
-       t && TREE_VALUE (t) != void_type_node && i < call_expr_nargs (exp);
-       t = TREE_CHAIN (t), i++)
-    {
-      int regno = m68k_place_next_arg (&cum, TREE_VALUE (t));
-      if (regno < 0 || !(mask & (1L << regno)))
-	continue;
-
-      tree arg = CALL_EXPR_ARG (exp, i);
-      machine_mode mode = TYPE_MODE (TREE_TYPE (arg));
-      if (regno >= 16
-	  || regno == FRAME_POINTER_REGNUM
-	  || call_used_or_fixed_reg_p (regno)
-	  || !(INTEGRAL_TYPE_P (TREE_TYPE (arg))
-	       || POINTER_TYPE_P (TREE_TYPE (arg)))
-	  || GET_MODE_SIZE (mode) > UNITS_PER_WORD
-	  || TYPE_MODE (TREE_VALUE (t)) != mode
-	  || TREE_CODE (arg) != SSA_NAME
-	  || !SSA_NAME_IS_DEFAULT_DEF (arg)
-	  || !SSA_NAME_VAR (arg)
-	  || TREE_CODE (SSA_NAME_VAR (arg)) != PARM_DECL
-	  || DECL_CONTEXT (SSA_NAME_VAR (arg)) != current_function_decl)
-	return false;
-
-      rtx incoming = DECL_INCOMING_RTL (SSA_NAME_VAR (arg));
-      if (!incoming || !REG_P (incoming) || REGNO (incoming) != (unsigned) regno
-	  || GET_MODE (incoming) != mode)
-	return false;
-      found |= 1L << regno;
-    }
-  return found == mask;
-}
 
 /**
  * Sibcall is only ok, if max regs d0/d1/a0/a1 (and fp0) are used; they are
  * call clobbered and the sibcall epilogue leaves them alone, while any other
- * register may be restored from the stack before the jump.  An argument in
- * any other register is ok when it is the incoming value of the same
- * register (m68k_sibcall_args_are_incoming).
+ * register may be restored from the stack before the jump.
  * A target that is not a direct call m68k_symbolic_jump can branch to (an
  * indirect call, or a direct one with -m68000 -fbaserel, -resident or
  * -mpcrel) is loaded into an address register of its own by
@@ -204,13 +153,7 @@ bool m68k_is_ok_for_sibcall(tree decl, tree exp)
 	      = STATIC_CHAIN_REGNUM == A0_REG ? A1_REG : A0_REG;
 	  allowed &= ~(1L << m68k_sibcall_target_regno);
 	}
-      /* Not for a call to the current function: m68k_function_arg places
-	 its arguments by the PARM_DECLs (current_parm_decl), which keep
-	 asm registers that TYPE_ARG_TYPES may have lost.  */
-      long others = cum->regs_already_used & ~allowed;
-      return others == 0
-	     || (decl != current_function_decl
-		 && m68k_sibcall_args_are_incoming (exp, fntype, others));
+      return (cum->regs_already_used & ~allowed) == 0;
     }
   return false;
 }
@@ -478,19 +421,6 @@ _m68k_function_arg (struct m68k_args * cum, machine_mode mode, const_tree type)
 /* A C expression that controls whether a function argument is passed
  in a register, and which register. */
 
-/* The registers an argument of mode MODE bound to an asm register takes,
-   counting from that register.  */
-
-static int
-m68k_asmreg_arg_len (machine_mode mode)
-{
-  if (mode == XFmode)
-    return 3;
-  if (mode == DImode || mode == DFmode)
-    return 2;
-  return 1;
-}
-
 rtx m68k_function_arg (cumulative_args_t cum_v, const function_arg_info & ai)
 {
   DPRINTF((stderr, "m68k_function_arg %p\r\n", cum_v.p));
@@ -531,7 +461,13 @@ rtx m68k_function_arg (cumulative_args_t cum_v, const function_arg_info & ai)
       if (!this_arg_type)
         unpromoted_mode = TYPE_MODE(ai.type);
 
-      cum->last_arg_len = m68k_asmreg_arg_len (unpromoted_mode);
+      if (unpromoted_mode == XFmode)
+    	  cum->last_arg_len = 3;
+      else
+      if (unpromoted_mode == DImode || unpromoted_mode == DFmode)
+    	  cum->last_arg_len = 2;
+      else
+    	  cum->last_arg_len = 1;
 
       int arg_nregs = hard_regno_nregs (cum->last_arg_reg, ai.mode);
 
@@ -581,13 +517,10 @@ m68k_place_next_arg (struct m68k_args *cum, const_tree type)
   if (asmtree)
     {
       regno = TREE_INT_CST_LOW (TREE_VALUE (TREE_VALUE (asmtree)));
-      len = m68k_asmreg_arg_len (TYPE_MODE (type));
+      len = TYPE_MODE (type) == DImode ? 2 : 1;
     }
   else
     {
-      /* expand_call passes a transparent union as its first field.  */
-      if (RECORD_OR_UNION_TYPE_P (type) && TYPE_TRANSPARENT_AGGR (type))
-	type = TREE_TYPE (first_field (type));
       regno = m68k_arg_regno (cum, TYPE_MODE (type), type);
       len = cum->last_arg_len;
     }
