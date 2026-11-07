@@ -1,4 +1,4 @@
-/* The condition variables of gthr-amigaos.h on m68k.
+/* The condition variables of <benaphore.h> for AmigaOS.
    Copyright (C) 2026 Free Software Foundation, Inc.
 
 This file is part of GCC.
@@ -26,113 +26,85 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #include <exec/tasks.h>
 #include <proto/exec.h>
 
-#include "gthr-amigaos.h"
-#include "gthr-amigaos-int.h"
-
-extern struct ExecBase *SysBase;
+#include "amigaos-benaphore-int.h"
 
 /* Condition variables: a FIFO of waiters on their own stacks, as the
    benaphore's.  The queue is only touched under Forbid(), and a waiter is
    signalled once, after it is taken off it.  */
 
 void
-__gthread_cond_enqueue (__gthread_cond_t *cond, struct __gthread_cond_waiter *w)
+__benaphore_cond_enqueue (benaphore_cond_t *c, struct __benaphore_cond_waiter *w)
 {
   w->next = 0;
   w->task = SysBase->ThisTask;
   w->signalled = false;
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wdangling-pointer"
-  if (cond->__tail)
-    cond->__tail->next = w;
+  if (c->__tail)
+    c->__tail->next = w;
   else
-    cond->__head = w;
-  cond->__tail = w;
+    c->__head = w;
+  c->__tail = w;
 #pragma GCC diagnostic pop
 }
 
 void
-__gthread_cond_dequeue (__gthread_cond_t *cond, struct __gthread_cond_waiter *w)
+__benaphore_cond_dequeue (benaphore_cond_t *c, struct __benaphore_cond_waiter *w)
 {
-  struct __gthread_cond_waiter **link, *prev = 0;
+  struct __benaphore_cond_waiter **link, *prev = 0;
 
-  for (link = &cond->__head; *link; prev = *link, link = &(*link)->next)
+  for (link = &c->__head; *link; prev = *link, link = &(*link)->next)
     if (*link == w)
       {
 	*link = w->next;
-	if (cond->__tail == w)
-	  cond->__tail = prev;
+	if (c->__tail == w)
+	  c->__tail = prev;
 	return;
       }
 }
 
 static void
-wake (__gthread_cond_t *cond)
+wake (benaphore_cond_t *c)
 {
-  struct __gthread_cond_waiter *w = cond->__head;
+  struct __benaphore_cond_waiter *w = c->__head;
 
-  cond->__head = w->next;
-  if (!cond->__head)
-    cond->__tail = 0;
+  c->__head = w->next;
+  if (!c->__head)
+    c->__tail = 0;
   w->signalled = true;
   Signal (w->task, SIGF_SINGLE);
 }
 
-int
-__gthread_cond_signal (__gthread_cond_t *cond)
+void
+__benaphore_cond_signal (benaphore_cond_t *c)
 {
   Forbid ();
-  if (cond->__head)
-    wake (cond);
+  if (c->__head)
+    wake (c);
   Permit ();
-  return 0;
 }
 
-int
-__gthread_cond_broadcast (__gthread_cond_t *cond)
+void
+__benaphore_cond_broadcast (benaphore_cond_t *c)
 {
   Forbid ();
-  while (cond->__head)
-    wake (cond);
+  while (c->__head)
+    wake (c);
   Permit ();
-  return 0;
 }
 
 /* The unlock can't miss a signal: it happens under the Forbid() in which
    we queue ourselves, and Wait() breaks it only once we sleep.  */
-int
-__gthread_cond_wait (__gthread_cond_t *cond, __gthread_mutex_t *mx)
+void
+__benaphore_cond_wait (benaphore_cond_t *c, benaphore_t *b)
 {
-  struct __gthread_cond_waiter w;
+  struct __benaphore_cond_waiter w;
 
   Forbid ();
-  __gthread_cond_enqueue (cond, &w);
-  benaphore_unlock (mx);
+  __benaphore_cond_enqueue (c, &w);
+  benaphore_unlock (b);
   while (!w.signalled)
     Wait (SIGF_SINGLE);
   Permit ();
-  benaphore_lock (mx);
-  return 0;
+  benaphore_lock (b);
 }
-
-int
-__gthread_cond_wait_recursive (__gthread_cond_t *cond,
-			       __gthread_recursive_mutex_t *mx)
-{
-  unsigned long count = mx->__count;
-  struct __gthread_cond_waiter w;
-
-  Forbid ();
-  __gthread_cond_enqueue (cond, &w);
-  mx->__owner = 0;
-  mx->__count = 0;
-  benaphore_unlock (&mx->__b);
-  while (!w.signalled)
-    Wait (SIGF_SINGLE);
-  Permit ();
-  benaphore_lock (&mx->__b);
-  mx->__owner = SysBase->ThisTask;
-  mx->__count = count;
-  return 0;
-}
-
