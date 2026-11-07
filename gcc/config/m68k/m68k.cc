@@ -1899,11 +1899,11 @@ output_dbcc_and_branch (rtx *operands, rtx_code code)
 	break;
 
       case PLUS:
-	output_asm_insn ("dbpl %0,%l1\n\tjle %l2", operands);
+	output_asm_insn ("dbpl %0,%l1\n\tjpl %l2", operands);
 	break;
 
       case MINUS:
-	output_asm_insn ("dbmi %0,%l1\n\tjle %l2", operands);
+	output_asm_insn ("dbmi %0,%l1\n\tjmi %l2", operands);
 	break;
 
       default:
