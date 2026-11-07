@@ -269,13 +269,22 @@ __gthread_detach (__gthread_t thread)
   return 0;
 }
 
-/* SetTaskPri() to the same priority puts us behind the other tasks of
-   that priority and reschedules.  */
+/* exec's scheduler bits in ExecBase->SysFlags: a reschedule is pending, and
+   the running task's time slice is over.  */
+#define SFF_ATTN_SWITCH (1 << 15)
+#define SFF_QUANTUM_OVER (1 << 14)
+
+/* End our time slice, as exec does when it runs out: Permit() reschedules,
+   and we go back on the ready list behind the tasks of our priority.  */
 int
 __gthread_yield (void)
 {
-  struct Task *me = SysBase->ThisTask;
-
-  SetTaskPri (me, me->tc_Node.ln_Pri);
+  Forbid ();
+  /* Atomically set both bits, since interrupts change SysFlags too.  */
+  __asm__ __volatile__ ("or.w %1,%0"
+			: "+m" (SysBase->SysFlags)
+			: "i" (SFF_ATTN_SWITCH | SFF_QUANTUM_OVER)
+			: "cc");
+  Permit ();
   return 0;
 }
