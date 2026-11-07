@@ -1138,7 +1138,8 @@ m68k_written_regs (HARD_REG_SET *written)
    dead after its last read.  A pass after reload may reuse it there, and
    the unwinder would then hand the caller a value nobody saved.  Without
    -fexceptions no insn is marked as throwing, but with unwind tables an
-   exception can still pass through a call, so every call counts.  */
+   exception can still pass through a call, so every call counts.  With
+   asynchronous unwind tables an unwind can start at any insn.  */
 
 static bool
 m68k_dead_end_may_throw_p (void)
@@ -1161,22 +1162,24 @@ m68k_dead_end_may_throw_p (void)
 	  stack.safe_push (e->src);
     }
 
-  bool calls_unwind = (!flag_exceptions
-		       && (flag_unwind_tables || flag_asynchronous_unwind_tables));
+  bool calls_unwind = !flag_exceptions && flag_unwind_tables;
   basic_block bb;
   rtx_insn *insn;
   FOR_EACH_BB_FN (bb, cfun)
     if (!bitmap_bit_p (reached, bb->index))
       FOR_BB_INSNS (bb, insn)
 	if (INSN_P (insn)
-	    && (can_throw_external (insn) || (calls_unwind && CALL_P (insn))))
+	    && (flag_asynchronous_unwind_tables
+		|| can_throw_external (insn)
+		|| (calls_unwind && CALL_P (insn))))
 	  return true;
   return false;
 }
 
 /* Check that the body writes no call-saved register the prologue leaves
    unsaved.  The frame was laid out during register allocation, and a
-   register first written after it has no save slot.  */
+   register first written after it has no save slot.  The prologue is
+   expanded inside a sequence of its own, so scan the function body.  */
 
 static void
 m68k_check_written_regs (void)
@@ -1185,7 +1188,9 @@ m68k_check_written_regs (void)
     return;
 
   HARD_REG_SET written;
+  push_topmost_sequence ();
   m68k_written_regs (&written);
+  pop_topmost_sequence ();
   for (unsigned int regno = 0; regno < 24; regno++)
     gcc_assert (!TEST_HARD_REG_BIT (written, regno)
 		|| (regno == FRAME_POINTER_REGNUM && frame_pointer_needed)
