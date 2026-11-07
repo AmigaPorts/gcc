@@ -22,33 +22,19 @@ a copy of the GCC Runtime Library Exception along with this program;
 see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 <http://www.gnu.org/licenses/>.  */
 
-/* The queue of sleeping tasks, which is only touched under Forbid().  The
-   benaphore's longword is the last sleeper's address with the lock in bit 0,
-   and the last sleeper's next is the first.  Both slow paths run with the
-   lock held, so they write the longword back with bit 0 set.  */
+/* The queue of sleeping tasks, see amigaos-benaphore-int.h.  Both slow
+   paths run with the lock held, so they write the longword back with bit 0
+   set.  */
 
 #include <exec/execbase.h>
 #include <exec/tasks.h>
 #include <proto/exec.h>
-#include <benaphore.h>
-
-/* On the stack of the task that sleeps.  */
-struct __benaphore_waiter {
-	struct __benaphore_waiter *next;
-	struct Task *task;
-	bool granted;
-};
-
-#define LOCKED 1UL
-
-static inline struct __benaphore_waiter *last(benaphore_t *b)
-{
-	return (struct __benaphore_waiter *) ((unsigned long) b->__last & ~LOCKED);
-}
+#include "amigaos-benaphore-int.h"
 
 static inline void set_last(benaphore_t *b, struct __benaphore_waiter *w)
 {
-	b->__last = (struct __benaphore_waiter *) ((unsigned long) w | LOCKED);
+	b->__last = (struct __benaphore_waiter *)
+		((unsigned long) w | __BENAPHORE_LOCKED);
 }
 
 void __benaphore_lock_slow(benaphore_t *b)
@@ -64,7 +50,7 @@ void __benaphore_lock_slow(benaphore_t *b)
 		   task that grants us the lock dequeues us first.  */
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wdangling-pointer"
-		l = last(b);
+		l = __benaphore_last(b);
 		if (l) {
 			w.next = l->next;
 			l->next = &w;
@@ -89,7 +75,7 @@ void __benaphore_wake(benaphore_t *b)
 	struct __benaphore_waiter *w, *l;
 
 	Forbid();
-	l = last(b);
+	l = __benaphore_last(b);
 	if (l && benaphore_trylock(b)) {
 		w = l->next;
 		if (w == l)
