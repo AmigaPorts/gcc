@@ -478,6 +478,19 @@ _m68k_function_arg (struct m68k_args * cum, machine_mode mode, const_tree type)
 /* A C expression that controls whether a function argument is passed
  in a register, and which register. */
 
+/* The registers an argument of mode MODE bound to an asm register takes,
+   counting from that register.  */
+
+static int
+m68k_asmreg_arg_len (machine_mode mode)
+{
+  if (mode == XFmode)
+    return 3;
+  if (mode == DImode || mode == DFmode)
+    return 2;
+  return 1;
+}
+
 rtx m68k_function_arg (cumulative_args_t cum_v, const function_arg_info & ai)
 {
   DPRINTF((stderr, "m68k_function_arg %p\r\n", cum_v.p));
@@ -518,13 +531,7 @@ rtx m68k_function_arg (cumulative_args_t cum_v, const function_arg_info & ai)
       if (!this_arg_type)
         unpromoted_mode = TYPE_MODE(ai.type);
 
-      if (unpromoted_mode == XFmode)
-    	  cum->last_arg_len = 3;
-      else
-      if (unpromoted_mode == DImode || unpromoted_mode == DFmode)
-    	  cum->last_arg_len = 2;
-      else
-    	  cum->last_arg_len = 1;
+      cum->last_arg_len = m68k_asmreg_arg_len (unpromoted_mode);
 
       int arg_nregs = hard_regno_nregs (cum->last_arg_reg, ai.mode);
 
@@ -574,7 +581,7 @@ m68k_place_next_arg (struct m68k_args *cum, const_tree type)
   if (asmtree)
     {
       regno = TREE_INT_CST_LOW (TREE_VALUE (TREE_VALUE (asmtree)));
-      len = TYPE_MODE (type) == DImode ? 2 : 1;
+      len = m68k_asmreg_arg_len (TYPE_MODE (type));
     }
   else
     {
