@@ -269,13 +269,20 @@ __gthread_detach (__gthread_t thread)
   return 0;
 }
 
-/* SetTaskPri() to the same priority puts us behind the other tasks of
-   that priority and reschedules.  */
+/* exec switches tasks only when the running one drops below a ready task's
+   priority, so SetTaskPri() to the same priority lets nobody run.  Dip
+   below our equals, which hands one of them the CPU, and take our priority
+   back once we have it again.  At the lowest priority, nothing is below.  */
 int
 __gthread_yield (void)
 {
   struct Task *me = SysBase->ThisTask;
+  BYTE pri = me->tc_Node.ln_Pri;
 
-  SetTaskPri (me, me->tc_Node.ln_Pri);
+  if (pri > -128)
+    {
+      SetTaskPri (me, pri - 1);
+      SetTaskPri (me, pri);
+    }
   return 0;
 }
