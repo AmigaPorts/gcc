@@ -122,17 +122,39 @@ static struct m68k_args mycum, othercum;
 
 bool m68k_is_ok_for_sibcall(tree decl, tree exp);
 
-/* Whether each register of REGS holds an argument of call EXP, set up in
-   CUM, that is the incoming value of a parameter of the current function
-   in that same call-saved register and mode.  The sibcall epilogue
-   restores such a register to its incoming value before the jump, or
-   leaves it alone when the prologue did not save it, and either way it
-   holds the argument.  */
+/* Whether each register outside ALLOWED that an argument of call EXP,
+   set up in CUM, takes holds the incoming value of a parameter of the
+   current function in that same call-saved register and mode.  The
+   sibcall epilogue restores such a register to its incoming value before
+   the jump, or leaves it alone when the prologue did not save it, and
+   either way it holds the argument.  The registers are those
+   regs_already_used marks and every register a recorded argument spans.
+   An argument of more than one register that reaches outside ALLOWED,
+   such as a _Complex int in d1 and d2, is refused, even when
+   regs_already_used marks only its first register.  */
 
 static bool
 m68k_sibcall_args_are_incoming (const struct m68k_args *cum, tree exp,
-				long regs)
+				long allowed)
 {
+  long regs = cum->regs_already_used;
+  for (int regno = 0; regno < FIRST_PSEUDO_REGISTER; regno++)
+    if (cum->reg_arg[regno] >= 0)
+      {
+	int end = regno + hard_regno_nregs (regno, cum->reg_arg_mode[regno]);
+	if (end > FIRST_PSEUDO_REGISTER)
+	  return false;
+	long span = 0;
+	for (int r = regno; r < end; r++)
+	  span |= 1L << r;
+	if (end > regno + 1 && (span & ~allowed))
+	  return false;
+	regs |= span;
+      }
+  regs &= ~allowed;
+  if (regs == 0)
+    return true;
+
   if (cum->arg_num != call_expr_nargs (exp))
     return false;
 
@@ -206,9 +228,7 @@ bool m68k_is_ok_for_sibcall(tree decl, tree exp)
 	      = STATIC_CHAIN_REGNUM == A0_REG ? A1_REG : A0_REG;
 	  allowed &= ~(1L << m68k_sibcall_target_regno);
 	}
-      long others = cum->regs_already_used & ~allowed;
-      return others == 0
-	     || m68k_sibcall_args_are_incoming (cum, exp, others);
+      return m68k_sibcall_args_are_incoming (cum, exp, allowed);
     }
   return false;
 }
