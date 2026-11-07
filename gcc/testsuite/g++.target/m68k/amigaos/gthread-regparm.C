@@ -1,10 +1,11 @@
 // { dg-do compile }
+// { dg-require-effective-target amigaos_gthreads }
 // { dg-options "-O2 -fomit-frame-pointer -m68000 -mregparm=2 -mmangle-regparm" }
 
 // libgcc's out-of-line gthread functions are built once, so the amigaos
 // thread model's header fixes their convention whatever -mregparm and
 // -mmangle-regparm the caller uses: the arguments on the stack, and the
-// plain names.  With another thread model there is nothing to check here.
+// plain names.  Another thread model has nothing to check here.
 
 #include <bits/gthr.h>
 
