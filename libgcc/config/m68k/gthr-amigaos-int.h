@@ -22,17 +22,6 @@ a copy of the GCC Runtime Library Exception along with this program;
 see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 <http://www.gnu.org/licenses/>.  */
 
-/* A task waiting on a condition variable, on its own stack.  */
-struct __gthread_cond_waiter {
-  struct __gthread_cond_waiter *next;
-  struct Task *task;
-  bool signalled;
-};
-
-/* Under Forbid().  */
-void __gthread_cond_enqueue (__gthread_cond_t *, struct __gthread_cond_waiter *);
-void __gthread_cond_dequeue (__gthread_cond_t *, struct __gthread_cond_waiter *);
-
 /* A thread's keys: in its creator before it starts, first thing in it,
    in the creator if it fails to start, and at its end, which runs their
    destructors and frees its block.  */
