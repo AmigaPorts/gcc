@@ -23,3 +23,4 @@ written (long a __asm ("d3"))
 /* { dg-final { scan-assembler-not "d2,-\\(sp\\)" } } */
 /* { dg-final { scan-assembler-not "a2,-\\(sp\\)" } } */
 /* { dg-final { scan-assembler-times "d3,-\\(sp\\)" 1 } } */
+/* { dg-final { scan-assembler-not "movem" } } */

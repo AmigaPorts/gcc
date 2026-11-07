@@ -49,6 +49,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "memmodel.h"
 #include "emit-rtl.h"
 #include "function-abi.h"
+#include "except.h"
 #include "stmt.h"
 #include "expr.h"
 #include "reload.h"
@@ -123,6 +124,10 @@ struct m68k_frame
 
   /* Function which the above information refers to.  */
   int funcdef_no;
+
+  /* A call-saved register is saved only if the body writes it
+     (m68k_written_regs).  */
+  bool written_only;
 };
 
 /* Current frame information calculated by m68k_compute_frame_layout().  */
@@ -176,6 +181,9 @@ static tree m68k_handle_fndecl_attribute (tree *node, tree name,
 					  bool *no_add_attrs);
 static void m68k_compute_frame_layout (void);
 static void m68k_written_regs (HARD_REG_SET *);
+static bool m68k_dead_end_may_throw_p (void);
+static bool m68k_unsaved_call_saved_reg_p (unsigned int);
+static void m68k_layout_frame (void);
 static bool m68k_save_reg (unsigned int regno, bool interrupt_handler,
 			   const HARD_REG_SET *written);
 static bool m68k_ok_for_sibcall_p (tree, tree);
@@ -411,6 +419,9 @@ m68k_use_by_pieces_infrastructure_p (unsigned HOST_WIDE_INT size,
 #define TARGET_HARD_REGNO_MODE_OK m68k_hard_regno_mode_ok
 #undef TARGET_HARD_REGNO_SCRATCH_OK
 #define TARGET_HARD_REGNO_SCRATCH_OK m68k_hard_regno_scratch_ok
+
+#undef TARGET_COMPUTE_FRAME_LAYOUT
+#define TARGET_COMPUTE_FRAME_LAYOUT m68k_layout_frame
 
 #undef TARGET_MODES_TIEABLE_P
 #define TARGET_MODES_TIEABLE_P m68k_modes_tieable_p
@@ -916,8 +927,23 @@ m68k_handle_fndecl_attribute (tree *node, tree name,
   return NULL_TREE;
 }
 
+/* Only compute the frame once per function: after reload, and while LRA
+   runs, which calls TARGET_COMPUTE_FRAME_LAYOUT before each round of
+   elimination offsets.  */
+
 static void
 m68k_compute_frame_layout (void)
+{
+  if (current_frame.funcdef_no == current_function_funcdef_no
+      && (reload_completed || lra_in_progress))
+    return;
+  m68k_layout_frame ();
+}
+
+/* Implement TARGET_COMPUTE_FRAME_LAYOUT.  */
+
+static void
+m68k_layout_frame (void)
 {
   int regno, saved;
   unsigned int mask;
@@ -926,25 +952,23 @@ m68k_compute_frame_layout (void)
   bool interrupt_handler = func_kind == m68k_fk_interrupt_handler;
   bool interrupt_thread = func_kind == m68k_fk_interrupt_thread;
 
-  /* Only compute the frame once per function.
-     Don't cache information until reload has been completed.  */
-  if (current_frame.funcdef_no == current_function_funcdef_no
-      && reload_completed)
-    return;
-
   current_frame.size = (get_frame_size () + 3) & -4;
 
   mask = saved = 0;
 
-  /* The old reload pass is not followed, and saves_all_registers means
-     LRA wants every call-saved register saved.  */
+  /* The old reload pass is not followed, saves_all_registers means LRA
+     wants every call-saved register saved, and the unwinder needs the
+     caller's values of the ones that are only read where nothing keeps
+     them live (m68k_dead_end_may_throw_p).  */
   HARD_REG_SET written_regs;
   const HARD_REG_SET *written = NULL;
-  if (targetm.lra_p () && !crtl->saves_all_registers)
+  if (targetm.lra_p () && !crtl->saves_all_registers
+      && !m68k_dead_end_may_throw_p ())
     {
       m68k_written_regs (&written_regs);
       written = &written_regs;
     }
+  current_frame.written_only = written != NULL;
 
   /* Interrupt thread does not need to save any register.  */
   if (!interrupt_thread)
@@ -1082,20 +1106,12 @@ m68k_note_written_reg (rtx x, const_rtx setter, void *data)
   m68k_add_written_reg (dest, (HARD_REG_SET *) data);
 }
 
-/* The registers m68k_written_regs found while the register allocator
-   was laying out the frame, and the function they belong to.  */
-static HARD_REG_SET m68k_ra_written_regs;
-static int m68k_ra_written_funcdef_no = -1;
-
 /* Set *WRITTEN to the hard registers the body of the current function
    writes: SET and CLOBBER destinations, asm clobbers included, the address
    registers of auto-increment addresses, and what the ABI of each call
    clobbers.  The entry definitions of incoming arguments are not insns,
-   so a register that is only read is not in the set.
-
-   During register allocation pseudos count as their hard registers, and
-   the result is kept: the stack offsets of the eliminations come from
-   that frame layout, so later layouts must save the same registers.  */
+   so a register that is only read is not in the set.  During register
+   allocation pseudos count as their hard registers.  */
 
 static void
 m68k_written_regs (HARD_REG_SET *written)
@@ -1113,22 +1129,62 @@ m68k_written_regs (HARD_REG_SET *written)
       if (CALL_P (insn))
 	*written |= insn_callee_abi (insn).full_and_partial_reg_clobbers ();
     }
+}
 
-  if (!reload_completed)
+/* Whether an insn that can throw out of the function is in a block from
+   which the exit cannot be reached, such as one that ends in a noreturn
+   call.  After the epilogue DF counts the call-saved registers as live
+   at the exit, so this is the only place where one that is only read is
+   dead after its last read.  A pass after reload may reuse it there, and
+   the unwinder would then hand the caller a value nobody saved.  */
+
+static bool
+m68k_dead_end_may_throw_p (void)
+{
+  if (!cfun->cfg)
+    return true;
+
+  auto_sbitmap reached (last_basic_block_for_fn (cfun));
+  bitmap_clear (reached);
+  auto_vec<basic_block, 32> stack;
+  bitmap_set_bit (reached, EXIT_BLOCK);
+  stack.safe_push (EXIT_BLOCK_PTR_FOR_FN (cfun));
+  while (!stack.is_empty ())
     {
-      m68k_ra_written_regs = *written;
-      m68k_ra_written_funcdef_no = current_function_funcdef_no;
+      basic_block bb = stack.pop ();
+      edge e;
+      edge_iterator ei;
+      FOR_EACH_EDGE (e, ei, bb->preds)
+	if (bitmap_set_bit (reached, e->src->index))
+	  stack.safe_push (e->src);
     }
-  else if (m68k_ra_written_funcdef_no == current_function_funcdef_no)
-    {
-      /* A call-saved register first written after allocation would need
-	 a save slot the stack offsets have no room for.  */
-      HARD_REG_SET late = *written & ~m68k_ra_written_regs;
-      for (unsigned int regno = 0; regno < 24; regno++)
-	gcc_assert (!TEST_HARD_REG_BIT (late, regno)
-		    || call_used_or_fixed_reg_p (regno));
-      *written |= m68k_ra_written_regs;
-    }
+
+  basic_block bb;
+  rtx_insn *insn;
+  FOR_EACH_BB_FN (bb, cfun)
+    if (!bitmap_bit_p (reached, bb->index))
+      FOR_BB_INSNS (bb, insn)
+	if (INSN_P (insn) && can_throw_external (insn))
+	  return true;
+  return false;
+}
+
+/* Check that the body writes no call-saved register the prologue leaves
+   unsaved.  The frame was laid out during register allocation, and a
+   register first written after it has no save slot.  */
+
+static void
+m68k_check_written_regs (void)
+{
+  if (!current_frame.written_only)
+    return;
+
+  HARD_REG_SET written;
+  m68k_written_regs (&written);
+  for (unsigned int regno = 0; regno < 24; regno++)
+    gcc_assert (!TEST_HARD_REG_BIT (written, regno)
+		|| (regno == FRAME_POINTER_REGNUM && frame_pointer_needed)
+		|| !m68k_unsaved_call_saved_reg_p (regno));
 }
 
 /* Refer to the array `regs_ever_live' to determine which registers
@@ -1283,6 +1339,7 @@ m68k_expand_prologue (void)
   rtx limit, src, dest;
 
   m68k_compute_frame_layout ();
+  m68k_check_written_regs ();
 
   if (flag_stack_usage_info)
     current_function_static_stack_size

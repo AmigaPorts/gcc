@@ -204,9 +204,13 @@ bool m68k_is_ok_for_sibcall(tree decl, tree exp)
 	      = STATIC_CHAIN_REGNUM == A0_REG ? A1_REG : A0_REG;
 	  allowed &= ~(1L << m68k_sibcall_target_regno);
 	}
+      /* Not for a call to the current function: m68k_function_arg places
+	 its arguments by the PARM_DECLs (current_parm_decl), which keep
+	 asm registers that TYPE_ARG_TYPES may have lost.  */
       long others = cum->regs_already_used & ~allowed;
       return others == 0
-	     || m68k_sibcall_args_are_incoming (exp, fntype, others);
+	     || (decl != current_function_decl
+		 && m68k_sibcall_args_are_incoming (exp, fntype, others));
     }
   return false;
 }

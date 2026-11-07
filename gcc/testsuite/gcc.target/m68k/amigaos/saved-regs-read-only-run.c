@@ -1,13 +1,48 @@
 /* Amiga register-parameter ABI: functions that only read their arguments
    in call-saved registers do not save them, and a forwarder that passes
-   them on unchanged, long or short, tail-jumps.  The caller's own values in d2, d3 and a2
-   must survive all of it, as must a value written into part of an
-   argument register.  Result-based, so valid at every -O level.  */
+   them on unchanged, long or short, tail-jumps.  Each call goes through
+   call_kept, which loads d2, d3, d4 and a2 itself and compares all 32
+   bits of each after the call, so a callee that changes one of them
+   fails whatever the caller's register allocation.  */
 
 /* { dg-do run } */
 /* { dg-skip-if "amiga register-parameter ABI" { ! { m68k-*-amigaos* } } } */
 
 extern void abort (void);
+
+/* call_kept (fn, d2, d3, d4, a2, result) loads the four registers, calls
+   FN, stores its result in *RESULT and returns a mask of the registers
+   that came back changed: 1 for d2, 2 for d3, 4 for d4 and 8 for a2.  */
+extern long call_kept (void *, long, long, long, long, long *);
+
+__asm__ ("	.text\n"
+	 "	.even\n"
+	 "	.globl	_call_kept\n"
+	 "_call_kept:\n"
+	 "	movem.l	d2-d4/a2,-(sp)\n"
+	 "	move.l	20(sp),a0\n"
+	 "	move.l	24(sp),d2\n"
+	 "	move.l	28(sp),d3\n"
+	 "	move.l	32(sp),d4\n"
+	 "	move.l	36(sp),a2\n"
+	 "	jsr	(a0)\n"
+	 "	move.l	40(sp),a0\n"
+	 "	move.l	d0,(a0)\n"
+	 "	moveq	#0,d0\n"
+	 "	cmp.l	24(sp),d2\n"
+	 "	jeq	1f\n"
+	 "	addq.l	#1,d0\n"
+	 "1:	cmp.l	28(sp),d3\n"
+	 "	jeq	2f\n"
+	 "	addq.l	#2,d0\n"
+	 "2:	cmp.l	32(sp),d4\n"
+	 "	jeq	3f\n"
+	 "	addq.l	#4,d0\n"
+	 "3:	cmp.l	36(sp),a2\n"
+	 "	jeq	4f\n"
+	 "	addq.l	#8,d0\n"
+	 "4:	movem.l	(sp)+,d2-d4/a2\n"
+	 "	rts\n");
 
 __attribute__ ((noipa)) long
 take3 (long a __asm ("d2"), long b __asm ("d3"), long c __asm ("a2"))
@@ -47,26 +82,35 @@ insert_byte (long a __asm ("d2"))
   return ident (a);
 }
 
+/* Writes d3 through an asm clobber.  */
+__attribute__ ((noipa)) long
+clobber_d3 (long a __asm ("d3"))
+{
+  __asm__ volatile ("moveq #-1,%%d3" : : : "d3");
+  return a + 1;
+}
+
 int
 main (void)
 {
-  long a = 1, b = 2, c = 3;
+  long r;
 
-  /* Live across the calls in the registers the callees must keep.  */
-  __asm__ volatile ("" : "+d" (a), "+d" (b), "+a" (c));
-  if (take3 (12, 34, 56) != 123456)
+  if (call_kept (take3, 12, 34, 0x5a5a5a5aL, 56, &r) != 0
+      || r != 123456)
     abort ();
-  __asm__ volatile ("" : "+d" (a), "+d" (b), "+a" (c));
-  if (forward3 (12, 34, 56) != 123456)
+  if (call_kept (forward3, 12, 34, 0x5a5a5a5aL, 56, &r) != 0
+      || r != 123456)
     abort ();
-  __asm__ volatile ("" : "+d" (a), "+d" (b), "+a" (c));
-  if (forward_short (-12, 200) != -11800)
+  /* The upper bits of the narrow arguments must survive too.  */
+  if (call_kept (forward_short, 0x5555fff4L, 0x11111111L, 0x123456c8L, 0,
+		 &r) != 0
+      || r != -11800)
     abort ();
-  __asm__ volatile ("" : "+d" (a), "+d" (b), "+a" (c));
-  if (insert_byte (0x12345678L) != 0x78345678L)
+  if (call_kept (insert_byte, 0x12345678L, 0, 0, 0, &r) != 0
+      || r != 0x78345678L)
     abort ();
-  __asm__ volatile ("" : "+d" (a), "+d" (b), "+a" (c));
-  if (a != 1 || b != 2 || c != 3)
+  if (call_kept (clobber_d3, 0, 41, 0, 0, &r) != 0
+      || r != 42)
     abort ();
   return 0;
 }
