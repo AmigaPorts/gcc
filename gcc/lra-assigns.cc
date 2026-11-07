@@ -1786,9 +1786,10 @@ find_reload_regno_insns (int regno, rtx_insn * &start, rtx_insn * &finish)
    range in live range of a reload pseudo, and then return TRUE.  Otherwise,
    return FALSE.  When FAIL_P is TRUE and if we did not split a hard reg live
    range for failed reload pseudos, report an error and modify related asm
-   insns.  */
+   insns.  When SPLIT_P is FALSE, do not split anything: just treat every
+   reload pseudo without a hard reg as failed.  */
 bool
-lra_split_hard_reg_for (bool fail_p)
+lra_split_hard_reg_for (bool fail_p, bool split_p)
 {
   int i, regno;
   rtx_insn *insn, *first, *last;
@@ -1836,7 +1837,8 @@ lra_split_hard_reg_for (bool fail_p)
 		 insn = NEXT_INSN (insn))
 	      if (bitmap_bit_p (&over_split_insns, INSN_UID (insn)))
 		break;
-	    if (insn != NEXT_INSN (last)
+	    if (!split_p
+		|| insn != NEXT_INSN (last)
 		|| !spill_hard_reg_in_range (i, rclass, first, last))
 	      {
 		bitmap_set_bit (&failed_reload_pseudos, i);

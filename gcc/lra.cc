@@ -2536,6 +2536,7 @@ lra (FILE *f, int verbose)
 	  bool fails_p;
 	  lra_hard_reg_split_p = false;
 	  int split_fails_num = 0;
+	  int splits_num = 0;
 	  do
 	    {
 	      /* We need live ranges for lra_assign -- so build them.
@@ -2578,10 +2579,12 @@ lra (FILE *f, int verbose)
 		  if (live_p)
 		    lra_clear_live_ranges ();
 		  live_p = false;
-		  /* See a comment for LRA_MAX_FAILED_SPLITS definition.  */
+		  /* See a comment for LRA_MAX_FAILED_SPLITS and LRA_MAX_SPLITS
+		     definitions.  */
+		  bool split_p = ++splits_num <= LRA_MAX_SPLITS;
 		  bool last_failed_split_p
-		    = split_fails_num > LRA_MAX_FAILED_SPLITS;
-		  if (! lra_split_hard_reg_for (last_failed_split_p))
+		    = split_fails_num > LRA_MAX_FAILED_SPLITS || !split_p;
+		  if (! lra_split_hard_reg_for (last_failed_split_p, split_p))
 		    {
 		      if (last_failed_split_p)
 			break;
