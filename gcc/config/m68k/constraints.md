@@ -23,6 +23,9 @@
 (define_register_constraint "d" "DATA_REGS"
   "Data register.")
 
+(define_register_constraint "Ya" "TARGET_68020 ? ADDR_REGS : NO_REGS"
+  "Address register that tst can test: 68020 and later.")
+
 (define_register_constraint "f" "TARGET_HARD_FLOAT ? FP_REGS : NO_REGS"
   "Floating point register.")
 
