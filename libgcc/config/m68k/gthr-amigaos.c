@@ -45,16 +45,18 @@ extern struct ExecBase *SysBase;
 
    As only tc_Launch sets the pointer, a task without one would read the
    values of the task that ran before it.  So each task of the program
-   gets its block before another one can run:
-   - the main task when it first sets a key, or before it starts its first
-     thread;
+   gets its block and tc_Launch before another one can run:
+   - the main task before it starts its first thread;
    - a thread before it runs any code of its creator's:
      __gthread_amigaos_new_keys() in the creator keeps a block ready for
      it, and __gthread_amigaos_start_keys(), the first thing the thread
      does, puts it on.
    __gthread_create() calls them, and libpthread calls them through
-   amigaos-task-end.c.  Until the main task has a block, the pointer
-   points to zeros: it is the only task, and has set no key.
+   amigaos-task-end.c.  Until then the main task is the only one, and
+   nothing else moves the pointer: the block it gets when it first sets a
+   key needs no tc_Launch, so a program that starts no thread costs
+   nothing at a task switch.  Before its first key, the pointer points to
+   zeros.
 
    When a thread ends, __gthread_amigaos_end_keys() runs its destructors,
    takes its tc_Launch off, and puts its block on the free list for a
@@ -74,6 +76,7 @@ struct key_block {
   /* jsr old.L, then move.l #values,__gthread_amigaos_values.L and rts */
   unsigned short launch[9];
   unsigned char old_flags;
+  bool hooked;				/* launch[] is the task's tc_Launch */
 };
 
 static const void *no_values[KEYS_MAX];
@@ -83,9 +86,11 @@ const void *const *__gthread_amigaos_values = no_values;
   ((struct key_block *) ((char *) (v) - offsetof (struct key_block, values)))
 
 /* The blocks, the free ones and how many of those are kept for threads
-   that are starting, under key_lock.  */
+   that are starting, and whether the program has started a task, under
+   key_lock.  */
 static struct key_block *blocks, *free_blocks;
 static unsigned int free_count, starting;
+static bool threaded;
 
 static void (*key_destroy[KEYS_MAX]) (void *);
 static bool key_used[KEYS_MAX];
@@ -160,18 +165,29 @@ reserve (void)
   return 0;
 }
 
-/* Give the running task a free block and its tc_Launch.  Under key_lock,
-   with a block free.  */
-static void
-hook (void)
+/* Give the running task a free block.  Under key_lock, with a block
+   free.  */
+static struct key_block *
+attach_block (void)
 {
-  struct Task *me = SysBase->ThisTask;
   struct key_block *b = free_blocks;
-  unsigned short *p = b->launch;
 
   free_blocks = b->next_free;
   free_count--;
-  b->task = me;
+  b->task = SysBase->ThisTask;
+  __gthread_amigaos_values = b->values;
+  return b;
+}
+
+/* Make the running task's block its tc_Launch.  Under key_lock, which does
+   not stop task switches: another task's tc_Launch may have moved the
+   pointer since attach_block(), so set it again with the hook on.  */
+static void
+install_launch_hook (struct key_block *b)
+{
+  struct Task *me = SysBase->ThisTask;
+  unsigned short *p = b->launch;
+
   Forbid ();
   b->old_flags = me->tc_Flags & TF_LAUNCH;
   b->old_launch = b->old_flags ? me->tc_Launch : 0;
@@ -186,32 +202,41 @@ hook (void)
   flush_caches ();
   me->tc_Launch = (void (*) ()) b->launch;
   me->tc_Flags |= TF_LAUNCH;
+  b->hooked = true;
   __gthread_amigaos_values = b->values;
   Permit ();
 }
 
-/* Give the running task its old tc_Launch back.  */
+/* Give the running task its old tc_Launch back, if it got ours.  */
 static void
-unhook (struct key_block *b)
+remove_launch_hook (struct key_block *b)
 {
   struct Task *me = SysBase->ThisTask;
 
+  if (!b->hooked)
+    return;
   Forbid ();
   me->tc_Launch = b->old_launch;
   me->tc_Flags = (me->tc_Flags & ~TF_LAUNCH) | b->old_flags;
+  b->hooked = false;
   Permit ();
 }
 
-/* Before the running task starts a task: give it a block, if it has none
-   yet, and keep one ready for the new task.  */
+/* Before the running task starts a task: give it a block and its
+   tc_Launch, if it has none yet, and keep a block ready for the new
+   task.  */
 int
 __gthread_amigaos_new_keys (void)
 {
+  struct key_block *b;
   int err = 0;
 
   benaphore_lock (&key_lock);
-  if (!my_block () && !(err = reserve ()))
-    hook ();
+  threaded = true;
+  if (!(b = my_block ()) && !(err = reserve ()))
+    b = attach_block ();
+  if (b && !b->hooked)
+    install_launch_hook (b);
   if (!err && !(err = reserve ()))
     starting++;
   benaphore_unlock (&key_lock);
@@ -228,7 +253,7 @@ __gthread_amigaos_start_keys (void)
   if (starting)
     starting--;
   if (!reserve ())
-    hook ();
+    install_launch_hook (attach_block ());
   benaphore_unlock (&key_lock);
 }
 
@@ -292,11 +317,14 @@ __gthread_setspecific (__gthread_key_t key, const void *value)
     {
       benaphore_lock (&key_lock);
       if (!(err = reserve ()))
-	hook ();
+	{
+	  b = attach_block ();
+	  if (threaded)
+	    install_launch_hook (b);
+	}
       benaphore_unlock (&key_lock);
       if (err)
 	return err;
-      b = my_block ();
     }
   b->values[key] = value;
   return 0;
@@ -333,7 +361,7 @@ __gthread_amigaos_end_keys (struct Task *me)
       if (!again)
 	break;
     }
-  unhook (b);
+  remove_launch_hook (b);
   for (i = 0; i < KEYS_MAX; i++)
     b->values[i] = 0;
   benaphore_lock (&key_lock);
@@ -361,7 +389,7 @@ free_keys (void)
   /* The hooks are in the blocks.  Only this task's can still be called:
      every other thread has ended, as it must before the program does.  */
   if ((b = my_block ()))
-    unhook (b);
+    remove_launch_hook (b);
   __gthread_amigaos_values = no_values;
   for (b = blocks; b; b = next)
     {
@@ -370,4 +398,5 @@ free_keys (void)
     }
   blocks = free_blocks = 0;
   free_count = starting = 0;
+  threaded = false;
 }
