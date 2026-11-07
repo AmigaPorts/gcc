@@ -429,19 +429,28 @@ amiga_named_section (const char *name, unsigned int flags, tree decl ATTRIBUTE_U
 #endif
 
 
+/* Whether the current function loads its own a4 in the prologue and gives
+   the caller's back in the epilogue: __saveds, -mrestore-a4 and
+   -malways-restore-a4 under -fbaserel or -fbaserel32, which the driver
+   also passes for -resident and -resident32.  */
+
+bool
+amigaos_restores_a4_p (void)
+{
+  if (flag_pic < 3 || flag_resident)
+    return false;
+  tree attrs = TYPE_ATTRIBUTES (TREE_TYPE (current_function_decl));
+  return lookup_attribute ("saveds", attrs) || AMIGAOS_RESTORE_A4;
+}
+
 void
 amigaos_restore_a4 (void)
   {
-    if (flag_pic >= 3 && !flag_resident)
+    if (amigaos_restores_a4_p ())
       {
-	tree attrs = TYPE_ATTRIBUTES (TREE_TYPE (current_function_decl));
-	tree attr = lookup_attribute ("saveds", attrs);
-	if (attr || AMIGAOS_RESTORE_A4)
-	  {
-	    rtx a4 = gen_rtx_ASM_INPUT_loc(VOIDmode, "\tjsr ___restore_a4", DECL_SOURCE_LOCATION (current_function_decl));
-	    a4->volatil = 1;
-	    emit_insn(a4);
-	  }
+	rtx a4 = gen_rtx_ASM_INPUT_loc(VOIDmode, "\tjsr ___restore_a4", DECL_SOURCE_LOCATION (current_function_decl));
+	a4->volatil = 1;
+	emit_insn(a4);
       }
   }
 
