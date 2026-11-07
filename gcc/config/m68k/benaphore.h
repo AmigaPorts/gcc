@@ -197,6 +197,125 @@ __BENAPHORE_INLINE void benaphore_recursive_unlock(benaphore_recursive_t *__r)
 	}
 }
 
+/* A deadline, on the clock of gettimeofday(): a struct timespec, but the
+   same whatever time_t the C library has. */
+typedef struct {
+	long long __sec;
+	long __nsec;
+} benaphore_time_t;
+
+/* A condition variable: a FIFO of the tasks that wait on it, each on its
+   own stack.  All zeros is a valid one. */
+struct __benaphore_cond_waiter;
+typedef struct {
+	struct __benaphore_cond_waiter *__head, *__tail;
+} benaphore_cond_t;
+
+#define BENAPHORE_COND_INITIALIZER { 0, 0 }
+
+/* libgcc builds these once, so they take their arguments on the stack
+   whatever -mregparm and -mmangle-regparm the caller uses.  The timed ones
+   return 0, or ETIMEDOUT once the deadline has passed.  They are apart from
+   the others, so that only programs that use them link DOSBase and
+   gettimeofday().
+
+   FIXME: the deadline is coarse, whatever nanoseconds it has.  A timed wait
+   sleeps on a clone of dos.library's timer request, timer.device's
+   UNIT_VBLANK, which counts vertical blanks: it can end late by up to one,
+   20 ms at 50 Hz (PAL) or 17 ms at 60 Hz (NTSC).  It is compared against
+   gettimeofday(), which in newlib and libnix moves in DOS ticks of 1/50 s,
+   so a finer timer would gain nothing until the clock is finer too: see
+   AmigaPorts/m68k-amigaos-gcc#324.  A release or a signal wakes the waiter
+   at once, without waiting for the timer. */
+#define __BENAPHORE_STACK_ABI __stdargs __attribute__((__nothrow__))
+int __benaphore_lock_timed(benaphore_t *__b, const benaphore_time_t *__deadline) __BENAPHORE_STACK_ABI;
+void __benaphore_cond_signal(benaphore_cond_t *__c) __BENAPHORE_STACK_ABI;
+void __benaphore_cond_broadcast(benaphore_cond_t *__c) __BENAPHORE_STACK_ABI;
+void __benaphore_cond_wait(benaphore_cond_t *__c, benaphore_t *__b) __BENAPHORE_STACK_ABI;
+int __benaphore_cond_timedwait(benaphore_cond_t *__c, benaphore_t *__b,
+			       const benaphore_time_t *__deadline) __BENAPHORE_STACK_ABI;
+
+/* As benaphore_lock(), but gives up at the deadline.  A task that holds the
+   lock already waits for the deadline: use the recursive one if it can. */
+__BENAPHORE_INLINE int benaphore_timedlock(benaphore_t *__b,
+					   const benaphore_time_t *__deadline)
+{
+	if (benaphore_trylock(__b))
+		return 0;
+	return __benaphore_lock_timed(__b, __deadline);
+}
+
+__BENAPHORE_INLINE int benaphore_recursive_timedlock(benaphore_recursive_t *__r,
+						     const benaphore_time_t *__deadline)
+{
+	void *__me = __BENAPHORE_THIS_TASK();
+	int __err;
+
+	if (__atomic_load_n(&__r->__owner, __ATOMIC_RELAXED) == __me) {
+		__r->__count++;
+		return 0;
+	}
+	if ((__err = benaphore_timedlock(&__r->__b, __deadline)))
+		return __err;
+	__atomic_store_n(&__r->__owner, __me, __ATOMIC_RELAXED);
+	__r->__count = 1;
+	return 0;
+}
+
+__BENAPHORE_INLINE void benaphore_cond_signal(benaphore_cond_t *__c)
+{
+	__benaphore_cond_signal(__c);
+}
+
+__BENAPHORE_INLINE void benaphore_cond_broadcast(benaphore_cond_t *__c)
+{
+	__benaphore_cond_broadcast(__c);
+}
+
+/* Release the lock, which the caller holds, and sleep until signalled; then
+   take the lock again.  The release and the start of the wait are one step
+   for the tasks that signal. */
+__BENAPHORE_INLINE void benaphore_cond_wait(benaphore_cond_t *__c, benaphore_t *__b)
+{
+	__benaphore_cond_wait(__c, __b);
+}
+
+/* As benaphore_cond_wait(), until the deadline at most.  The lock is taken
+   again either way. */
+__BENAPHORE_INLINE int benaphore_cond_timedwait(benaphore_cond_t *__c, benaphore_t *__b,
+						const benaphore_time_t *__deadline)
+{
+	return __benaphore_cond_timedwait(__c, __b, __deadline);
+}
+
+/* The recursive lock is released whatever its count, and taken back with
+   it.  Until then the owner is nobody, so that another task can take it;
+   only the holder writes the count. */
+__BENAPHORE_INLINE void benaphore_cond_wait_recursive(benaphore_cond_t *__c,
+						      benaphore_recursive_t *__r)
+{
+	unsigned long __count = __r->__count;
+
+	__atomic_store_n(&__r->__owner, (void *) 0, __ATOMIC_RELAXED);
+	__benaphore_cond_wait(__c, &__r->__b);
+	__atomic_store_n(&__r->__owner, __BENAPHORE_THIS_TASK(), __ATOMIC_RELAXED);
+	__r->__count = __count;
+}
+
+__BENAPHORE_INLINE int benaphore_cond_timedwait_recursive(benaphore_cond_t *__c,
+							  benaphore_recursive_t *__r,
+							  const benaphore_time_t *__deadline)
+{
+	unsigned long __count = __r->__count;
+	int __err;
+
+	__atomic_store_n(&__r->__owner, (void *) 0, __ATOMIC_RELAXED);
+	__err = __benaphore_cond_timedwait(__c, &__r->__b, __deadline);
+	__atomic_store_n(&__r->__owner, __BENAPHORE_THIS_TASK(), __ATOMIC_RELAXED);
+	__r->__count = __count;
+	return __err;
+}
+
 #ifdef __cplusplus
 }
 #endif

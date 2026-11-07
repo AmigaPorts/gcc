@@ -46,10 +46,7 @@ typedef struct {
   unsigned char __pad[3];
 } __gthread_once_t;
 
-struct __gthread_cond_waiter;
-typedef struct {
-  struct __gthread_cond_waiter *__head, *__tail;
-} __gthread_cond_t;
+typedef benaphore_cond_t __gthread_cond_t;
 
 typedef unsigned int __gthread_key_t;
 
@@ -57,16 +54,13 @@ typedef unsigned int __gthread_key_t;
 typedef void *__gthread_t;
 
 /* libstdc++ fills it as { tv_sec, tv_nsec }, whatever time_t is.  */
-typedef struct {
-  long long __sec;
-  long __nsec;
-} __gthread_time_t;
+typedef benaphore_time_t __gthread_time_t;
 
 #define __GTHREAD_MUTEX_INIT BENAPHORE_INITIALIZER
 #define __GTHREAD_MUTEX_INIT_FUNCTION(__mx) __gthread_mutex_init (__mx)
 #define __GTHREAD_RECURSIVE_MUTEX_INIT BENAPHORE_RECURSIVE_INITIALIZER
 #define __GTHREAD_ONCE_INIT { BENAPHORE_INITIALIZER, 0, { 0, 0, 0 } }
-#define __GTHREAD_COND_INIT { 0, 0 }
+#define __GTHREAD_COND_INIT BENAPHORE_COND_INITIALIZER
 #define __GTHREAD_HAS_COND 1
 
 #ifdef __cplusplus
@@ -222,24 +216,56 @@ __gthread_getspecific (__gthread_key_t __key)
   return (void *) __gthread_amigaos_values[__key];
 }
 
-int __gthread_cond_signal (__gthread_cond_t *__cond) __GTHREAD_NOTHROW;
-int __gthread_cond_broadcast (__gthread_cond_t *__cond) __GTHREAD_NOTHROW;
-int __gthread_cond_wait (__gthread_cond_t *__cond, __gthread_mutex_t *__mx)
-  __GTHREAD_NOTHROW;
-int __gthread_cond_wait_recursive (__gthread_cond_t *__cond,
-				   __gthread_recursive_mutex_t *__mx)
-  __GTHREAD_NOTHROW;
-int __gthread_cond_timedwait (__gthread_cond_t *__cond,
-			      __gthread_mutex_t *__mx,
-			      const __gthread_time_t *__abs_timeout)
-  __GTHREAD_NOTHROW;
+/* Condition variables and timed waits are <benaphore.h>'s.  */
+__GTHREAD_INLINE int
+__gthread_cond_signal (__gthread_cond_t *__cond)
+{
+  benaphore_cond_signal (__cond);
+  return 0;
+}
 
-int __gthread_mutex_timedlock (__gthread_mutex_t *__mx,
-			       const __gthread_time_t *__abs_timeout)
-  __GTHREAD_NOTHROW;
-int __gthread_recursive_mutex_timedlock (__gthread_recursive_mutex_t *__mx,
-					 const __gthread_time_t *__abs_timeout)
-  __GTHREAD_NOTHROW;
+__GTHREAD_INLINE int
+__gthread_cond_broadcast (__gthread_cond_t *__cond)
+{
+  benaphore_cond_broadcast (__cond);
+  return 0;
+}
+
+__GTHREAD_INLINE int
+__gthread_cond_wait (__gthread_cond_t *__cond, __gthread_mutex_t *__mx)
+{
+  benaphore_cond_wait (__cond, __mx);
+  return 0;
+}
+
+__GTHREAD_INLINE int
+__gthread_cond_wait_recursive (__gthread_cond_t *__cond,
+			       __gthread_recursive_mutex_t *__mx)
+{
+  benaphore_cond_wait_recursive (__cond, __mx);
+  return 0;
+}
+
+__GTHREAD_INLINE int
+__gthread_cond_timedwait (__gthread_cond_t *__cond, __gthread_mutex_t *__mx,
+			  const __gthread_time_t *__abs_timeout)
+{
+  return benaphore_cond_timedwait (__cond, __mx, __abs_timeout);
+}
+
+__GTHREAD_INLINE int
+__gthread_mutex_timedlock (__gthread_mutex_t *__mx,
+			   const __gthread_time_t *__abs_timeout)
+{
+  return benaphore_timedlock (__mx, __abs_timeout);
+}
+
+__GTHREAD_INLINE int
+__gthread_recursive_mutex_timedlock (__gthread_recursive_mutex_t *__mx,
+				     const __gthread_time_t *__abs_timeout)
+{
+  return benaphore_recursive_timedlock (__mx, __abs_timeout);
+}
 
 int __gthread_create (__gthread_t *__thr, void *(*__func) (void *),
 		      void *__args) __GTHREAD_NOTHROW;

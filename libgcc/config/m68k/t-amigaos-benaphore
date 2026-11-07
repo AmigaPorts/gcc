@@ -1,4 +1,8 @@
 # The out-of-line half of <benaphore.h>, and the end of a task that another
 # thread library started, which that library calls with any thread model.
+# Condition variables and timed waits are objects of their own, so that a
+# program links them, and timer.device, only if it uses them.
 LIB2ADD += $(srcdir)/config/m68k/amigaos-benaphore.c \
+	   $(srcdir)/config/m68k/amigaos-benaphore-cond.c \
+	   $(srcdir)/config/m68k/amigaos-benaphore-timed.c \
 	   $(srcdir)/config/m68k/amigaos-task-end.c
