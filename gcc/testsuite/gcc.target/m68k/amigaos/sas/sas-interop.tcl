@@ -93,12 +93,13 @@ array set sas_xfail {
 
 foreach g {noargs core narrow struct asm fpu} {
     # amigaos.exp=sas/* runs these groups alone (amigaos.exp=sas/core
-    # one of them), like a file name pattern
+    # one of them), like a file name pattern.  A parallel check runs this
+    # file in every slice, and runtest_file_p also gives each group to one
+    # of them.  Make no other gcc_parallel_test_run_p call: the slice that
+    # got the group would then count one call more than the others, the
+    # slices would stop agreeing on whose turn the next groups are, and
+    # some groups would run in none.
     if { ![runtest_file_p $runtests $sas_dir/$g] } {
-	continue
-    }
-    # a parallel check runs this file in every slice: each group in one
-    if { ![gcc_parallel_test_run_p "sas-$g"] } {
 	continue
     }
     set opts ""
