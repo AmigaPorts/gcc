@@ -1069,7 +1069,17 @@ m68k_add_written_reg (rtx x, HARD_REG_SET *set)
       int outer = simplify_subreg_regno (regno, GET_MODE (x),
 					 SUBREG_BYTE (subreg),
 					 GET_MODE (subreg));
-      add_to_hard_reg_set (set, GET_MODE (subreg), outer >= 0 ? outer : regno);
+      /* Where that fails, alter_subreg still applies the offset, so count
+	 both.  */
+      if (outer < 0)
+	{
+	  add_to_hard_reg_set (set, GET_MODE (subreg), regno);
+	  outer = regno + subreg_regno_offset (regno, GET_MODE (x),
+					       SUBREG_BYTE (subreg),
+					       GET_MODE (subreg));
+	}
+      if (outer >= 0)
+	add_to_hard_reg_set (set, GET_MODE (subreg), outer);
     }
 }
 

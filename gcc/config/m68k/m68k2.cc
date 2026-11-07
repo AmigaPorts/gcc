@@ -585,6 +585,9 @@ m68k_place_next_arg (struct m68k_args *cum, const_tree type)
     }
   else
     {
+      /* expand_call passes a transparent union as its first field.  */
+      if (RECORD_OR_UNION_TYPE_P (type) && TYPE_TRANSPARENT_AGGR (type))
+	type = TREE_TYPE (first_field (type));
       regno = m68k_arg_regno (cum, TYPE_MODE (type), type);
       len = cum->last_arg_len;
     }
