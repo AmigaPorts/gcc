@@ -263,14 +263,20 @@ __BENAPHORE_INLINE int benaphore_recursive_timedlock(benaphore_recursive_t *__r,
 	return 0;
 }
 
+/* Nothing to do when nobody waits, the usual case.  A waiter joins the
+   queue in the same Forbid() as it releases the lock, so a task that
+   signals with the lock held can't miss it; one that signals without the
+   lock and finds the queue empty signalled before the wait began. */
 __BENAPHORE_INLINE void benaphore_cond_signal(benaphore_cond_t *__c)
 {
-	__benaphore_cond_signal(__c);
+	if (__atomic_load_n(&__c->__head, __ATOMIC_RELAXED))
+		__benaphore_cond_signal(__c);
 }
 
 __BENAPHORE_INLINE void benaphore_cond_broadcast(benaphore_cond_t *__c)
 {
-	__benaphore_cond_broadcast(__c);
+	if (__atomic_load_n(&__c->__head, __ATOMIC_RELAXED))
+		__benaphore_cond_broadcast(__c);
 }
 
 /* Release the lock, which the caller holds, and sleep until signalled; then
