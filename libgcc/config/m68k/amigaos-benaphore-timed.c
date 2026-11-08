@@ -52,23 +52,29 @@ struct timer {
 
 /* 0 with the request ready to send, or ETIMEDOUT if the deadline has
    passed.  The deadline is on the clock of gettimeofday(), as libstdc++'s
-   system_clock and pthreads' are.  */
+   system_clock and pthreads' are.  Seconds and microseconds apart, so that
+   no 64-bit division is needed.  */
 static int
 timer_init (struct timer *t, const benaphore_time_t *deadline)
 {
-  /* tr_time's seconds are 32 bits: wait no more than 68 years.  */
-  const long long max_us = 0x7fffffffLL * 1000000;
   struct MsgPort *p = &t->port;
   struct timeval now;
-  long long us;
+  long long secs;
+  long micro;
 
   gettimeofday (&now, 0);
-  us = (deadline->__sec - now.tv_sec) * 1000000LL
-       + deadline->__nsec / 1000 - now.tv_usec;
-  if (us <= 0)
+  secs = deadline->__sec - now.tv_sec;
+  micro = deadline->__nsec / 1000 - now.tv_usec;
+  if (micro < 0)
+    {
+      micro += 1000000;
+      secs--;
+    }
+  if (secs < 0 || (secs == 0 && micro == 0))
     return ETIMEDOUT;
-  if (us > max_us)
-    us = max_us;
+  /* tr_time's seconds are 32 bits: wait no more than 68 years.  */
+  if (secs > 0x7fffffff)
+    secs = 0x7fffffff;
 
   p->mp_Node.ln_Type = NT_MSGPORT;
   p->mp_Flags = PA_SIGNAL;
@@ -83,8 +89,8 @@ timer_init (struct timer *t, const benaphore_time_t *deadline)
   t->io.tr_node.io_Message.mn_ReplyPort = p;
   t->io.tr_node.io_Command = TR_ADDREQUEST;
   t->io.tr_node.io_Flags = 0;
-  t->io.tr_time.tv_secs = us / 1000000;
-  t->io.tr_time.tv_micro = us % 1000000;
+  t->io.tr_time.tv_secs = secs;
+  t->io.tr_time.tv_micro = micro;
   return 0;
 }
 
