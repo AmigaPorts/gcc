@@ -193,6 +193,7 @@ static rtx m68k_delegitimize_address (rtx);
 extern void m68k_function_arg_advance (cumulative_args_t,
 				       const function_arg_info &);
 extern rtx m68k_function_arg (cumulative_args_t, const function_arg_info &);
+extern rtx m68k_static_chain_rtx (const_tree, bool);
 static bool m68k_cannot_force_const_mem (machine_mode mode, rtx x);
 static bool m68k_output_addr_const_extra (FILE *, rtx);
 static void m68k_init_sync_libfuncs (void) ATTRIBUTE_UNUSED;
@@ -367,6 +368,9 @@ m68k_use_by_pieces_infrastructure_p (unsigned HOST_WIDE_INT size,
 
 #undef TARGET_FUNCTION_ARG_ADVANCE
 #define TARGET_FUNCTION_ARG_ADVANCE m68k_function_arg_advance
+
+#undef TARGET_STATIC_CHAIN
+#define TARGET_STATIC_CHAIN m68k_static_chain_rtx
 
 #undef TARGET_LEGITIMATE_CONSTANT_P
 #define TARGET_LEGITIMATE_CONSTANT_P m68k_legitimate_constant_p
@@ -7285,18 +7289,19 @@ m68k_sched_indexed_address_bypass_p (rtx_insn *pro, rtx_insn *con)
 /* We generate a two-instructions program at M_TRAMP :
 	movea.l &CHAIN_VALUE,%a0
 	jmp FNADDR
-   where %a0 can be modified by changing STATIC_CHAIN_REGNUM.  */
+   where %a0 is the static chain register of FNDECL.  */
 
 static void
 m68k_trampoline_init (rtx m_tramp, tree fndecl, rtx chain_value)
 {
   rtx fnaddr = XEXP (DECL_RTL (fndecl), 0);
   rtx mem;
+  int chain_regno = REGNO (targetm.calls.static_chain (fndecl, false));
 
-  gcc_assert (ADDRESS_REGNO_P (STATIC_CHAIN_REGNUM));
+  gcc_assert (ADDRESS_REGNO_P (chain_regno));
 
   mem = adjust_address (m_tramp, HImode, 0);
-  emit_move_insn (mem, GEN_INT(0x207C + ((STATIC_CHAIN_REGNUM-8) << 9)));
+  emit_move_insn (mem, GEN_INT(0x207C + ((chain_regno-8) << 9)));
   mem = adjust_address (m_tramp, SImode, 2);
   emit_move_insn (mem, chain_value);
 
