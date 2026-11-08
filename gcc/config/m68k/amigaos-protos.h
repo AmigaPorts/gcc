@@ -36,6 +36,9 @@ amigaos_legitimate_src (rtx src);
 extern int
 amigaos_callconv_comp_type_attributes (const_tree type1, const_tree type2);
 
+extern bool
+amigaos_restores_a4_p (void);
+
 extern void
 amigaos_restore_a4 (void);
 

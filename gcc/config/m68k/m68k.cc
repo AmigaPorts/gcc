@@ -1232,8 +1232,7 @@ m68k_save_reg (unsigned int regno, bool interrupt_handler,
 #if defined(TARGET_AMIGAOS)
       /* __saveds, -mrestore-a4 and -malways-restore-a4 load a4 in the
 	 prologue (amigaos_restore_a4): save the caller's.  */
-      if (flag_pic >= 3 && !flag_resident
-	  && (lookup_attribute ("saveds", attrs) || AMIGAOS_RESTORE_A4))
+      if (amigaos_restores_a4_p ())
 	return true;
 #endif
       if (crtl->uses_pic_offset_table)
@@ -1740,6 +1739,13 @@ m68k_ok_for_sibcall_p (tree decl, tree exp)
 
   if (!m68k_is_ok_for_sibcall(decl, exp))
     return false;
+
+#if defined(TARGET_AMIGAOS)
+  /* The sibcall epilogue gives the caller's a4 back before the jump, so
+     the callee would run with the caller's a4 instead of ours.  */
+  if (amigaos_restores_a4_p ())
+    return false;
+#endif
 
   /* We cannot use sibcalls for nested functions because we use the
      static chain register for indirect calls.  */
