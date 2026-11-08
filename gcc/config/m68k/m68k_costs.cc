@@ -797,6 +797,12 @@ m68k_costs_engine (rtx x,
                   }
                 else if (REG_P (a) && REG_P (b))
                     *total = COST_MEM_PLUS_REG_REG;
+                /* A register and a symbol: a 32-bit base displacement in
+                   the full extension format, so no cheaper than (d16,An).
+                   Otherwise a pass that reaches past a pointer to the
+                   register and symbol it was made of sees a gain.  */
+                else if (REG_P (a) && CONSTANT_P (b))
+                    *total = MAX (COST_MEM_PLUS_REG_DISP, COST_MEM_OTHER);
                 else
                     *total = COST_MEM_OTHER;
                 break;
