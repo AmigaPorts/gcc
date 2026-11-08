@@ -112,16 +112,91 @@ struct m68k_args
   tree fntype; /* initial function type */
   bool incoming; /* the current function's own parameters, not a call */
   bool sas; /* assign registers as -msasregparm does */
+  /* For each hard register an argument starts in: the index of that
+     argument and the mode m68k_function_arg gave it, or -1.  */
+  int reg_arg[FIRST_PSEUDO_REGISTER];
+  machine_mode reg_arg_mode[FIRST_PSEUDO_REGISTER];
 };
 
 static struct m68k_args mycum, othercum;
 
 bool m68k_is_ok_for_sibcall(tree decl, tree exp);
 
+/* Whether each register outside ALLOWED that an argument of call EXP,
+   set up in CUM, takes holds the incoming value of a parameter of the
+   current function in that same call-saved register and mode.  The
+   sibcall epilogue restores such a register to its incoming value before
+   the jump, or leaves it alone when the prologue did not save it, and
+   either way it holds the argument.  The registers are those
+   regs_already_used marks and every register a recorded argument spans.
+   An argument of more than one register that reaches outside ALLOWED,
+   such as a _Complex int in d1 and d2, is refused, even when
+   regs_already_used marks only its first register.  */
+
+static bool
+m68k_sibcall_args_are_incoming (const struct m68k_args *cum, tree exp,
+				long allowed)
+{
+  long regs = cum->regs_already_used;
+  for (int regno = 0; regno < FIRST_PSEUDO_REGISTER; regno++)
+    if (cum->reg_arg[regno] >= 0)
+      {
+	int end = regno + hard_regno_nregs (regno, cum->reg_arg_mode[regno]);
+	if (end > FIRST_PSEUDO_REGISTER)
+	  return false;
+	long span = 0;
+	for (int r = regno; r < end; r++)
+	  span |= 1L << r;
+	if (end > regno + 1 && (span & ~allowed))
+	  return false;
+	regs |= span;
+      }
+  regs &= ~allowed;
+  if (regs == 0)
+    return true;
+
+  if (cum->arg_num != call_expr_nargs (exp))
+    return false;
+
+  for (int regno = 0; regno < FIRST_PSEUDO_REGISTER; regno++)
+    {
+      if (!(regs & (1L << regno)))
+	continue;
+
+      int i = cum->reg_arg[regno];
+      machine_mode mode = cum->reg_arg_mode[regno];
+      if (i < 0
+	  || !INT_REGNO_P (regno)
+	  || regno == FRAME_POINTER_REGNUM
+	  || call_used_or_fixed_reg_p (regno)
+	  || GET_MODE_SIZE (mode) > UNITS_PER_WORD)
+	return false;
+
+      tree arg = CALL_EXPR_ARG (exp, i);
+      if (!(INTEGRAL_TYPE_P (TREE_TYPE (arg))
+	    || POINTER_TYPE_P (TREE_TYPE (arg)))
+	  || TREE_CODE (arg) != SSA_NAME
+	  || !SSA_NAME_IS_DEFAULT_DEF (arg)
+	  || !SSA_NAME_VAR (arg)
+	  || TREE_CODE (SSA_NAME_VAR (arg)) != PARM_DECL
+	  || DECL_CONTEXT (SSA_NAME_VAR (arg)) != current_function_decl)
+	return false;
+
+      rtx incoming = DECL_INCOMING_RTL (SSA_NAME_VAR (arg));
+      if (!incoming || !REG_P (incoming)
+	  || REGNO (incoming) != (unsigned) regno
+	  || GET_MODE (incoming) != mode)
+	return false;
+    }
+  return true;
+}
+
 /**
  * Sibcall is only ok, if max regs d0/d1/a0/a1 (and fp0) are used; they are
  * call clobbered and the sibcall epilogue leaves them alone, while any other
- * register may be restored from the stack before the jump.
+ * register may be restored from the stack before the jump.  An argument in
+ * any other register is ok when it is the incoming value of the same
+ * register (m68k_sibcall_args_are_incoming).
  * A target that is not a direct call m68k_symbolic_jump can branch to (an
  * indirect call, or a direct one with -m68000 -fbaserel, -resident or
  * -mpcrel) is loaded into an address register of its own by
@@ -153,7 +228,7 @@ bool m68k_is_ok_for_sibcall(tree decl, tree exp)
 	      = STATIC_CHAIN_REGNUM == A0_REG ? A1_REG : A0_REG;
 	  allowed &= ~(1L << m68k_sibcall_target_regno);
 	}
-      return (cum->regs_already_used & ~allowed) == 0;
+      return m68k_sibcall_args_are_incoming (cum, exp, allowed);
     }
   return false;
 }
@@ -174,6 +249,8 @@ m68k_init_arg_regs (struct m68k_args *cum, const_tree fntype)
   cum->regs_already_used = 0;
   cum->arg_num = 0;
   cum->sas = false;
+  for (int i = 0; i < FIRST_PSEUDO_REGISTER; i++)
+    cum->reg_arg[i] = -1;
 
   if (!fntype)
     return;
@@ -418,6 +495,20 @@ _m68k_function_arg (struct m68k_args * cum, machine_mode mode, const_tree type)
   return 0;
 }
 
+/* Note in CUM that the current argument goes in REG, for
+   m68k_sibcall_args_are_incoming, and return REG.  */
+
+static rtx
+m68k_note_arg_reg (struct m68k_args *cum, rtx reg)
+{
+  if (reg && REG_P (reg) && REGNO (reg) < FIRST_PSEUDO_REGISTER)
+    {
+      cum->reg_arg[REGNO (reg)] = cum->arg_num;
+      cum->reg_arg_mode[REGNO (reg)] = GET_MODE (reg);
+    }
+  return reg;
+}
+
 /* A C expression that controls whether a function argument is passed
  in a register, and which register. */
 
@@ -500,9 +591,10 @@ rtx m68k_function_arg (cumulative_args_t cum_v, const function_arg_info & ai)
 	  cum->regs_already_used |= (1 << (cum->last_arg_reg + i));
 	}
 
-      return gen_rtx_REG (unpromoted_mode, cum->last_arg_reg);
+      return m68k_note_arg_reg (cum, gen_rtx_REG (unpromoted_mode,
+						  cum->last_arg_reg));
     }
-  return _m68k_function_arg (cum, ai.mode, ai.type);
+  return m68k_note_arg_reg (cum, _m68k_function_arg (cum, ai.mode, ai.type));
 }
 
 /* Where the next argument, of type TYPE, goes in the call CUM describes:
