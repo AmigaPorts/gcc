@@ -198,7 +198,8 @@ __BENAPHORE_INLINE void benaphore_recursive_unlock(benaphore_recursive_t *__r)
 }
 
 /* A deadline, on the clock of gettimeofday(): a struct timespec, but the
-   same whatever time_t the C library has. */
+   same whatever time_t the C library has.  __nsec is in [0, 1000000000),
+   as libstdc++ fills it and as pthreads check it. */
 typedef struct {
 	long long __sec;
 	long __nsec;
