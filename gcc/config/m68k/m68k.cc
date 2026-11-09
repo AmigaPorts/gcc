@@ -2138,11 +2138,12 @@ output_dbcc_and_branch (rtx *operands, rtx_code code)
     }
 
   /* If the decrement is to be done in SImode, then we have
-     to compensate for the fact that dbcc decrements in HImode.  */
+     to compensate for the fact that dbcc decrements in HImode.
+     Only a borrow out of the high word, a counter of 0, ends the loop.  */
   switch (GET_MODE (operands[0]))
     {
       case E_SImode:
-        output_asm_insn ("clr%.w %0\n\tsubq%.l #1,%0\n\tjpl %l1", operands);
+        output_asm_insn ("clr%.w %0\n\tsubq%.l #1,%0\n\tjcc %l1", operands);
         break;
 
       case E_HImode:
