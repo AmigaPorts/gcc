@@ -29,6 +29,9 @@
 (define_register_constraint "f" "TARGET_HARD_FLOAT ? FP_REGS : NO_REGS"
   "Floating point register.")
 
+(define_register_constraint "Dz" "TARGET_68020 ? NO_REGS : DATA_REGS"
+  "Data register, for a compare with zero on CPUs without tst.l An.")
+
 (define_constraint "I"
   "Integer constant in the range 1 @dots 8, for immediate shift counts and addq."
   (and (match_code "const_int")
