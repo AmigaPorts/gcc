@@ -1,4 +1,5 @@
 // { dg-do run }
+// { dg-require-stack-size "4*1024*128" }
 // { dg-additional-options "-fstack-protector-strong" { target fstack_protector } }
 // { dg-additional-options "-fstack-clash-protection" { target supports_stack_clash_protection } }
 
