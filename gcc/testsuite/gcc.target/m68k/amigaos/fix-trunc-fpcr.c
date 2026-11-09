@@ -1,5 +1,3 @@
-/* Derived from OpenAmigaGCC's FPCR reproducer.  */
-/* Copyright (C) 2026 Dalsin Limited.  */
 /* Saving FPCR must not overwrite the register indexing the destination.
    The 68040 sequence saves FPCR to a scratch register, switches the
    rounding mode, stores the result and restores FPCR; the scratch

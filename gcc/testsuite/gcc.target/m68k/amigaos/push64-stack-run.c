@@ -1,4 +1,3 @@
-/* Derived from OpenAmigaGCC; Copyright (C) 2026 Dalsin Limited.  */
 /* { dg-do run } */
 /* { dg-options "-Os -fomit-frame-pointer" } */
 /* 64-bit libcall arguments pushed from stack slots (no frame pointer):
