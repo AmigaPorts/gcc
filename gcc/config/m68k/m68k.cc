@@ -213,6 +213,8 @@ static enum flt_eval_method
 m68k_excess_precision (enum excess_precision_type);
 static unsigned int m68k_hard_regno_nregs (unsigned int, machine_mode);
 static bool m68k_hard_regno_mode_ok (unsigned int, machine_mode);
+static reg_class_t m68k_ira_change_pseudo_allocno_class (int, reg_class_t,
+							 reg_class_t);
 static bool m68k_modes_tieable_p (machine_mode, machine_mode);
 static bool m68k_can_change_mode_class (machine_mode, machine_mode,
 				       reg_class_t);
@@ -421,6 +423,10 @@ m68k_use_by_pieces_infrastructure_p (unsigned HOST_WIDE_INT size,
 #define TARGET_HARD_REGNO_NREGS m68k_hard_regno_nregs
 #undef TARGET_HARD_REGNO_MODE_OK
 #define TARGET_HARD_REGNO_MODE_OK m68k_hard_regno_mode_ok
+
+#undef TARGET_IRA_CHANGE_PSEUDO_ALLOCNO_CLASS
+#define TARGET_IRA_CHANGE_PSEUDO_ALLOCNO_CLASS \
+  m68k_ira_change_pseudo_allocno_class
 #undef TARGET_HARD_REGNO_SCRATCH_OK
 #define TARGET_HARD_REGNO_SCRATCH_OK m68k_hard_regno_scratch_ok
 
@@ -6290,6 +6296,24 @@ m68k_hard_regno_mode_ok (unsigned int regno, machine_mode mode)
 	return true;
     }
   return false;
+}
+
+/* Implement TARGET_IRA_CHANGE_PSEUDO_ALLOCNO_CLASS.  No byte instruction
+   takes an address register, so a byte in one must be copied to a data
+   register for every use.  Keep a byte pseudo to the data registers, or
+   memory, which the byte instructions reach: in an address register it
+   needs a data register anyway, and when none is free, as when arguments
+   bound to every data register live across the use, LRA cannot reload
+   it.  */
+
+static reg_class_t
+m68k_ira_change_pseudo_allocno_class (int regno, reg_class_t allocno_class,
+				      reg_class_t best_class ATTRIBUTE_UNUSED)
+{
+  if (GET_MODE_SIZE (PSEUDO_REGNO_MODE (regno)) == 1
+      && (allocno_class == GENERAL_REGS || allocno_class == ADDR_REGS))
+    return DATA_REGS;
+  return allocno_class;
 }
 
 /* Implement TARGET_MODES_TIEABLE_P.  */
