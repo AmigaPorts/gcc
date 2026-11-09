@@ -212,6 +212,19 @@ proc check_effective_target_m68020_runtime { } {
     } "-m68020"]
 }
 
+# Whether the board runs 68881 code: a 68000 board, or a 68020 one
+# without --fpu, traps on the F-line instruction.
+proc check_effective_target_m68881_runtime { } {
+    return [check_runtime m68881_runtime {
+	int main (void)
+	{
+	  double x = 1.0;
+	  __asm__ volatile ("fmove.d %0,fp0" : : "m" (x) : "fp0");
+	  return 0;
+	}
+    } "-m68020 -m68881"]
+}
+
 torture-init
 set-torture-options {
     "-O0" "-O1" "-O2" "-O3" "-Os"

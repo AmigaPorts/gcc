@@ -6510,16 +6510,18 @@ push_parm_decl (const struct c_parm *parm, tree *expr)
         ++asmspec;
        int reg_number = decode_reg_name (asmspec);
 
+       location_t loc = DECL_SOURCE_LOCATION (decl);
+
        /* First detect errors in declaring global registers.  */
        if (reg_number == -1)
-        error ("%Jregister name not specified for %qD", decl, decl);
+        error_at (loc, "register name not specified for %qD", decl);
        else if (reg_number < 0)
-        error ("%Jinvalid register name for %qD", decl, decl);
-       else if (TYPE_MODE (TREE_TYPE (decl)) == BLKmode)
-        error ("%Jdata type of %qD isn%'t suitable for a register", decl, decl);
-       else if (!targetm.hard_regno_mode_ok(reg_number, TYPE_MODE (TREE_TYPE (decl))))
-        error ("%Jregister specified for %qD isn%'t suitable for data type",
-               decl, decl);
+        error_at (loc, "invalid register name for %qD", decl);
+       else if (TYPE_MODE (TREE_TYPE (decl)) == BLKmode
+                || !targetm.hard_regno_mode_ok (reg_number,
+                                                TYPE_MODE (TREE_TYPE (decl))))
+        error_at (loc, "register %qs cannot hold an argument of type %qT",
+                  asmspec, TREE_TYPE (decl));
        /* Now handle properly declared static register variables.  */
        else
         {

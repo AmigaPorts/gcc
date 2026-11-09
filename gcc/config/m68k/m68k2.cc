@@ -328,13 +328,6 @@ m68k_init_cumulative_args (CUMULATIVE_ARGS *cump, tree fntype, tree decl,
   m68k_init_arg_regs (cum, fntype);
   DPRINTF((stderr, "m68k_init_cumulative_args %s %d -> %d\r\n", decl ? lang_hooks.decl_printable_name (decl, 2) : "?", *cump, cum->num_of_regs));
 
-  if (fntype && fntype->base.code == FUNCTION_DECL && DECL_STATIC_CHAIN(fntype))
-    {
-      rtx reg = m68k_static_chain_rtx (decl, 0);
-      if (reg)
-	cum->regs_already_used |= (1 << REGNO(reg));
-    }
-
   if (fntype)
     cum->current_param_type = TYPE_ARG_TYPES(cum->fntype = fntype);
   else
@@ -552,15 +545,28 @@ rtx m68k_function_arg (cumulative_args_t cum_v, const function_arg_info & ai)
       if (!this_arg_type)
         unpromoted_mode = TYPE_MODE(ai.type);
 
-      if (unpromoted_mode == XFmode)
-    	  cum->last_arg_len = 3;
-      else
-      if (unpromoted_mode == DImode || unpromoted_mode == DFmode)
-    	  cum->last_arg_len = 2;
-      else
-    	  cum->last_arg_len = 1;
+      /* A data or address register holds 4 bytes, an FP register a float
+	 of any mode.  */
+      cum->last_arg_len = hard_regno_nregs (cum->last_arg_reg,
+					    unpromoted_mode);
 
       int arg_nregs = hard_regno_nregs (cum->last_arg_reg, ai.mode);
+      location_t loc = cum->current_parm_decl
+		       ? DECL_SOURCE_LOCATION (cum->current_parm_decl)
+		       : input_location;
+
+      /* Without an FPU the FP registers are fixed and no move pattern
+	 reaches them, so LRA would loop on the copy in or out.  BLKmode has
+	 size 0, which hard_regno_mode_ok accepts in any register.  */
+      if ((FP_REGNO_P (cum->last_arg_reg) && !TARGET_HARD_FLOAT)
+	  || unpromoted_mode == BLKmode
+	  || !targetm.hard_regno_mode_ok (cum->last_arg_reg, unpromoted_mode))
+	{
+	  error_at (loc, "register %qs cannot hold an argument of type %qT",
+		    reg_names[cum->last_arg_reg],
+		    TYPE_MAIN_VARIANT (ai.type));
+	  return 0;
+	}
 
       /* The frame pointer is eliminated later, so an explicit argument
 	 binding to it would be rewritten to SP.  An incoming single-register
@@ -573,9 +579,6 @@ rtx m68k_function_arg (cumulative_args_t cum_v, const function_arg_info & ai)
 	    || (cum->last_arg_reg + i == STACK_POINTER_REGNUM
 		&& (!cum->incoming || span > 1)))
 	  {
-	    location_t loc = cum->current_parm_decl
-			     ? DECL_SOURCE_LOCATION (cum->current_parm_decl)
-			     : input_location;
 	    error_at (loc, "register %qs is reserved for the frame or stack pointer",
 		      reg_names[cum->last_arg_reg + i]);
 	    return 0;
@@ -597,21 +600,32 @@ rtx m68k_function_arg (cumulative_args_t cum_v, const function_arg_info & ai)
   return m68k_note_arg_reg (cum, _m68k_function_arg (cum, ai.mode, ai.type));
 }
 
+/* The register a parameter of type TYPE is bound to with __asm, or -1,
+   and in *NREGS the number of registers from it that the argument takes,
+   as m68k_function_arg counts them.  */
+
+static int
+m68k_asmreg_param_regno (const_tree type, int *nregs)
+{
+  tree asmtree = lookup_attribute ("asmreg", TYPE_ATTRIBUTES (type));
+
+  if (!asmtree)
+    return -1;
+  int regno = TREE_INT_CST_LOW (TREE_VALUE (TREE_VALUE (asmtree)));
+  *nregs = hard_regno_nregs (regno, TYPE_MODE (type));
+  return regno;
+}
+
 /* Where the next argument, of type TYPE, goes in the call CUM describes:
    its register, or -1 for the stack.  Advances CUM past it.  */
 
 static int
 m68k_place_next_arg (struct m68k_args *cum, const_tree type)
 {
-  tree asmtree = lookup_attribute ("asmreg", TYPE_ATTRIBUTES (type));
-  int regno, len;
+  int len = 0;
+  int regno = m68k_asmreg_param_regno (type, &len);
 
-  if (asmtree)
-    {
-      regno = TREE_INT_CST_LOW (TREE_VALUE (TREE_VALUE (asmtree)));
-      len = TYPE_MODE (type) == DImode ? 2 : 1;
-    }
-  else
+  if (regno == -1)
     {
       regno = m68k_arg_regno (cum, TYPE_MODE (type), type);
       len = cum->last_arg_len;
@@ -887,35 +901,35 @@ m68k_handle_type_attribute (tree *node, tree name, tree args, int flags ATTRIBUT
   return NULL_TREE ;
 }
 
+/* TARGET_STATIC_CHAIN.  The static chain goes in the first of
+   STATIC_CHAIN_REGNUM, a0, a1, a2, a3 and a6 that no argument of the
+   function takes, as its type places them: __asm bindings with every
+   register they span, -mregparm registers and the struct value register.
+   A call through a trampoline places the arguments by the type alone, so
+   the chain must not move them.  */
+
 rtx
-m68k_static_chain_rtx (const_tree decl, bool incoming ATTRIBUTE_UNUSED)
+m68k_static_chain_rtx (const_tree fndecl_or_type,
+		       bool incoming ATTRIBUTE_UNUSED)
 {
-  if (!decl || !DECL_STATIC_CHAIN(decl))
-    return 0;
+  static const int candidates[] = {
+    STATIC_CHAIN_REGNUM, A0_REG, A1_REG, A0_REG + 2, A0_REG + 3, A0_REG + 6
+  };
+  const_tree fntype = DECL_P (fndecl_or_type) ? TREE_TYPE (fndecl_or_type)
+					     : fndecl_or_type;
+  struct m68k_args cum;
 
-  unsigned used = 0;
-  tree fntype = TREE_TYPE(decl);
-  if (fntype)
-    for (tree current_param_type = TYPE_ARG_TYPES(fntype); current_param_type; current_param_type = TREE_CHAIN(current_param_type))
-      {
-	tree asmtree = TYPE_ATTRIBUTES(TREE_VALUE(current_param_type));
-	if (!asmtree || strcmp ("asmreg", IDENTIFIER_POINTER(TREE_PURPOSE(asmtree))))
-	  continue;
+  m68k_init_arg_regs (&cum, fntype);
+  for (const_tree arg = TYPE_ARG_TYPES (fntype);
+       arg && TREE_VALUE (arg) != void_type_node; arg = TREE_CHAIN (arg))
+    m68k_place_next_arg (&cum, TREE_VALUE (arg));
 
-	unsigned regno = TREE_INT_CST_LOW(TREE_VALUE(TREE_VALUE(asmtree)));
-	used |= 1 << regno;
-      }
+  for (unsigned i = 0; i < ARRAY_SIZE (candidates); i++)
+    if (!(cum.regs_already_used & (1 << candidates[i])))
+      return gen_rtx_REG (Pmode, candidates[i]);
 
-  if (!(used & (1 << 9)))
-    return gen_rtx_REG (Pmode, 9);
-  if (!(used & (1 << 10)))
-    return gen_rtx_REG (Pmode, 10);
-  if (!(used & (1 << 11)))
-    return gen_rtx_REG (Pmode, 11);
-  if (!(used & (1 << 14)))
-    return gen_rtx_REG (Pmode, 14);
-
-  return 0;
+  error ("no address register is free for the static chain");
+  return gen_rtx_REG (Pmode, STATIC_CHAIN_REGNUM);
 }
 
 static unsigned HOST_WIDE_INT
