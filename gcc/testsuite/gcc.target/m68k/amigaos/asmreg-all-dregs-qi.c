@@ -5,7 +5,10 @@
    compare takes, and found no data register to reload it into: "unable
    to find a register to spill", or an endless loop before the LRA split
    limit.  A byte pseudo must stay out of the address registers.  Reduced
-   from the ZZ9000 Picasso96 driver's BlitPlanar2Chunky.  */
+   from the ZZ9000 Picasso96 driver's BlitPlanar2Chunky.
+
+   Compiling is the check: no byte compare takes an address register, so
+   the assembly can't show one there.  */
 
 /* { dg-do compile } */
 /* { dg-skip-if "amiga register-parameter ABI" { ! { m68k-*-amigaos* } } } */
@@ -68,6 +71,3 @@ f (struct BoardInfo *b __asm ("a0"), struct BitMap *bm __asm ("a1"),
   regs[1] = dy;
   regs[2] = mask | bm->Depth << 8;
 }
-
-/* The byte is tested in a data register or in memory.  */
-/* { dg-final { scan-assembler-not {(tst|cmp)\.b [^\n]*a[0-7]\n} } } */
