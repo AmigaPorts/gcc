@@ -8,6 +8,7 @@
 #include <benaphore.h>
 
 benaphore_t b;
+benaphore_recursive_t r;
 
 void
 lock (void)
@@ -21,7 +22,21 @@ unlock (void)
   benaphore_unlock (&b);
 }
 
+void
+rlock (void)
+{
+  benaphore_recursive_lock (&r);
+}
+
+void
+runlock (void)
+{
+  benaphore_recursive_unlock (&r);
+}
+
 /* { dg-final { scan-assembler "lea _b,a0\n\tjra \"@__benaphore_lock_slow\"" } } */
 /* { dg-final { scan-assembler "lea _b,a0\n\tjra \"@__benaphore_wake\"" } } */
+/* { dg-final { scan-assembler "lea _r,a0\n\tjsr \"@__benaphore_recursive_lock_slow\"" } } */
+/* { dg-final { scan-assembler "lea _r,a0\n\tjra \"@__benaphore_recursive_wake\"" } } */
 /* { dg-final { scan-assembler-not "___benaphore" } } */
 /* { dg-final { scan-assembler-not "\[0-7\]@__benaphore" } } */
