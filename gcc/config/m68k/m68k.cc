@@ -4731,6 +4731,39 @@ find_addr_reg (rtx addr)
   return addr;
 }
 
+/* Whether X is the stack, frame or argument pointer, or a virtual
+   register that becomes one of them.  */
+
+static bool
+m68k_frame_base_reg_p (rtx x)
+{
+  if (!REG_P (x))
+    return false;
+  unsigned int regno = REGNO (x);
+  return (regno == STACK_POINTER_REGNUM
+	  || regno == FRAME_POINTER_REGNUM
+	  || regno == HARD_FRAME_POINTER_REGNUM
+	  || regno == ARG_POINTER_REGNUM
+	  || VIRTUAL_REGISTER_NUM_P (regno));
+}
+
+/* Whether an SImode add may set OPERANDS[0].  Before register
+   allocation, an add of a frame base register into memory is done in a
+   register and stored.  An add into memory takes that memory as an
+   input, so the allocators would reload the base register and the
+   offset separately; set into a register, (plus (frame) (const_int))
+   is folded into one address by register elimination.  */
+
+bool
+m68k_add_dest_ok_p (rtx *operands)
+{
+  return (!MEM_P (operands[0])
+	  || !can_create_pseudo_p ()
+	  || lra_in_progress
+	  || !(m68k_frame_base_reg_p (operands[1])
+	       || m68k_frame_base_reg_p (operands[2])));
+}
+
 /* Output assembler code to perform a 32-bit 3-operand add.  */
 
 const char *
