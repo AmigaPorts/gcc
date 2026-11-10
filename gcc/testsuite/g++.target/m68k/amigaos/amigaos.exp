@@ -23,20 +23,6 @@ if { ![istarget m68k-*-amigaos*] } {
     return
 }
 
-# Whether bits/gthr.h is the amigaos thread model's: only a gcc configured
-# with --enable-threads=amigaos installs it.  THREADS=no installs the single
-# model and THREADS=posix gthr-posix.h, which here have no condition
-# variables.  gcc.target/m68k/amigaos/amigaos.exp has the same check for C,
-# by libgcc instead of the header.
-proc check_effective_target_amigaos_gthreads { } {
-    return [check_no_compiler_messages amigaos_gthreads assembly {
-	#include <bits/gthr.h>
-	#ifndef _GLIBCXX_GCC_GTHR_AMIGAOS_H
-	#error not the amigaos thread model
-	#endif
-    }]
-}
-
 dg-init
 
 dg-runtest [lsort [glob -nocomplain $srcdir/$subdir/*.C]] "" ""
