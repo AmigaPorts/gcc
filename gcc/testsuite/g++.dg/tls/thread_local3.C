@@ -1,6 +1,6 @@
 // thread_local is not per thread with the single thread model: emutls has
 // one copy per program and the destructors run at exit.
-// { dg-do run { xfail m68k-*-amigaos* } }
+// { dg-do run { xfail { m68k-*-amigaos* && { ! amigaos_gthreads } } } }
 // { dg-require-effective-target c++11 }
 // { dg-require-effective-target tls_runtime }
 // { dg-require-effective-target pthread }

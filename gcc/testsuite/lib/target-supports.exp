@@ -10729,6 +10729,20 @@ proc check_effective_target_clib2 {} {
     }]
 }
 
+# Return true if gcc has m68k-amigaos's own thread model: libgcc has its
+# key code only with --enable-threads=amigaos.  The single thread model
+# keeps one copy of each thread_local per program.
+
+proc check_effective_target_amigaos_gthreads {} {
+    if { ![istarget m68k-*-amigaos*] } {
+	return 0
+    }
+    return [check_no_compiler_messages amigaos_gthreads executable {
+	extern const void *const *__gthread_amigaos_values;
+	int main (void) { return !__gthread_amigaos_values; }
+    }]
+}
+
 # Return true if GCC was configured with --enable-newlib-nano-formatted-io
 proc check_effective_target_newlib_nano_io { } {
     return [check_configured_with "--enable-newlib-nano-formatted-io"]
