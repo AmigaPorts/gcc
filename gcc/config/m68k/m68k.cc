@@ -6222,11 +6222,21 @@ m68k_unsaved_call_saved_reg_p (unsigned int regno)
 
 /* Implement TARGET_HARD_REGNO_SCRATCH_OK.  peephole2 may take a dead
    register as scratch, and an argument register is dead after its last
-   read even where it is not saved.  */
+   read even where it is not saved.
+
+   An interrupt handler saves only the registers it uses.  EPILOGUE_USES
+   keeps every other register live on a path to the return, but not in a
+   block that never returns, such as a for (;;) loop, so the handler may
+   take only a register it already uses, as in m68k_hard_regno_rename_ok.  */
 
 static bool
 m68k_hard_regno_scratch_ok (unsigned int regno)
 {
+  if (m68k_get_function_kind (current_function_decl)
+      == m68k_fk_interrupt_handler
+      && !df_regs_ever_live_p (regno))
+    return false;
+
   return !m68k_unsaved_call_saved_reg_p (regno);
 }
 
