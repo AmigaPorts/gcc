@@ -213,7 +213,8 @@ extern const void *const *__gthread_amigaos_values;
 __GTHREAD_INLINE void *
 __gthread_getspecific (__gthread_key_t __key)
 {
-  return (void *) __gthread_amigaos_values[__key];
+  /* Through an integer: the const is __gthread_setspecific()'s.  */
+  return (void *) (__UINTPTR_TYPE__) __gthread_amigaos_values[__key];
 }
 
 /* Condition variables and timed waits are <benaphore.h>'s.  */
