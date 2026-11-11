@@ -121,7 +121,7 @@ amigaos_handle_type_attribute (tree *node, tree name, tree args ATTRIBUTE_UNUSED
 	    {
 	      if (lookup_attribute ("interrupt", TYPE_ATTRIBUTES(nnn)))
 		{
-		  error ("%'stackext%' and %'interrupt%' are mutually exclusive");
+		  error ("%<stackext%> and %<interrupt%> are mutually exclusive");
 		  break;
 		}
 	    }
@@ -129,19 +129,19 @@ amigaos_handle_type_attribute (tree *node, tree name, tree args ATTRIBUTE_UNUSED
 	    {
 	      if (flag_pic < 3)
 		{
-		  warning (OPT_Wattributes, "%'%s%' attribute is only usable with fbaserel", IDENTIFIER_POINTER(name));
+		  warning (OPT_Wattributes, "%qs attribute is only usable with fbaserel", IDENTIFIER_POINTER(name));
 		}
 	      else
 	      if (flag_resident)
 		{
-		  error ("%'saveds%' cannot be used with resident");
+		  error ("%<saveds%> cannot be used with resident");
 		}
 	    }
 	  else if (is_attribute_p ("entrypoint", name))
 	    {
 	      if (lookup_attribute ("saveallregs", TYPE_ATTRIBUTES(nnn)))
 		{
-		  error ("%'entrypoint%' and %'saveallregs%' are mutually exclusive");
+		  error ("%<entrypoint%> and %<saveallregs%> are mutually exclusive");
 		  break;
 		}
 	    }
@@ -149,13 +149,13 @@ amigaos_handle_type_attribute (tree *node, tree name, tree args ATTRIBUTE_UNUSED
 	    {
 	      if (lookup_attribute ("entrypoint", TYPE_ATTRIBUTES(nnn)))
 		{
-		  error ("%'entrypoint%' and %'saveallregs%' are mutually exclusive");
+		  error ("%<entrypoint%> and %<saveallregs%> are mutually exclusive");
 		  break;
 		}
 	    }
 	  else
 	    {
-	      warning (OPT_Wattributes, "%'%s%' attribute only applies to data", IDENTIFIER_POINTER(name));
+	      warning (OPT_Wattributes, "%qs attribute only applies to data", IDENTIFIER_POINTER(name));
 	    }
 	}
       else
@@ -166,7 +166,7 @@ amigaos_handle_type_attribute (tree *node, tree name, tree args ATTRIBUTE_UNUSED
 	    }
 	  else
 	    {
-	      warning (OPT_Wattributes, "%'%s%' attribute only applies to functions", IDENTIFIER_POINTER(name));
+	      warning (OPT_Wattributes, "%qs attribute only applies to functions", IDENTIFIER_POINTER(name));
 	    }
 	}
       return NULL_TREE ;
@@ -223,8 +223,13 @@ amigaos_mangle_decl_assembler_name (tree decl, tree id)
   if (!regs)
     return id;
   const char *name = IDENTIFIER_POINTER (id);
-  id = get_identifier (sas ? ACONCAT (("@", name, NULL))
-		       : ACONCAT (("_", regs, "@", name, NULL)));
+  /* Not in get_identifier's argument, which it evaluates twice.  */
+  const char *mangled;
+  if (sas)
+    mangled = ACONCAT (("@", name, NULL));
+  else
+    mangled = ACONCAT (("_", regs, "@", name, NULL));
+  id = get_identifier (mangled);
   free (regs);
   return id;
 }
@@ -287,13 +292,13 @@ amigaos_insert_attribute (tree decl, tree * attr)
     {
       if (TREE_TYPE(decl)->base.code == VAR_DECL)
 	{
-	  error ("%'%s%' attribute can only be specified for variables", IDENTIFIER_POINTER(name));
+	  error ("%qs attribute can only be specified for variables", IDENTIFIER_POINTER(name));
 	  return;
 	}
 
       if (! TREE_STATIC (decl) && ! DECL_EXTERNAL (decl))
 	{
-	  error ("%'%s%' attribute cannot be specified for local variables", IDENTIFIER_POINTER(name));
+	  error ("%qs attribute cannot be specified for local variables", IDENTIFIER_POINTER(name));
 	  return;
 	}
 
@@ -302,9 +307,8 @@ amigaos_insert_attribute (tree decl, tree * attr)
 	section_name = AMIGA_CHIP_SECTION_NAME;
       else if (is_attribute_p("fast", name))
 	section_name = AMIGA_FAST_SECTION_NAME;
-      else if (is_attribute_p("far", name))
+      else
 	section_name = AMIGA_FAR_SECTION_NAME;
-
 
       /* The decl may have already been given a section attribute from
 	     a previous declaration.  Ensure they match.  */
@@ -313,7 +317,7 @@ amigaos_insert_attribute (tree decl, tree * attr)
       else if (strcmp (DECL_SECTION_NAME (decl), section_name) )
 	{
 	  error_at (DECL_SOURCE_LOCATION(decl),
-		  "%'%s%' attribute conflicts with previous declaration", IDENTIFIER_POINTER(name));
+		  "%qs attribute conflicts with previous declaration", IDENTIFIER_POINTER(name));
 	}
     }
   else

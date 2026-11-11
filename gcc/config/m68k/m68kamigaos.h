@@ -721,7 +721,7 @@ extern void amigaos_postlink_hook (const char *);
    *address* of "strip_flag" variable.  */
 
 #define COLLECT2_PRELINK_HOOK(LD1_ARGV, STRIP) \
-amigaos_prelink_hook((const char **)(LD1_ARGV), (STRIP))
+amigaos_prelink_hook(const_cast<const char **> (LD1_ARGV), (STRIP))
 
 /* This macro is called just after the first linker invocation, in place of
    "nm" and "ldd".  OUTPUT_FILE is the executable's filename.  */
