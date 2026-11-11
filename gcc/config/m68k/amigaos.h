@@ -184,11 +184,11 @@ do									\
     if (flag_resident)							\
       {									\
         if (flag_pic)							\
-	  error ("%'-fbaserel%' and %'-resident%' are mutual exclusiv");	\
+	  error ("%<-fbaserel%> and %<-resident%> are mutually exclusive");	\
         flag_pic = flag_resident;					\
       }									\
     if (!TARGET_68020 && flag_pic==4)					\
-      error ("%'-fbaserel32%' is not supported on the 68000 or 68010");	\
+      error ("%<-fbaserel32%> is not supported on the 68000 or 68010");	\
     /* flag_pic 1 and 2 are the generic -fpic/-fPIC (and -fpie/-fPIE);	\
        the hunk linker has no GOT, so only the a4-relative modes 3 and 4 \
        above are valid; the generic ones are warned about and dropped,	\
@@ -197,8 +197,8 @@ do									\
        through.  */							\
     if ((flag_pic == 1 || flag_pic == 2) && !TARGET_PCREL)		\
       {								\
-	warning (0, "%'-fpic%', %'-fPIC%' and %'-fpie%' are not supported on " \
-		 "this target and are ignored, use %'-fbaserel%' instead"); \
+	warning (0, "%<-fpic%>, %<-fPIC%> and %<-fpie%> are not supported on " \
+		 "this target and are ignored, use %<-fbaserel%> instead"); \
 	flag_pic = flag_pie = 0;					\
       }								\
     /* finish_options sets flag_shlib for any flag_pic, which makes	\

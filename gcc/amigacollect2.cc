@@ -153,7 +153,7 @@ amigaos_libname_hook (const char *arg)
     {
       const char *lib;
 
-      ((char*)arg)[len - 2] = '\0';
+      const_cast<char *> (arg)[len - 2] = '\0';
       lib = strrchr(arg, '/');
       if (lib == NULL)
 	lib = strrchr(arg, ':');
@@ -161,7 +161,7 @@ amigaos_libname_hook (const char *arg)
 	lib = arg - 1;
       if (!strncmp(lib + 1, "lib", 3))
 	add_lib(lib + 4);
-      ((char *)arg)[len - 2] = '.';
+      const_cast<char *> (arg)[len - 2] = '.';
     }
 }
 
@@ -253,7 +253,7 @@ amigaos_prelink_hook (const char **ld1_argv, int *strip_flag)
 	      const char *libname;
 	      int substituted=0;
 
-	      ((char *)(*ld1))[len - 2] = '\0';
+	      const_cast<char *> (*ld1)[len - 2] = '\0';
 	      libname = strrchr(*ld1, '/');
 	      if (libname == NULL)
 		libname = strrchr(*ld1, ':');
@@ -273,7 +273,7 @@ amigaos_prelink_hook (const char **ld1_argv, int *strip_flag)
 		      break;
 		    }
 	      if (!substituted)
-		((char *)(*ld1))[len - 2] = '.';
+		const_cast<char *> (*ld1)[len - 2] = '.';
 	    }
 	  else if (strcmp(ld1[0], "-m")==0 && ld1[1]
 		   && strcmp(ld1[1], "amiga_bss")==0)
@@ -304,7 +304,7 @@ amigaos_prelink_hook (const char **ld1_argv, int *strip_flag)
       fclose(out);
       fclose(x);
       argv[0]=c_file_name;
-      fork_execute("gcc", (char **)argv, false, NULL);
+      fork_execute("gcc", const_cast<char **> (argv), false, NULL);
 
       /* Unfortunately, unlike "-s", "-T" cannot be specified as the last
 	 argument. We put it after "-L" args.  */
@@ -345,5 +345,5 @@ amigaos_postlink_hook (const char *output_file)
     }
   else
     argv[1]=output_file;
-  fork_execute("postlink", (char **)argv, false, NULL);
+  fork_execute("postlink", const_cast<char **> (argv), false, NULL);
 }

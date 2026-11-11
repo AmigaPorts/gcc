@@ -73,10 +73,6 @@
 #include "toplev.h"
 #include "df.h"
 
-
-/* This file should be included last.  */
-#include "target-def.h"
-
 //#define MYDEBUG 1
 #ifdef MYDEBUG
 #define DPRINTF(x) fprintf x;
@@ -828,7 +824,7 @@ m68k_handle_type_attribute (tree *node, tree name, tree args, int flags ATTRIBUT
 
 	      if (lookup_attribute ("stkparm", TYPE_ATTRIBUTES(nnn)))
 		{
-		  error ("%'regparm%' and %'stkparm%' aka %'__stdargs%' are mutually exclusive");
+		  error ("%<regparm%> and %<stkparm%> aka %<__stdargs%> are mutually exclusive");
 		  break;
 		}
 	      if (args && TREE_CODE (args) == TREE_LIST)
@@ -840,14 +836,14 @@ m68k_handle_type_attribute (tree *node, tree name, tree args, int flags ATTRIBUT
 		      unsigned no = TREE_INT_CST_LOW(val);
 		      if (no > M68K_MAX_REGPARM)
 			{
-			  error ("%'regparm%' attribute: value %d not in [0 - %d]", no,
+			  error ("%<regparm%> attribute: value %d not in [0 - %d]", no,
 			  M68K_MAX_REGPARM);
 			  break;
 			}
 		    }
 		  else
 		    {
-		      error ("invalid argument(s) to %'regparm%' attribute");
+		      error ("invalid argument(s) to %<regparm%> attribute");
 		      break;
 		    }
 		}
@@ -856,13 +852,13 @@ m68k_handle_type_attribute (tree *node, tree name, tree args, int flags ATTRIBUT
 	    {
 	      if (lookup_attribute ("regparm", TYPE_ATTRIBUTES(nnn)))
 		{
-		  error ("%'regparm%' and %'stkparm%' aka %'__stdargs%' are mutually exclusive");
+		  error ("%<regparm%> and %<stkparm%> aka %<__stdargs%> are mutually exclusive");
 		  break;
 		}
 	    }
 	  else
 	    {
-	      warning (OPT_Wattributes, "%'%s%' attribute only applies to data", IDENTIFIER_POINTER(name));
+	      warning (OPT_Wattributes, "%qs attribute only applies to data", IDENTIFIER_POINTER(name));
 	    }
 	}
       else
@@ -877,20 +873,20 @@ m68k_handle_type_attribute (tree *node, tree name, tree args, int flags ATTRIBUT
 		      unsigned no = TREE_INT_CST_LOW(val);
 		      if (no >= 23)
 			{
-			  error ("%'asmreg%' attribute: value %d not in [0 - 23]", no);
+			  error ("%<asmreg%> attribute: value %d not in [0 - 23]", no);
 			  break;
 			}
 		    }
 		  else
 		    {
-		      error ("invalid argument(s) to %'asmreg%' attribute");
+		      error ("invalid argument(s) to %<asmreg%> attribute");
 		      break;
 		    }
 		}
 	    }
 	  else
 	    {
-	      warning (OPT_Wattributes, "%'%s%' attribute only applies to functions", IDENTIFIER_POINTER(name));
+	      warning (OPT_Wattributes, "%qs attribute only applies to functions", IDENTIFIER_POINTER(name));
 	    }
 	}
       return NULL_TREE ;
@@ -933,7 +929,7 @@ m68k_static_chain_rtx (const_tree fndecl_or_type,
 }
 
 static unsigned HOST_WIDE_INT
-get_env_uint (char const * name, unsigned HOST_WIDE_INT dflt)
+get_env_uint (char const * name ATTRIBUTE_UNUSED, unsigned HOST_WIDE_INT dflt)
 {
 #if M68K_SWITCHES_MODE
   unsigned HOST_WIDE_INT r;
