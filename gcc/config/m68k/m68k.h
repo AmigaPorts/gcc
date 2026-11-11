@@ -630,8 +630,9 @@ extern int m68k_function_arg_reg(unsigned regno);
    The function definition just permits use of "asm with operands"
    (though the operand list is empty).  */
 #define TRANSFER_FROM_TRAMPOLINE				\
+void __transfer_from_trampoline (void);				\
 void								\
-__transfer_from_trampoline ()					\
+__transfer_from_trampoline (void)				\
 {								\
   register char *a0 asm (M68K_STATIC_CHAIN_REG_NAME);		\
   asm (GLOBAL_ASM_OP "___trampoline");				\

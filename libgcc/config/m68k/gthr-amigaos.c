@@ -83,7 +83,8 @@ static const void *no_values[KEYS_MAX];
 const void *const *__gthread_amigaos_values = no_values;
 
 #define BLOCK(v) \
-  ((struct key_block *) ((char *) (v) - offsetof (struct key_block, values)))
+  ((struct key_block *) ((__UINTPTR_TYPE__) (v) \
+			 - offsetof (struct key_block, values)))
 
 /* The blocks, the free ones and how many of those are kept for threads
    that are starting, and whether the program has started a task, under
@@ -349,7 +350,7 @@ __gthread_amigaos_end_keys (struct Task *me)
       for (i = KEYS_MAX - 1; i >= 0; i--)
 	{
 	  void (*destroy) (void *) = key_destroy[i];
-	  void *value = (void *) b->values[i];
+	  void *value = (void *) (__UINTPTR_TYPE__) b->values[i];
 
 	  if (value && destroy && key_used[i])
 	    {

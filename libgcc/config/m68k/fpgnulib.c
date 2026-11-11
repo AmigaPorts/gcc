@@ -57,6 +57,7 @@
 double __floatunsidf (unsigned long);
 double __floatsidf (long);
 float __floatsisf (long);
+float __floatunsisf (unsigned long);
 double __extendsfdf2 (float);
 float __truncdfsf2 (double);
 long __fixdfsi (double);
@@ -1494,7 +1495,9 @@ __negxf2 (long double x1)
 
 #else /* EXTFLOATCMP */
 
-/* Compare two long doubles.  Returns:
+#ifdef __CMPXF2
+/* Compare two long doubles, for __cmpxf2, which the other comparisons call.
+   Returns:
    0 if a == b
    1 if a > b
   -1 if a < b
@@ -1548,7 +1551,6 @@ __xfcmp (long double a, long double b)
   return xsign ? -mag : mag;
 }
 
-#ifdef __CMPXF2
 long
 __cmpxf2 (long double x1, long double x2)
 {

@@ -71,16 +71,6 @@ int VertBServer(struct profile_data * p __asm("a1"));
 extern const char _stext;
 extern const char _etext;
 
-#if 0
-asm ("
-	.globl	mcount
-mcount:	movel	a1,-(sp)	| Save A1 as it might be used to store the
-	bsr	__mcount	| address of a structure
-	movel	(sp)+,a1
-	rts
-");
-#endif
-
 void moncontrol(int mode);
 
 static unsigned int	*store_last_pc;
@@ -244,7 +234,11 @@ __saveallregs void mcount(void)
 	selfpc = (char *) __builtin_return_address (0);
 	/* frompcindex = pc in preceding frame.
 	   This identifies the caller of the function just entered.  */
+	/* Deliberately the caller's caller, which the call graph needs.  */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wframe-address"
 	frompcindex = (void *) __builtin_return_address (1);
+#pragma GCC diagnostic pop
 	/*
 	 *	check that we are profiling
 	 *	and that we aren't recursively invoked.
@@ -400,7 +394,7 @@ int VertBServer(struct profile_data * p __asm("a1")) {
 }
 
 int profil(char *buf, size_t bufsiz,
-                  size_t offset, unsigned int scale) {
+                  size_t offset, unsigned int /*scale*/) {
   if (buf) {
       // install interrupt if not running
       if (vbdata.data)
@@ -412,7 +406,8 @@ int profil(char *buf, size_t bufsiz,
 
       vbint.is_Node.ln_Type = NT_INTERRUPT;         /* Initialize the node. */
       vbint.is_Node.ln_Pri = 20;
-      vbint.is_Node.ln_Name = "gcc profiler";
+      static char name[] = "gcc profiler";
+      vbint.is_Node.ln_Name = name;
       vbint.is_Data = (APTR)&vbdata;
       vbint.is_Code = (void(*)(void))VertBServer;
 
