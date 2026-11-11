@@ -1,6 +1,7 @@
 /* { dg-do run } */
 /* { dg-shouldfail "the libraries are older than __oslibversion" } */
 /* { dg-skip-if "ixemul opens no libraries for the program" { *-*-* } { "-mcrt=ixemul" } { "" } } */
+/* { dg-skip-if "clib2 has no __oslibversion" { *-*-* } { "-mcrt=clib2" } { "" } } */
 
 /* A program that asks for newer libraries than the system has, with
    __oslibversion, must not start: the startup code names the libraries it
