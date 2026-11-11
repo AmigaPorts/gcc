@@ -6116,12 +6116,16 @@ allocate_reload_reg (class insn_chain *chain ATTRIBUTE_UNUSED, int r,
 
       /**
        * SBF: This is an REG_INC for the same reg in in/out.
-       * Use the last_spill_reg.
+       * Use the last_spill_reg: i holds it, and count < n_spills tells the
+       * code below one was found.
        */
       if (r == 1 && rld->in == rld->out && rld->in == rld[1].in
           && rld->rclass == rld[1].rclass
           && rld->when_needed == RELOAD_OTHER && rld[1].when_needed == RELOAD_FOR_OPERAND_ADDRESS)
-	break;
+	{
+	  count = 0;
+	  break;
+	}
 
       for (count = 0; count < n_spills; count++)
 	{
