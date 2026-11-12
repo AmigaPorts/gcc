@@ -950,9 +950,16 @@ get_env_uint (char const * name ATTRIBUTE_UNUSED, unsigned HOST_WIDE_INT dflt)
 bool
 m68k_use_by_pieces_infrastructure_p (unsigned HOST_WIDE_INT size,
                                      unsigned int align ATTRIBUTE_UNUSED,
-                                     enum by_pieces_operation op ATTRIBUTE_UNUSED,
+                                     enum by_pieces_operation op,
                                      bool speed_p)
 {
+  /* From the 68020 on, m68k_emit_movmemsi copies a byte aligned block
+     with long moves through (An)+.  The pieces would be single bytes,
+     each followed by an add to its pointer, and fwprop can fold the
+     first add into the next address before auto_inc_dec pairs them.  */
+  if (op == MOVE_BY_PIECES && speed_p && align < 16 && TARGET_68020)
+    return false;
+
   /* ALIGN is in bits.  Word alignment is as good as long alignment for
      the pieces, and nothing beyond a long helps: a 16384-byte aligned
      struct must not turn a 48 KB memset into thousands of stores
