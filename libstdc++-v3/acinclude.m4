@@ -1817,6 +1817,11 @@ AC_DEFUN([GLIBCXX_ENABLE_LIBSTDCXX_TIME], [
         ac_has_nanosleep=yes
         ac_has_sched_yield=yes
         ;;
+      amigaos*)
+        # _GLIBCXX_USE_SCHED_YIELD only makes the headers call
+        # __gthread_yield(), which the AmigaOS thread models provide.
+        ac_has_sched_yield=yes
+        ;;
       uclinux*)
         ac_has_nanosleep=yes
         ac_has_sched_yield=yes
