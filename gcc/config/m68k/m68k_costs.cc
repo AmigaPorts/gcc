@@ -894,6 +894,17 @@ m68k_costs_engine (rtx x, machine_mode mode, int outer_code,
         if (outer_code == COMPARE && GET_CODE (XEXP (x, 1)) == CONST_INT && INTVAL (XEXP (x, 1)) == 1) {
             *total = 2; return true;
         }
+        /* FALLTHRU */
+      case SIGN_EXTRACT:
+        /* bfextu/bfexts on a register: no cheaper than the pair of shifts
+           it stands for.  Unpriced, it costs no more than its operands, and
+           combine turns a byte taken from a shift into a bitfield extract,
+           which takes several times as long on the 68040.  */
+        if (REG_P (XEXP (x, 0)) || SUBREG_P (XEXP (x, 0)))
+          {
+            *total = 2 * COST_SHIFT_CONST;
+            return true;
+          }
         return false;
       case POST_INC:
       case TRUNCATE:
