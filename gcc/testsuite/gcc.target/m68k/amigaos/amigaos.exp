@@ -242,6 +242,18 @@ proc check_effective_target_m68881_runtime { } {
     } "-m68020 -m68881"]
 }
 
+# Whether the board has a battclock.resource: a simulator may provide no
+# resources at all.
+proc check_effective_target_amigaos_battclock { } {
+    return [check_runtime amigaos_battclock {
+	#include <proto/exec.h>
+	int main (void)
+	{
+	  return OpenResource ("battclock.resource") == 0;
+	}
+    }]
+}
+
 torture-init
 set-torture-options {
     "-O0" "-O1" "-O2" "-O3" "-Os"
