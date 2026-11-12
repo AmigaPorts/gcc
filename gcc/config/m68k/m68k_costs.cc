@@ -742,10 +742,10 @@ const_int_cost (HOST_WIDE_INT i)
 {
   switch (m68k_const_method (i))
     {
+    case MOVQ: return 0;
     case MVZ: case MVS: case NOTB: case NOTW: case NEGW: case SWAP: return 1;
     case MOVL: return 2;
     }
-  // case MOVQ:
   return 0;
 }
 
