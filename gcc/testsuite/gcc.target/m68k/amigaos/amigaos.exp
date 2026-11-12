@@ -181,6 +181,32 @@ if { !$multilib_pinned } {
     }
 }
 
+# Whether the board's file system dates its files: a simulator may report
+# the epoch for every one.  Asked of dos.library itself, so that a C runtime
+# whose stat() loses the date fails its tests instead of skipping them.
+proc check_effective_target_amigaos_file_dates { } {
+    return [check_runtime amigaos_file_dates {
+	#include <proto/dos.h>
+	int main (void)
+	{
+	  static struct FileInfoBlock fib __attribute__ ((aligned (4)));
+	  BPTR fh = Open ("T:gcc-file-dates", MODE_NEWFILE);
+	  BPTR lock;
+	  int dated = 0;
+
+	  if (fh)
+	    Close (fh);
+	  if ((lock = Lock ("T:gcc-file-dates", ACCESS_READ)))
+	    {
+	      dated = Examine (lock, &fib) && fib.fib_Date.ds_Days > 0;
+	      UnLock (lock);
+	    }
+	  DeleteFile ("T:gcc-file-dates");
+	  return !dated;
+	}
+    }]
+}
+
 # Runtime register-ABI check, swept over -O level, allocator and CPU (the
 # result is invariant, so every combination must pass once fixed).  The caller
 # lives in a companion TU (*-run-lib.c, pulled in by dg-additional-sources)
@@ -246,9 +272,11 @@ if { [llength $newlib_tests] } {
     set board_info($tboard,cflags) $saved_cflags
 }
 
-# Link tests for the ixemul runtime, the same way.  ixemul programs cannot
-# run under the simulator (no ixemul.library), so these only link, and only
-# when the ixemul SDK is installed: the minimal CI build has no ixemul.
+# Link tests for the ixemul runtime, the same way.  Programs need an
+# ixemul.library to run, which only the -mcrt=ixemul board variant gives the
+# simulator, and there the *-run.c tests above run with ixemul.  These link
+# on every board, but only when the ixemul SDK is installed: the minimal CI
+# build has no ixemul.
 set ixemul_tests [lsort [glob -nocomplain $srcdir/$subdir/*-ixemul-link.c]]
 if { [llength $ixemul_tests] } {
     global board_info
