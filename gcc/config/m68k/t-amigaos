@@ -23,12 +23,6 @@ m68k_costs.o: $(srcdir)/config/m68k/m68k_costs.cc
 	$(COMPILE) $<
 	$(POSTCOMPILE)
 
-# bebbo's cost tables index their arrays with designators ([IDX_REG] = 13),
-# which C++ has only as a GNU extension, and two of the cost functions keep
-# parameters they no longer use.  The rewritten tables of gcc#138 have neither:
-# drop this then.
-m68k_costs.o-warn = -Wno-pedantic -Wno-unused-parameter
-
 # Additional target dependent options for compiling libgcc.a.  This just
 # ensures that we don't compile libgcc* with anything other than a
 # fixed stack.
