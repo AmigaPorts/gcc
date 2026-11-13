@@ -1,5 +1,4 @@
 /* { dg-do run } */
-/* { dg-xfail-run-if "clib2 locks the file with a packet, which volamos does not answer" { *-*-* } { "-mcrt=clib2" } { "" } } */
 
 /* lstat() in the board's C runtime: on a file that is no link it reports
    what stat() does, and a file that is not there is ENOENT.  */
