@@ -1,4 +1,5 @@
 /* { dg-do run } */
+/* { dg-skip-if "fstat() is a stub in nix13" { *-*-* } { "-mcrt=nix13" } { "" } } */
 
 /* stat() and fstat() in the board's C runtime: the type and size of a file
    and of a directory, and the error for a file that is not there.

@@ -1,5 +1,6 @@
 /* { dg-do run } */
 /* { dg-require-effective-target amigaos_file_dates } */
+/* { dg-skip-if "fstat() is a stub in nix13" { *-*-* } { "-mcrt=nix13" } { "" } } */
 
 /* The modification time in stat() and fstat(): a file just written was
    modified now, by the clock that time() reads, and utime() sets another
