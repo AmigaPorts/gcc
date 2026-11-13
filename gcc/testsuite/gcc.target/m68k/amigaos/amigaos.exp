@@ -270,21 +270,29 @@ foreach f [lsort [glob -nocomplain $srcdir/$subdir/*-run.c]] {
 gcc-dg-runtest $run_tests "" ""
 torture-finish
 
-# Run tests for the newlib runtime.  Every board pins -mcrt=nix20 and a test
-# cannot drop a board flag (two -mcrt= selectors are an error), so these run
-# with the board's runtime selector replaced by -mcrt=newlib.  A board variant
-# that picks a runtime of its own (volamos/-mcrt=clib2) is a multilib flag,
-# which stays: these run on the other boards.
+# Run tests for the newlib runtime.  A test cannot drop a board flag, and two
+# different -mcrt= selectors are an error, so these run with the runtime
+# selector of the board's cflags, -mcrt=nix20, replaced by -mcrt=newlib.  A
+# board variant that picks a runtime of its own (volamos/-mcrt=clib2) does
+# it with a multilib flag, which stays: there these are unsupported, unless
+# the runtime it picks is newlib.
 set newlib_tests [lsort [glob -nocomplain $srcdir/$subdir/*-newlib-run.c]]
 set tboard [target_info name]
-if { [llength $newlib_tests]
-     && ![string match "*-mcrt=*" [board_info $tboard multilib_flags]] } {
-    global board_info
-    set saved_cflags [board_info $tboard cflags]
-    regsub -all {(-mcrt=\S+|-noixemul)} $saved_cflags "" newlib_cflags
-    set board_info($tboard,cflags) "$newlib_cflags -mcrt=newlib"
-    dg-runtest $newlib_tests "" ""
-    set board_info($tboard,cflags) $saved_cflags
+set variant_flags [board_info $tboard multilib_flags]
+if { ![string match "*-mcrt=*" $variant_flags]
+     || [string match "*-mcrt=newlib*" $variant_flags] } {
+    if { [llength $newlib_tests] } {
+	global board_info
+	set saved_cflags [board_info $tboard cflags]
+	regsub -all {(-mcrt=\S+|-noixemul)} $saved_cflags "" newlib_cflags
+	set board_info($tboard,cflags) "$newlib_cflags -mcrt=newlib"
+	dg-runtest $newlib_tests "" ""
+	set board_info($tboard,cflags) $saved_cflags
+    }
+} else {
+    foreach f $newlib_tests {
+	unsupported "[file tail $f]: the board's runtime is not newlib"
+    }
 }
 
 # Link tests for the ixemul runtime, the same way.  Programs need an
