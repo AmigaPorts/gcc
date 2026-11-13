@@ -6,6 +6,7 @@
    cannot produce the right sequence.  A destructor that runs out of
    turn aborts, which the harness sees as a failed run.  */
 /* { dg-do run } */
+/* { dg-xfail-run-if "an ixemul program runs no constructors, AmigaPorts/m68k-amigaos-gcc#234" { *-*-* } { "-mcrt=ixemul" } } */
 
 static int seq;
 
