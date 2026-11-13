@@ -16,6 +16,7 @@
 
 /* { dg-do run } */
 /* { dg-skip-if "libnix base variables" { ! { m68k-*-amigaos* } } } */
+/* { dg-skip-if "ixemul's libc needs ixemulbase from its startup code" { *-*-* } { "-mcrt=ixemul" } } */
 /* { dg-additional-options "-flto -flto-partition=one -nostartfiles" } */
 /* { dg-additional-sources "lto-late-libref-run-lib.c" } */
 
