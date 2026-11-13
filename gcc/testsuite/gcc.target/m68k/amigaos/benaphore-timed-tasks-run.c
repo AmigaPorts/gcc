@@ -1,5 +1,6 @@
 /* { dg-do run } */
 /* { dg-skip-if "CreateNewProc() is Kickstart 2.0" { *-*-* } { "-mcrt=nix13" } } */
+/* { dg-skip-if "ixemul faults in a process it did not create, AmigaPorts/m68k-amigaos-gcc#353" { *-*-* } { "-mcrt=ixemul" } } */
 /* Timed waits of <benaphore.h> ended by another task with the timer still
    pending: a condition signalled, a lock handed over.  None may time out or
    leave SIGF_SINGLE behind.  The tasks sleep on a timed wait, not Delay():
