@@ -1,25 +1,23 @@
 /* m68k-costs.cc - m68k RTX cost model.
 
    Per-family tables (speed, size) select the cost model for the active
-   CPU. Five families are supported:
+   CPU. Five families have tables:
 
-     68000/010                    distinct (2-cycle shifts, no cache)
-     68020/020_40/030             shared (Volamos does not model 68030
-                                  caches, so the 68030 grid scores
-                                  identically to 68020)
-     68040                        distinct (barrel shifter, caches)
-     68060                        distinct (superscalar, deeper pipeline)
-     68080                        distinct (Apollo); uses 68060 values
-                                  as a starting point (untuned) / unused
+     68000/010                    2-cycle shifts, no cache
+     68020, -m68020-40            Volamos
+     68030                        real A3000 hardware
+     68040                        barrel shifter, caches
+     68060, -m68020-60            superscalar, deeper pipeline
 
    The values were derived by CMA-ES tuning against a benchmark suite
-   executed on a cycle-accurate simulator. See
-   gcc/config/m68k/m68k-costs-tuning.md for the external harness and
-   reproduction instructions.
+   executed on a cycle-accurate simulator, with a harness that is not
+   part of GCC.
 
-   The M68K_COSTS_FILE environment variable can override the active
-   table for tuning and diagnostics. This is not a supported feature;
-   the .txt format is not stable and may change between GCC releases. */
+   A compiler built with M68K_SWITCHES_MODE reads overrides for the
+   active tables from the file that the M68K_COSTS_FILE environment
+   variable names, for tuning and diagnostics. A release compiler does
+   not. The .txt format is not stable and may change between GCC
+   releases. */
 
 #define IN_TARGET_CODE 1
 
@@ -104,10 +102,7 @@ static int cost_size_68040[IDX_COUNT];
 
 static int cost_speed_68060[IDX_COUNT];
 static int cost_size_68060[IDX_COUNT];
-#if 0
-static int cost_speed_68080[IDX_COUNT];
-static int cost_size_68080[IDX_COUNT];
-#endif
+
 static inline void
 set_cost (int t[IDX_COUNT], enum m68k_cost_idx idx, int val)
 {
@@ -642,6 +637,7 @@ init_cost_size_68060 (int t[IDX_COUNT])
 /* ============================================
    Cost map for M68K_COSTS_FILE overrides (tuning only)
    ============================================ */
+#if M68K_SWITCHES_MODE
 struct cost_map_entry { const char *name; int index; };
 static const struct cost_map_entry cost_map[] = {
     { "cost_reg_src",           IDX_REG_SRC },
@@ -691,14 +687,15 @@ static const struct cost_map_entry cost_map[] = {
     { "cost_mult_68000_word_mul",  IDX_MULT_68000_WORD_MUL },
     { "cost_extend_extra",      IDX_EXTEND_EXTRA },
 };
+#endif
 
 static int *active_speed;
 static int *active_size;
 
 /* Cost-table selection by m68k_tune value.
 
-   m68k_tune is one of: u68000, u68010, u68020, u68030, u68040,
-   u68060, u68020_40, u68020_60, u68080.
+   For the 680x0, m68k_tune is one of: u68000, u68010, u68020, u68030,
+   u68040, u68060, u68020_40, u68020_60.
 
    The tables are grouped by architectural family:
 
@@ -708,8 +705,10 @@ static int *active_size;
      68030          -> 68030      (real A3000 hardware, not Volamos)
      68040          -> 68040
      68060          -> 68060      (superscalar, deeper pipeline)
-     u68020_40      -> 68040      (tune for 68040; the target is the 68040)
+     u68020_40      -> 68020      (the code must run well on a 68020)
      u68020_60      -> 68060      (tune for 68060; the target is the 68060)
+
+   There is no u68080: nothing sets m68k_tune for the 68080 (Apollo).
 */
 
 static void
@@ -736,7 +735,7 @@ m68k_select_cost_tables (void)
         active_speed = cost_speed_68030;
         active_size  = cost_size_68030;
       }
-    else if (m68k_tune == u68040  || m68k_tune == u68020_40)
+    else if (m68k_tune == u68040)
       {
         init_cost_speed_68040 (cost_speed_68040);
         init_cost_size_68040  (cost_size_68040);
@@ -750,19 +749,9 @@ m68k_select_cost_tables (void)
         active_speed = cost_speed_68060;
         active_size  = cost_size_68060;
       }
-#if 0
-    else if (m68k_tune == u68080)
-      {
-        init_cost_speed_68080 (cost_speed_68080);
-        init_cost_size_68080  (cost_size_68080);
-        active_speed = cost_speed_68080;
-        active_size  = cost_size_68080;
-      }
-#endif
     else
       {
-        /* Unreachable given all current m68k_tune values, but keeps
-           active_speed / active_size valid if a future GCC adds one. */
+        /* CPU32 and ColdFire, which have no tables of their own.  */
         init_cost_speed_68030 (cost_speed_68030);
         init_cost_size_68030  (cost_size_68030);
         active_speed = cost_speed_68030;
@@ -770,6 +759,7 @@ m68k_select_cost_tables (void)
       }
 }
 
+#if M68K_SWITCHES_MODE
 /* Override loader - for tuning and diagnostics only. Not a supported
    user-facing feature; the .txt format is not stable across releases. */
 static void
@@ -809,20 +799,25 @@ load_cost_overrides (const char *filename, int table[])
       }
     fclose (f);
 }
+#endif
 
 static void
 m68k_init_costs (bool speed ATTRIBUTE_UNUSED)
 {
     m68k_select_cost_tables ();
 
+#if M68K_SWITCHES_MODE
     /* Opt-in override for tuning: M68K_COSTS_FILE points to a text file
-       of "name = value" pairs. No fallback filenames. */
+       of "name = value" pairs. No fallback filenames. Not in a release
+       compiler, which reads no file or environment variable that could
+       change the code it generates. */
     const char *env = getenv ("M68K_COSTS_FILE");
     if (env && *env)
       {
         load_cost_overrides (env, active_speed);
         load_cost_overrides (env, active_size);
       }
+#endif
 }
 
 #define COST_TABLE  (speed ? active_speed : active_size)
