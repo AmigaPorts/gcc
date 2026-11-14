@@ -146,6 +146,15 @@
   (and (match_code "const_int")
        (match_test "m68k_const_method (ival) == MOVQ")))
 
+(define_constraint "Cm"
+  "Integers moveq can load, as the immediate of a compare when tuning for
+   the 68040/68060 and not optimizing for size: cmp.l #imm is then no
+   slower than moveq and a register compare, and needs no register.
+   Not with -m68020-40, whose code is tuned for the 68020."
+  (and (match_code "const_int")
+       (match_test "ival >= -0x80 && ival < 0x80")
+       (match_test "(m68k_tune == u68040 || TUNE_68060) && !optimize_size")))
+
 (define_constraint "CW"
   "Integers valid for a moveq followed by a swap."
   (and (match_code "const_int")
