@@ -887,6 +887,7 @@ m68k_costs_engine (rtx x, machine_mode mode, int outer_code,
           return true;
         }
       case EQ: case NE: case GE: case GT: case GTU: case LE: case LT:
+      case GEU: case LEU: case LTU:
         if (COST_IS_UNDEFINED (IDX_BRANCH)) return false;
         *total = COST_BRANCH;
         return true;
@@ -963,12 +964,9 @@ m68k_costs_engine (rtx x, machine_mode mode, int outer_code,
 
           if (GET_CODE(b) == CONST_INT)
             {
-              int n = INTVAL(b);
-              if (n < 0) n = -n;
-              int x_shift = 0;
-              unsigned y = 1;
-              for (; y < (unsigned)n; y += y, ++x_shift) ;
-              if (y == (unsigned)n) {
+              unsigned HOST_WIDE_INT n = absu_hwi (INTVAL(b));
+              if (pow2p_hwi (n)) {
+                  int x_shift = exact_log2 (n);
                   *total = (GET_MODE_SIZE(mode) > 2 ? COST_SHIFT_CONST : COST_SHIFT_CONST_W);
                   *total += COST_TABLE[IDX_LSL_SHIFT_STEP] * x_shift;
                   return true;
@@ -985,9 +983,9 @@ m68k_costs_engine (rtx x, machine_mode mode, int outer_code,
           if (speed) {
               int f = (GET_MODE_SIZE(mode) > 2) ? COST_TABLE[IDX_MULT_68000_LONG_MUL] : COST_TABLE[IDX_MULT_68000_WORD_MUL];
               if (GET_CODE(b) == CONST_INT && GET_MODE_SIZE(mode) == 2) {
-                  int i = INTVAL(b);
-                  if (i < 0) i = -i;
-                  int bits = 0, l = 0;
+                  unsigned HOST_WIDE_INT i = absu_hwi (INTVAL(b));
+                  int bits = 0;
+                  unsigned l = 0;
                   if (i > 0) {
                       if (GET_CODE (a) == ZERO_EXTEND) {
                           while (i) { ++bits; i>>=1; }
@@ -999,7 +997,7 @@ m68k_costs_engine (rtx x, machine_mode mode, int outer_code,
               }
               *total += f;
           } else {
-              *total = GET_MODE_SIZE(mode) > 2 ? COST_TABLE[IDX_MULT_68000_LONG_MUL] : COST_TABLE[IDX_MULT_68000_WORD_MUL];
+              *total += GET_MODE_SIZE(mode) > 2 ? COST_TABLE[IDX_MULT_68000_LONG_MUL] : COST_TABLE[IDX_MULT_68000_WORD_MUL];
           }
           return true;
         }
@@ -1010,8 +1008,7 @@ m68k_costs_engine (rtx x, machine_mode mode, int outer_code,
         {
           rtx a = XEXP(x, 0);
           if (m68k_costs_engine (a, mode, code, 0, total, speed)) {
-              if (speed) *total += GET_MODE_SIZE(mode) > 2 ? COST_DIV_L : COST_DIV_W;
-              else *total += GET_MODE_SIZE(mode) > 2 ? COST_DIV_L : COST_DIV_W;
+              *total += GET_MODE_SIZE(mode) > 2 ? COST_DIV_L : COST_DIV_W;
               return true;
           }
           break;
@@ -1050,11 +1047,11 @@ m68k_costs_engine (rtx x, machine_mode mode, int outer_code,
       case SUBREG:
       case STRICT_LOW_PART:
         if (GET_CODE (XEXP(x, 0)) == SUBREG || GET_CODE (XEXP(x, 0)) == STRICT_LOW_PART) return false;
-        return m68k_costs_engine (XEXP(x, 0), GET_MODE(XEXP(x, 0)), outer_code, 0, total, speed);
+        return m68k_costs_engine (XEXP(x, 0), GET_MODE(XEXP(x, 0)), outer_code, opno, total, speed);
       case ZERO_EXTEND:
       case SIGN_EXTEND:
         if (GET_CODE (XEXP(x, 0)) == ZERO_EXTEND || GET_CODE (XEXP(x, 0)) == SIGN_EXTEND) return false;
-        if (m68k_costs_engine (XEXP(x, 0), GET_MODE(XEXP(x, 0)), outer_code, 0, total, speed)) {
+        if (m68k_costs_engine (XEXP(x, 0), GET_MODE(XEXP(x, 0)), outer_code, opno, total, speed)) {
             *total += COST_TABLE[IDX_EXTEND_EXTRA];
             return true;
         }
@@ -1098,7 +1095,7 @@ m68k_costs_engine (rtx x, machine_mode mode, int outer_code,
           rtx a = XEXP(x, 0);
           rtx b = XEXP(x, 1);
 
-          if (GET_CODE(a) == PLUS && GET_CODE(b) == CONST_INT && (unsigned)(INTVAL(b) + 128) < 255) {
+          if (GET_CODE(a) == PLUS && GET_CODE(b) == CONST_INT && IN_RANGE (INTVAL(b), -128, 127)) {
               if (REG_P(XEXP(a,0)) && REG_P(XEXP(a,1))) {
                   if (COST_IS_UNDEFINED (IDX_PLUS_REG_REG)) return false;
                   *total = COST_PLUS_REG_REG + COST_TABLE[IDX_PLUS_LEA_OFFSET];
@@ -1111,7 +1108,7 @@ m68k_costs_engine (rtx x, machine_mode mode, int outer_code,
 
           if (REG_P(a) && REGNO(a) >= 8 && REGNO(a) < 16) {
               if (GET_CODE(b) == CONST && GET_CODE(XEXP(b, 0)) == UNSPEC) { *total = 8; return true; }
-              if (GET_CODE(b) == CONST_INT && (unsigned)(INTVAL(b) + 32768) < 65535) { *total = 8; return true; }
+              if (GET_CODE(b) == CONST_INT && IN_RANGE (INTVAL(b), -32768, 32767)) { *total = 8; return true; }
           }
 
           if (REG_P(a) && REG_P(b)) {
@@ -1121,8 +1118,8 @@ m68k_costs_engine (rtx x, machine_mode mode, int outer_code,
           }
 
           if (GET_CODE(b) == CONST_INT) {
-              int i = INTVAL(b);
-              if (REG_P(a) && (USE_MOVQ(i) || (REGNO(a) >= 8 && REGNO(a) < 16 && (unsigned)(INTVAL(b) + 32768) < 65535))) {
+              HOST_WIDE_INT i = INTVAL(b);
+              if (REG_P(a) && (USE_MOVQ(i) || (REGNO(a) >= 8 && REGNO(a) < 16 && IN_RANGE (i, -32768, 32767)))) {
                   if (COST_IS_UNDEFINED (IDX_PLUS_REG_CONSTQ)) return false;
                   *total = GET_MODE_SIZE(mode) > 2 ? COST_PLUS_REG_CONSTQ + 4 : COST_PLUS_REG_CONSTQ;
               } else {
@@ -1260,5 +1257,12 @@ m68k_costs (rtx x,
         m68k_init_costs (speed);
       }
 
-    return m68k_costs_engine_di (x, mode, outer_code, opno, total, speed);
+    /* The engine writes operand costs to *TOTAL as it goes.  When it then
+       gives up, rtx_cost adds the cost of every operand to *TOTAL, so that
+       must be the default again.  */
+    int dflt = *total;
+    if (m68k_costs_engine_di (x, mode, outer_code, opno, total, speed))
+      return true;
+    *total = dflt;
+    return false;
 }
