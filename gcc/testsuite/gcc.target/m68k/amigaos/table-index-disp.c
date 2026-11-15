@@ -1,10 +1,10 @@
 /* { dg-do compile } */
 /* { dg-options "-O2 -m68020-60" } */
 /* An entry of a constant table row, whose address is taken once and read
-   twice: the row offset goes into each load's (bd,Xn.l*8) displacement,
-   not into the index register with an add.  A register plus a symbol is
-   no cheaper than (d16,An), so the second load stays e[1] until combine
-   can fold the whole address into both.  */
+   twice: the row offset goes into a (bd,Xn.l*8) displacement, not into
+   the index register with an add.  A register plus a symbol costs more
+   than (d16,An), so the second load stays e[1] until combine can fold
+   the row offset into the address.  */
 
 extern unsigned int t[8][256][2];
 
@@ -19,5 +19,8 @@ f (const unsigned char *p, unsigned int *out)
   out[1] = l;
 }
 
+/* Each row offset is in a displacement: of the loads, or of a lea of the
+   row's address that the loads go through.  */
 /* { dg-final { scan-assembler-not {add\.l #} } } */
-/* { dg-final { scan-assembler-times {_t\+(12288|12292|10240|10244)\(d[0-7]\.l\*8\)} 4 } } */
+/* { dg-final { scan-assembler {_t\+(12288|12292)\(d[0-7]\.l\*8\)} } } */
+/* { dg-final { scan-assembler {_t\+(10240|10244)\(d[0-7]\.l\*8\)} } } */

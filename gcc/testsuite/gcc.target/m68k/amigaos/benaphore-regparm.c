@@ -22,6 +22,10 @@ unlock (void)
 }
 
 /* { dg-final { scan-assembler "lea _b,a0\n\tjra \"@__benaphore_lock_slow\"" } } */
-/* { dg-final { scan-assembler "lea _b,a0\n\tjra \"@__benaphore_wake\"" } } */
+/* unlock() may load a0 before its fast path, to use it there: nothing
+   else writes a0, so it still holds the lock at the jump.  */
+/* { dg-final { scan-assembler "\tjra \"@__benaphore_wake\"" } } */
+/* { dg-final { scan-assembler-times "lea _b,a0\n" 2 } } */
+/* { dg-final { scan-assembler-times ",a0\n" 2 } } */
 /* { dg-final { scan-assembler-not "___benaphore" } } */
 /* { dg-final { scan-assembler-not "\[0-7\]@__benaphore" } } */
