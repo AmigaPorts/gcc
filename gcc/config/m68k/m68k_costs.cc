@@ -903,9 +903,16 @@ m68k_costs_engine (rtx x, machine_mode mode, int outer_code,
           }
         return false;
       case POST_INC:
-      case TRUNCATE:
         *total = 0;
         return true;
+      case TRUNCATE:
+        /* Free on a register.  On anything else, such as the high part
+           of a widening multiply, it costs what it truncates.  */
+        if (REG_P (XEXP (x, 0)) || SUBREG_P (XEXP (x, 0))) {
+            *total = 0;
+            return true;
+        }
+        return m68k_costs_engine (XEXP (x, 0), GET_MODE (XEXP (x, 0)), code, opno, total, speed);
       case PRE_DEC:
         *total = 2;
         return true;
@@ -967,6 +974,16 @@ m68k_costs_engine (rtx x, machine_mode mode, int outer_code,
                   return true;
               }
             }
+
+          /* A 32 x 32 -> 64 multiply, the high part of which a division
+             by a constant uses.  The 68060 has no mulu.l with a 64-bit
+             result: it takes four mulu.w and the adds between them.  */
+          if ((GET_CODE (a) == ZERO_EXTEND || GET_CODE (a) == SIGN_EXTEND)
+              && GET_MODE_SIZE (GET_MODE (XEXP (a, 0))) == 4) {
+              *total = TUNE_68060 ? 4 * COST_TABLE[IDX_MULT_68000_WORD_MUL] + COST_TABLE[IDX_ADD_L]
+                                  : COST_TABLE[IDX_MULT_68000_LONG_MUL];
+              return true;
+          }
 
           if (GET_CODE (a) == ZERO_EXTEND || GET_CODE (a) == SIGN_EXTEND) {
               *total = 0;
@@ -1102,7 +1119,13 @@ m68k_costs_engine (rtx x, machine_mode mode, int outer_code,
           if (SUBREG_P(b)) b = XEXP(b, 0);
 
           if (REG_P(a) && REGNO(a) >= 8 && REGNO(a) < 16) {
-              if (GET_CODE(b) == CONST && GET_CODE(XEXP(b, 0)) == UNSPEC) { *total = 8; return true; }
+              /* a base-relative symbol, with or without an offset:
+                 sym:W(a4) and sym+4:W(a4) are both (d16,An) */
+              if (GET_CODE(b) == CONST
+                  && (GET_CODE(XEXP(b, 0)) == UNSPEC
+                      || (GET_CODE(XEXP(b, 0)) == PLUS
+                          && GET_CODE(XEXP(XEXP(b, 0), 0)) == UNSPEC
+                          && CONST_INT_P(XEXP(XEXP(b, 0), 1))))) { *total = 8; return true; }
               if (GET_CODE(b) == CONST_INT && IN_RANGE (INTVAL(b), -32768, 32767)) { *total = 8; return true; }
           }
 
@@ -1198,9 +1221,27 @@ m68k_costs_engine (rtx x, machine_mode mode, int outer_code,
                  the full extension format, so no cheaper than (d16,An).
                  Otherwise a pass that reaches past a pointer to the
                  register and symbol it was made of sees a gain.  */
-              else if (REG_P (a0) && CONSTANT_P (a1))
-                idx = COST_TABLE[IDX_MEM_OTHER] > COST_TABLE[IDX_MEM_PLUS_REG_DISP]
-                        ? IDX_MEM_OTHER : IDX_MEM_PLUS_REG_DISP;
+              /* A scaled index and a symbol, (bd,Xn*8), is the same
+                 format.  Both cost a little more than (d16,An): priced
+                 the same, fwprop folds a pointer into each of its loads,
+                 and combine can't move a constant row offset out of the
+                 index any more; priced as indexed, a pass scales the
+                 index into a register to get the cheaper form.  */
+              else if ((REG_P (a0)
+                        || ((GET_CODE (a0) == MULT || GET_CODE (a0) == ASHIFT)
+                            && REG_P (XEXP (a0, 0))
+                            && CONST_INT_P (XEXP (a0, 1))))
+                       && CONSTANT_P (a1))
+                {
+                  if (COST_IS_UNDEFINED (IDX_MEM_OTHER)
+                      || COST_IS_UNDEFINED (IDX_MEM_PLUS_REG_DISP))
+                    return false;
+                  *total = MAX (COST_TABLE[IDX_MEM_OTHER],
+                                COST_TABLE[IDX_MEM_PLUS_REG_DISP]) + 1;
+                  if (mode != QImode && mode != HImode)
+                    *total += COST_TABLE[IDX_MEM_LONG_EXTRA];
+                  return true;
+                }
               else
                 idx = IDX_MEM_PLUS_REG_REG;       /* (An,Xn) or (plus (plus reg reg) c) */
             }
@@ -1209,6 +1250,11 @@ m68k_costs_engine (rtx x, machine_mode mode, int outer_code,
 
           if (COST_IS_UNDEFINED (idx)) return false;
           *total = COST_TABLE[idx];
+          /* (An) is never slower than (d16,An).  A table that says it is
+             makes every pass replace a pointer in a register with the
+             address it was computed from.  */
+          if (idx == IDX_MEM_REG && !COST_IS_UNDEFINED (IDX_MEM_PLUS_REG_DISP))
+            *total = MIN (*total, COST_TABLE[IDX_MEM_PLUS_REG_DISP]);
           if (mode != QImode && mode != HImode)
             *total += COST_TABLE[IDX_MEM_LONG_EXTRA];
           if (opno && yc == PRE_DEC)
