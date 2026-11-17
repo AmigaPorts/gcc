@@ -4656,6 +4656,49 @@ output_addsi3 (rtx *operands)
   return "add%.l %2,%0";
 }
 
+/* Output the single instruction of an atomic CODE operation on the
+   MODE memory OPERANDS[0], with source OPERANDS[1].  */
+
+const char *
+m68k_output_atomic_op (rtx_code code, machine_mode mode, rtx *operands)
+{
+  static char buf[32];
+  const char *insn;
+  const char *sz = mode == QImode ? "%.b" : mode == HImode ? "%.w" : "%.l";
+
+  switch (code)
+    {
+    case PLUS:
+    case MINUS:
+      insn = code == PLUS ? "add" : "sub";
+      if (CONST_INT_P (operands[1]) && INTVAL (operands[1]) != 0
+	  && IN_RANGE (INTVAL (operands[1]), -8, 8))
+	{
+	  if (INTVAL (operands[1]) < 0)
+	    {
+	      operands[1] = GEN_INT (-INTVAL (operands[1]));
+	      insn = code == PLUS ? "sub" : "add";
+	    }
+	  snprintf (buf, sizeof buf, "%sq%s %%1,%%0", insn, sz);
+	  return buf;
+	}
+      break;
+    case AND:
+      insn = "and";
+      break;
+    case IOR:
+      insn = "or";
+      break;
+    case XOR:
+      insn = "eor";
+      break;
+    default:
+      gcc_unreachable ();
+    }
+  snprintf (buf, sizeof buf, "%s%s %%1,%%0", insn, sz);
+  return buf;
+}
+
 /* Emit a comparison between OP0 and OP1.  Return true iff the comparison
    was reversed.  SC1 is an SImode scratch reg, and SC2 a DImode scratch reg,
    as needed.  CODE is the code of the comparison, we return it unchanged or

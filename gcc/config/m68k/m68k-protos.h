@@ -40,6 +40,7 @@ extern const char *output_btst (rtx *, rtx, rtx, rtx_insn *, int);
 extern const char *output_scc_di (rtx, rtx, rtx, rtx);
 extern const char *output_addsi3 (rtx *);
 extern bool m68k_add_dest_ok_p (rtx *);
+extern const char *m68k_output_atomic_op (rtx_code, machine_mode, rtx *);
 extern const char *output_andsi3 (rtx *);
 extern const char *output_iorsi3 (rtx *);
 extern const char *output_xorsi3 (rtx *);

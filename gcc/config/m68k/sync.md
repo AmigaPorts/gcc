@@ -85,3 +85,73 @@
     return "bset #7,%1\;sne %0";
   return "tas %1\;sne %0";
 })
+
+;; AmigaOS runs on a single CPU, where an instruction that reads and
+;; writes memory cannot be interrupted halfway: it is atomic without a
+;; locked bus cycle.  The volatile insn is a compiler barrier, which is
+;; all that any memory model needs there.
+
+(define_code_iterator atomic_op [plus minus and ior xor])
+(define_code_attr atomic_optab
+  [(plus "add") (minus "sub") (and "and") (ior "or") (xor "xor")])
+
+(define_insn "atomic_<atomic_optab><mode>"
+  [(set (match_operand:I 0 "memory_operand" "+m")
+	(unspec_volatile:I
+	  [(atomic_op:I (match_dup 0)
+			(match_operand:I 1 "nonmemory_operand" "di"))
+	   (match_operand:SI 2 "const_int_operand")]		;; model
+	  UNSPECV_ATOMIC_OP))]
+  "TARGET_AMIGA && !TARGET_COLDFIRE"
+{
+  return m68k_output_atomic_op (<CODE>, <MODE>mode, operands);
+})
+
+(define_expand "atomic_<atomic_optab>_fetch_cmp_0<mode>"
+  [(match_operand:QI 0 "register_operand")
+   (atomic_op:I (match_operand:I 1 "memory_operand")
+		(match_operand:I 2 "nonmemory_operand"))
+   (match_operand:SI 3 "const_int_operand")			;; model
+   (match_operand:SI 4 "const_int_operand")]			;; comparison
+  "TARGET_AMIGA && !TARGET_COLDFIRE"
+{
+  enum rtx_code cmp = (enum rtx_code) INTVAL (operands[4]);
+  /* add and sub can set V, so only N and Z give the sign of the
+     result.  */
+  if ((cmp == GT || cmp == LE) && (<CODE> == PLUS || <CODE> == MINUS))
+    FAIL;
+  rtx t = gen_reg_rtx (QImode);
+  emit_insn (gen_atomic_<atomic_optab>_fetch_cmp_0<mode>_1
+	     (t, operands[1], operands[2], operands[4]));
+  t = expand_simple_unop (QImode, NEG, t, operands[0], 0);
+  if (t != operands[0])
+    emit_move_insn (operands[0], t);
+  DONE;
+})
+
+(define_insn "atomic_<atomic_optab>_fetch_cmp_0<mode>_1"
+  [(set (match_operand:QI 0 "register_operand" "=d")
+	(unspec_volatile:QI
+	  [(match_operand:I 1 "memory_operand" "+m")
+	   (match_operand:I 2 "nonmemory_operand" "di")
+	   (match_operand:SI 3 "const_int_operand")]		;; comparison
+	  UNSPECV_ATOMIC_OP_CMP_0))
+   (set (match_dup 1)
+	(unspec_volatile:I
+	  [(atomic_op:I (match_dup 1) (match_dup 2))]
+	  UNSPECV_ATOMIC_OP))]
+  "TARGET_AMIGA && !TARGET_COLDFIRE"
+{
+  output_asm_insn (m68k_output_atomic_op (<CODE>, <MODE>mode,
+					  &operands[1]), &operands[1]);
+  switch ((enum rtx_code) INTVAL (operands[3]))
+    {
+    case EQ: return "seq %0";
+    case NE: return "sne %0";
+    case LT: return "smi %0";
+    case GE: return "spl %0";
+    case GT: return "sgt %0";
+    case LE: return "sle %0";
+    default: gcc_unreachable ();
+    }
+})
