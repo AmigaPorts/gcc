@@ -77,4 +77,11 @@
    (set (match_dup 1)
 	(unspec_volatile:QI [(match_dup 1)] UNSPECV_TAS_2))]
   "ISA_HAS_TAS"
-  "tas %1\;sne %0")
+{
+  /* tas uses a locked read-modify-write cycle, which the Amiga chipset
+     does not support.  bset sets the same value, 0x80.  ColdFire keeps
+     tas: its bset #imm takes fewer addressing modes than "m".  */
+  if (TARGET_AMIGA && !TARGET_COLDFIRE)
+    return "bset #7,%1\;sne %0";
+  return "tas %1\;sne %0";
+})
