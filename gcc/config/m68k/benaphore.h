@@ -46,8 +46,15 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
    https://www.haiku-os.org/legacy-docs/benewsletter/Issue1-26.html
 
    All zeros is a valid unlocked benaphore.  Like any lock that can sleep,
-   it is for tasks, not interrupt code, and it needs a single CPU.  It has
-   no priority inheritance, as exec's semaphores don't.
+   it is for tasks, not interrupt code, and it needs a single CPU.
+
+   The recursive benaphore knows its owner, so it has priority inheritance,
+   which exec's semaphores don't: a task that sleeps on it raises the owner
+   to its own priority until the owner releases it.  exec always runs the
+   highest-priority ready task, so without that, a task of middle priority
+   that keeps busy would keep a lower-priority owner from ever releasing
+   the lock to a higher-priority task waiting for it.  The plain benaphore
+   has no owner to raise.
 
    What a 68000 takes when nobody else wants the lock, in cycles from the
    instruction timings, with its address in a register:
@@ -85,14 +92,18 @@ typedef struct {
 
 /* Taken again by the task that holds it, it counts instead of blocking.
    Other tasks read __owner without the lock, so all accesses to it are
-   atomic. */
+   atomic.  The others are only touched under Forbid(): the task a sleeper
+   raised, or 0, with its priority before that and the one it was raised
+   to.  It stays raised until a wake puts it back, whoever runs the wake. */
 typedef struct {
 	benaphore_t __b;
 	void *__owner;			/* struct Task * */
 	unsigned long __count;
+	void *__boosted;		/* struct Task * */
+	signed char __base_pri, __boost_pri;
 } benaphore_recursive_t;
 
-#define BENAPHORE_RECURSIVE_INITIALIZER { BENAPHORE_INITIALIZER, 0, 0 }
+#define BENAPHORE_RECURSIVE_INITIALIZER { BENAPHORE_INITIALIZER, 0, 0, 0, 0, 0 }
 
 /* The slow paths take the lock in a0 whatever -mregparm the caller was
    built with.  The asm names are the ones -mmangle-regparm gives them, so
@@ -102,6 +113,12 @@ typedef struct {
 #define __BENAPHORE_ABI __attribute__((__regparm__(1), __nothrow__))
 void __benaphore_lock_slow(benaphore_t *__b) __asm__("\"@__benaphore_lock_slow\"") __BENAPHORE_ABI;
 void __benaphore_wake(benaphore_t *__b) __asm__("\"@__benaphore_wake\"") __BENAPHORE_ABI;
+void __benaphore_recursive_lock_slow(benaphore_recursive_t *__r)
+	__asm__("\"@__benaphore_recursive_lock_slow\"") __BENAPHORE_ABI;
+void __benaphore_recursive_wake(benaphore_recursive_t *__r)
+	__asm__("\"@__benaphore_recursive_wake\"") __BENAPHORE_ABI;
+void __benaphore_recursive_unboost(benaphore_recursive_t *__r)
+	__asm__("\"@__benaphore_recursive_unboost\"") __BENAPHORE_ABI;
 
 /* In C++ the inline functions have external linkage, as gthr-posix.h's,
    so that inline functions of a module may use them. */
@@ -160,6 +177,7 @@ extern void *__benaphore_sysbase __asm__("_SysBase");
 #define __BENAPHORE_THIS_TASK() \
 	(*(void **) ((char *) __benaphore_sysbase + 276))
 
+/* As benaphore_lock(), but a sleeper raises the owner's priority. */
 __BENAPHORE_INLINE void benaphore_recursive_lock(benaphore_recursive_t *__r)
 {
 	void *__me = __BENAPHORE_THIS_TASK();
@@ -169,7 +187,11 @@ __BENAPHORE_INLINE void benaphore_recursive_lock(benaphore_recursive_t *__r)
 		__r->__count++;
 		return;
 	}
-	benaphore_lock(&__r->__b);
+	__asm__ __volatile__ goto ("bset #0,%0\n\tjeq %l[__free]"
+				   : : "m" (__BENAPHORE_LOCK_BYTE(&__r->__b))
+				   : "cc", "memory" : __free);
+	__benaphore_recursive_lock_slow(__r);
+__free:
 	__atomic_store_n(&__r->__owner, __me, __ATOMIC_RELAXED);
 	__r->__count = 1;
 }
@@ -189,11 +211,18 @@ __BENAPHORE_INLINE int benaphore_recursive_trylock(benaphore_recursive_t *__r)
 	return 1;
 }
 
+/* As benaphore_unlock().  Only a sleeper raises the owner, and it is still
+   in the queue, so after a raised owner's release there is always a wake,
+   which hands the lock on and then puts the owner's priority back. */
 __BENAPHORE_INLINE void benaphore_recursive_unlock(benaphore_recursive_t *__r)
 {
 	if (--__r->__count == 0) {
 		__atomic_store_n(&__r->__owner, (void *) 0, __ATOMIC_RELAXED);
-		benaphore_unlock(&__r->__b);
+		__asm__ __volatile__ ("bclr #0,%0"
+				      : "+m" (__BENAPHORE_LOCK_BYTE(&__r->__b))
+				      : : "cc", "memory");
+		if (__atomic_load_n(&__r->__b.__last, __ATOMIC_RELAXED))
+			__benaphore_recursive_wake(__r);
 	}
 }
 
@@ -297,13 +326,15 @@ __BENAPHORE_INLINE int benaphore_cond_timedwait(benaphore_cond_t *__c, benaphore
 
 /* The recursive lock is released whatever its count, and taken back with
    it.  Until then the owner is nobody, so that another task can take it;
-   only the holder writes the count. */
+   only the holder writes the count.  A sleeper may have raised us: the
+   release puts our priority back first. */
 __BENAPHORE_INLINE void benaphore_cond_wait_recursive(benaphore_cond_t *__c,
 						      benaphore_recursive_t *__r)
 {
 	unsigned long __count = __r->__count;
 
 	__atomic_store_n(&__r->__owner, (void *) 0, __ATOMIC_RELAXED);
+	__benaphore_recursive_unboost(__r);
 	__benaphore_cond_wait(__c, &__r->__b);
 	__atomic_store_n(&__r->__owner, __BENAPHORE_THIS_TASK(), __ATOMIC_RELAXED);
 	__r->__count = __count;
@@ -317,6 +348,7 @@ __BENAPHORE_INLINE int benaphore_cond_timedwait_recursive(benaphore_cond_t *__c,
 	int __err;
 
 	__atomic_store_n(&__r->__owner, (void *) 0, __ATOMIC_RELAXED);
+	__benaphore_recursive_unboost(__r);
 	__err = __benaphore_cond_timedwait(__c, &__r->__b, __deadline);
 	__atomic_store_n(&__r->__owner, __BENAPHORE_THIS_TASK(), __ATOMIC_RELAXED);
 	__r->__count = __count;
