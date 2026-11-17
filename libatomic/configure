@@ -14456,10 +14456,10 @@ else
 int
 main ()
 {
-typedef int T __attribute__((mode(QI))); T *x, y;
+typedef int T __attribute__((mode(QI))); T *x, y; volatile T sink;
      asm("" : "=g"(x), "=g"(y));
-     __atomic_fetch_add (x, y, 0);
-     __atomic_add_fetch (x, y, 0);
+     sink = __atomic_fetch_add (x, y, 0);
+     sink = __atomic_add_fetch (x, y, 0);
   ;
   return 0;
 }
@@ -14523,10 +14523,10 @@ else
 int
 main ()
 {
-typedef int T __attribute__((mode(HI))); T *x, y;
+typedef int T __attribute__((mode(HI))); T *x, y; volatile T sink;
      asm("" : "=g"(x), "=g"(y));
-     __atomic_fetch_add (x, y, 0);
-     __atomic_add_fetch (x, y, 0);
+     sink = __atomic_fetch_add (x, y, 0);
+     sink = __atomic_add_fetch (x, y, 0);
   ;
   return 0;
 }
@@ -14590,10 +14590,10 @@ else
 int
 main ()
 {
-typedef int T __attribute__((mode(SI))); T *x, y;
+typedef int T __attribute__((mode(SI))); T *x, y; volatile T sink;
      asm("" : "=g"(x), "=g"(y));
-     __atomic_fetch_add (x, y, 0);
-     __atomic_add_fetch (x, y, 0);
+     sink = __atomic_fetch_add (x, y, 0);
+     sink = __atomic_add_fetch (x, y, 0);
   ;
   return 0;
 }
@@ -14657,10 +14657,10 @@ else
 int
 main ()
 {
-typedef int T __attribute__((mode(DI))); T *x, y;
+typedef int T __attribute__((mode(DI))); T *x, y; volatile T sink;
      asm("" : "=g"(x), "=g"(y));
-     __atomic_fetch_add (x, y, 0);
-     __atomic_add_fetch (x, y, 0);
+     sink = __atomic_fetch_add (x, y, 0);
+     sink = __atomic_add_fetch (x, y, 0);
   ;
   return 0;
 }
@@ -14724,10 +14724,10 @@ else
 int
 main ()
 {
-typedef int T __attribute__((mode(TI))); T *x, y;
+typedef int T __attribute__((mode(TI))); T *x, y; volatile T sink;
      asm("" : "=g"(x), "=g"(y));
-     __atomic_fetch_add (x, y, 0);
-     __atomic_add_fetch (x, y, 0);
+     sink = __atomic_fetch_add (x, y, 0);
+     sink = __atomic_add_fetch (x, y, 0);
   ;
   return 0;
 }
@@ -14792,14 +14792,14 @@ else
 int
 main ()
 {
-typedef int T __attribute__((mode(QI))); T *x, y;
+typedef int T __attribute__((mode(QI))); T *x, y; volatile T sink;
      asm("" : "=g"(x), "=g"(y));
-     __atomic_fetch_add (x, y, 0); __atomic_add_fetch (x, y, 0);
-     __atomic_fetch_sub (x, y, 0); __atomic_sub_fetch (x, y, 0);
-     __atomic_fetch_and (x, y, 0); __atomic_and_fetch (x, y, 0);
-     __atomic_fetch_nand (x, y, 0); __atomic_nand_fetch (x, y, 0);
-     __atomic_fetch_xor (x, y, 0); __atomic_xor_fetch (x, y, 0);
-     __atomic_fetch_or (x, y, 0);  __atomic_or_fetch (x, y, 0);
+     sink = __atomic_fetch_add (x, y, 0); sink = __atomic_add_fetch (x, y, 0);
+     sink = __atomic_fetch_sub (x, y, 0); sink = __atomic_sub_fetch (x, y, 0);
+     sink = __atomic_fetch_and (x, y, 0); sink = __atomic_and_fetch (x, y, 0);
+     sink = __atomic_fetch_nand (x, y, 0); sink = __atomic_nand_fetch (x, y, 0);
+     sink = __atomic_fetch_xor (x, y, 0); sink = __atomic_xor_fetch (x, y, 0);
+     sink = __atomic_fetch_or (x, y, 0);  sink = __atomic_or_fetch (x, y, 0);
   ;
   return 0;
 }
@@ -14863,14 +14863,14 @@ else
 int
 main ()
 {
-typedef int T __attribute__((mode(HI))); T *x, y;
+typedef int T __attribute__((mode(HI))); T *x, y; volatile T sink;
      asm("" : "=g"(x), "=g"(y));
-     __atomic_fetch_add (x, y, 0); __atomic_add_fetch (x, y, 0);
-     __atomic_fetch_sub (x, y, 0); __atomic_sub_fetch (x, y, 0);
-     __atomic_fetch_and (x, y, 0); __atomic_and_fetch (x, y, 0);
-     __atomic_fetch_nand (x, y, 0); __atomic_nand_fetch (x, y, 0);
-     __atomic_fetch_xor (x, y, 0); __atomic_xor_fetch (x, y, 0);
-     __atomic_fetch_or (x, y, 0);  __atomic_or_fetch (x, y, 0);
+     sink = __atomic_fetch_add (x, y, 0); sink = __atomic_add_fetch (x, y, 0);
+     sink = __atomic_fetch_sub (x, y, 0); sink = __atomic_sub_fetch (x, y, 0);
+     sink = __atomic_fetch_and (x, y, 0); sink = __atomic_and_fetch (x, y, 0);
+     sink = __atomic_fetch_nand (x, y, 0); sink = __atomic_nand_fetch (x, y, 0);
+     sink = __atomic_fetch_xor (x, y, 0); sink = __atomic_xor_fetch (x, y, 0);
+     sink = __atomic_fetch_or (x, y, 0);  sink = __atomic_or_fetch (x, y, 0);
   ;
   return 0;
 }
@@ -14934,14 +14934,14 @@ else
 int
 main ()
 {
-typedef int T __attribute__((mode(SI))); T *x, y;
+typedef int T __attribute__((mode(SI))); T *x, y; volatile T sink;
      asm("" : "=g"(x), "=g"(y));
-     __atomic_fetch_add (x, y, 0); __atomic_add_fetch (x, y, 0);
-     __atomic_fetch_sub (x, y, 0); __atomic_sub_fetch (x, y, 0);
-     __atomic_fetch_and (x, y, 0); __atomic_and_fetch (x, y, 0);
-     __atomic_fetch_nand (x, y, 0); __atomic_nand_fetch (x, y, 0);
-     __atomic_fetch_xor (x, y, 0); __atomic_xor_fetch (x, y, 0);
-     __atomic_fetch_or (x, y, 0);  __atomic_or_fetch (x, y, 0);
+     sink = __atomic_fetch_add (x, y, 0); sink = __atomic_add_fetch (x, y, 0);
+     sink = __atomic_fetch_sub (x, y, 0); sink = __atomic_sub_fetch (x, y, 0);
+     sink = __atomic_fetch_and (x, y, 0); sink = __atomic_and_fetch (x, y, 0);
+     sink = __atomic_fetch_nand (x, y, 0); sink = __atomic_nand_fetch (x, y, 0);
+     sink = __atomic_fetch_xor (x, y, 0); sink = __atomic_xor_fetch (x, y, 0);
+     sink = __atomic_fetch_or (x, y, 0);  sink = __atomic_or_fetch (x, y, 0);
   ;
   return 0;
 }
@@ -15005,14 +15005,14 @@ else
 int
 main ()
 {
-typedef int T __attribute__((mode(DI))); T *x, y;
+typedef int T __attribute__((mode(DI))); T *x, y; volatile T sink;
      asm("" : "=g"(x), "=g"(y));
-     __atomic_fetch_add (x, y, 0); __atomic_add_fetch (x, y, 0);
-     __atomic_fetch_sub (x, y, 0); __atomic_sub_fetch (x, y, 0);
-     __atomic_fetch_and (x, y, 0); __atomic_and_fetch (x, y, 0);
-     __atomic_fetch_nand (x, y, 0); __atomic_nand_fetch (x, y, 0);
-     __atomic_fetch_xor (x, y, 0); __atomic_xor_fetch (x, y, 0);
-     __atomic_fetch_or (x, y, 0);  __atomic_or_fetch (x, y, 0);
+     sink = __atomic_fetch_add (x, y, 0); sink = __atomic_add_fetch (x, y, 0);
+     sink = __atomic_fetch_sub (x, y, 0); sink = __atomic_sub_fetch (x, y, 0);
+     sink = __atomic_fetch_and (x, y, 0); sink = __atomic_and_fetch (x, y, 0);
+     sink = __atomic_fetch_nand (x, y, 0); sink = __atomic_nand_fetch (x, y, 0);
+     sink = __atomic_fetch_xor (x, y, 0); sink = __atomic_xor_fetch (x, y, 0);
+     sink = __atomic_fetch_or (x, y, 0);  sink = __atomic_or_fetch (x, y, 0);
   ;
   return 0;
 }
@@ -15076,14 +15076,14 @@ else
 int
 main ()
 {
-typedef int T __attribute__((mode(TI))); T *x, y;
+typedef int T __attribute__((mode(TI))); T *x, y; volatile T sink;
      asm("" : "=g"(x), "=g"(y));
-     __atomic_fetch_add (x, y, 0); __atomic_add_fetch (x, y, 0);
-     __atomic_fetch_sub (x, y, 0); __atomic_sub_fetch (x, y, 0);
-     __atomic_fetch_and (x, y, 0); __atomic_and_fetch (x, y, 0);
-     __atomic_fetch_nand (x, y, 0); __atomic_nand_fetch (x, y, 0);
-     __atomic_fetch_xor (x, y, 0); __atomic_xor_fetch (x, y, 0);
-     __atomic_fetch_or (x, y, 0);  __atomic_or_fetch (x, y, 0);
+     sink = __atomic_fetch_add (x, y, 0); sink = __atomic_add_fetch (x, y, 0);
+     sink = __atomic_fetch_sub (x, y, 0); sink = __atomic_sub_fetch (x, y, 0);
+     sink = __atomic_fetch_and (x, y, 0); sink = __atomic_and_fetch (x, y, 0);
+     sink = __atomic_fetch_nand (x, y, 0); sink = __atomic_nand_fetch (x, y, 0);
+     sink = __atomic_fetch_xor (x, y, 0); sink = __atomic_xor_fetch (x, y, 0);
+     sink = __atomic_fetch_or (x, y, 0);  sink = __atomic_or_fetch (x, y, 0);
   ;
   return 0;
 }

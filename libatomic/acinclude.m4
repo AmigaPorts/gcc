@@ -145,10 +145,10 @@ dnl
 AC_DEFUN([LIBAT_HAVE_ATOMIC_FETCH_ADD],[
   LIBAT_TEST_ATOMIC_BUILTIN([for __atomic_fetch_add for size $2],
     [libat_cv_have_at_fadd_$2],
-    [typedef int T __attribute__((mode($1))); T *x, y;
+    [typedef int T __attribute__((mode($1))); T *x, y; volatile T sink;
      asm("" : "=g"(x), "=g"(y));
-     __atomic_fetch_add (x, y, 0);
-     __atomic_add_fetch (x, y, 0);])
+     sink = __atomic_fetch_add (x, y, 0);
+     sink = __atomic_add_fetch (x, y, 0);])
   LIBAT_DEFINE_YESNO([HAVE_ATOMIC_FETCH_ADD_$2], [$libat_cv_have_at_fadd_$2],
 	[Have __atomic_fetch_add for $2 byte integers.])
   AH_BOTTOM([#define MAYBE_HAVE_ATOMIC_FETCH_ADD_$2 HAVE_ATOMIC_FETCH_ADD_$2])
@@ -160,14 +160,14 @@ dnl
 AC_DEFUN([LIBAT_HAVE_ATOMIC_FETCH_OP],[
   LIBAT_TEST_ATOMIC_BUILTIN([for __atomic_fetch_op for size $2],
     [libat_cv_have_at_fop_$2],
-    [typedef int T __attribute__((mode($1))); T *x, y;
+    [typedef int T __attribute__((mode($1))); T *x, y; volatile T sink;
      asm("" : "=g"(x), "=g"(y));
-     __atomic_fetch_add (x, y, 0); __atomic_add_fetch (x, y, 0);
-     __atomic_fetch_sub (x, y, 0); __atomic_sub_fetch (x, y, 0);
-     __atomic_fetch_and (x, y, 0); __atomic_and_fetch (x, y, 0);
-     __atomic_fetch_nand (x, y, 0); __atomic_nand_fetch (x, y, 0);
-     __atomic_fetch_xor (x, y, 0); __atomic_xor_fetch (x, y, 0);
-     __atomic_fetch_or (x, y, 0);  __atomic_or_fetch (x, y, 0); ])
+     sink = __atomic_fetch_add (x, y, 0); sink = __atomic_add_fetch (x, y, 0);
+     sink = __atomic_fetch_sub (x, y, 0); sink = __atomic_sub_fetch (x, y, 0);
+     sink = __atomic_fetch_and (x, y, 0); sink = __atomic_and_fetch (x, y, 0);
+     sink = __atomic_fetch_nand (x, y, 0); sink = __atomic_nand_fetch (x, y, 0);
+     sink = __atomic_fetch_xor (x, y, 0); sink = __atomic_xor_fetch (x, y, 0);
+     sink = __atomic_fetch_or (x, y, 0);  sink = __atomic_or_fetch (x, y, 0); ])
   LIBAT_DEFINE_YESNO([HAVE_ATOMIC_FETCH_OP_$2], [$libat_cv_have_at_fop_$2],
 	[Have __atomic_fetch_op for all op for $2 byte integers.])
   AH_BOTTOM([#define MAYBE_HAVE_ATOMIC_FETCH_OP_$2 HAVE_ATOMIC_FETCH_OP_$2])
