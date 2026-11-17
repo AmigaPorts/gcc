@@ -1233,8 +1233,24 @@ m68k_save_reg (unsigned int regno, bool interrupt_handler,
   if (lookup_attribute ("entrypoint", attrs))
     return false;
 
+  /* saveallregs gives every register back but sp and those that hold the
+     return value: d0, d0/d1 or fp0, or for a value returned in memory the
+     register with its address, as expand_function_end sets it.  */
   if (regno != 15 && lookup_attribute ("saveallregs", attrs))
-    return true;
+    {
+      tree result = DECL_RESULT (current_function_decl);
+      tree type;
+
+      if (!result || VOID_TYPE_P (TREE_TYPE (result)))
+	return true;
+      type = TREE_TYPE (result);
+      if (aggregate_value_p (result, current_function_decl))
+	type = build_pointer_type (DECL_BY_REFERENCE (result)
+				   ? TREE_TYPE (type) : type);
+      return !refers_to_regno_p (regno,
+				 targetm.calls.function_value
+				   (type, current_function_decl, true));
+    }
 
   if (flag_pic && regno == PIC_REG)
     {
