@@ -1772,6 +1772,13 @@ m68k_ok_for_sibcall_p (tree decl, tree exp)
      the callee would run with the caller's a4 instead of ours.  */
   if (amigaos_restores_a4_p ())
     return false;
+
+  /* A saveallregs function restores every register before the jump,
+     including the callee's register arguments and the jump target, and
+     the callee need not preserve them.  */
+  if (lookup_attribute ("saveallregs",
+			TYPE_ATTRIBUTES (TREE_TYPE (current_function_decl))))
+    return false;
 #endif
 
   /* We cannot use sibcalls for nested functions because we use the
