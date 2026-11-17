@@ -488,6 +488,16 @@ extern const char *amigaos_crt_check (int argc, const char **argv);
 #define __LPTHREAD__   "%{pthread:-lpthread} %{lpthread:-lpthread } "
 #endif
 
+/* Atomic operations that the compiler does not inline call libatomic,
+   with or without threads.  It is a static archive, so a program that
+   makes no such call links nothing from it.  libatomic itself is built
+   with -fno-link-libatomic.  */
+#ifdef TARGET_PROVIDES_LIBATOMIC
+#define __LATOMIC__ "%{!fno-link-libatomic:-latomic} "
+#else
+#define __LATOMIC__ ""
+#endif
+
 #ifdef TARGET_AMIGAOS_VASM
 #define LIB_SPEC \
   "-lvc -lamiga "
@@ -503,6 +513,7 @@ extern const char *amigaos_crt_check (int argc, const char **argv);
   "%{!mcrt=*:%{!noixemul:%(lib_newlib)}} " \
   "%{fprofile-arcs|fprofile-generate*|coverage:-lgcov} " \
   "-lamiga -lgcc "\
+  __LATOMIC__ \
   __LPTHREAD__ \
   "%{lm:-lm } "\
   "-) "
