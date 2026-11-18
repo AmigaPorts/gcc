@@ -262,6 +262,21 @@ namespace
             if (!baserel_symbol_p (SYMBOL_REF_DECL (symbol)))
               return 0;
 
+            /* An insn can hold the same address twice, and need both to
+               stay equal (a match_dup, as in the atomic insns): the second
+               one takes the register made for the first.  */
+            rtx orig = *x;
+            for (int i = 0; i < cur_tmp_use; ++i)
+              if (rtx_equal_p (cur_symbol[i], orig))
+                {
+                  if (!validate_change (insn, x, cur_tmp_reg[i], 0))
+                    {
+                      *x = cur_tmp_reg[i];
+                      return -1;
+                    }
+                  return 1;
+                }
+
             /* A mutable data symbol: proceed with baserel conversion using a tmp reg */
             rtx pic_ref = gen_rtx_PLUS(Pmode, picreg,
   					gen_rtx_CONST(Pmode,
@@ -277,6 +292,21 @@ namespace
 
             if (!validate_unshare_change(insn, x, result, 0))
               {
+                /* Not valid here, or not until the other copy of this
+                   address changes too: use a register for the sum, and
+                   remember it for that copy.  */
+                if (cur_tmp_use < 8)
+                  {
+                    if (offset != const0_rtx)
+                      {
+                        rtx sum = gen_reg_rtx (Pmode);
+                        emit_insn_before (gen_rtx_SET (sum, result), insn);
+                        result = sum;
+                      }
+                    cur_symbol[cur_tmp_use] = orig;
+                    cur_tmp_reg[cur_tmp_use] = result;
+                    ++cur_tmp_use;
+                  }
                 *x = result;
                 return -1;
               }
