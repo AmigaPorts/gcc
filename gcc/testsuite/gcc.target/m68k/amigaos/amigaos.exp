@@ -28,10 +28,13 @@ if { ![istarget m68k-*-amigaos*] } {
 }
 
 # Codegen (scan-assembler) tests.  Each fixes its own -O and CPU via
-# dg-options, so a single run is enough.  The board's cflags come after
-# dg-options on the command line, so a board that pins a CPU or FPU
-# (volamos-fpu: -m68020 -m68881) would override the test's; they are
-# dropped here.  The runtime test and its companion are handled
+# dg-options, so a single run is enough.  A board that pins a CPU or FPU
+# would change the test's: in its cflags, which come after dg-options on
+# the command line (volamos-fpu: -m68020 -m68881), or in its variant
+# (volamos/-m68020-60/-m68881), which comes before and still changes the
+# code: the FPU stays on, and -m68020-60 -m68000 is not -m68000.
+# Both are dropped here, with -fbaserel32 and -resident32, which need the
+# 68020 that just went.  The runtime test and its companion are handled
 # separately below.
 dg-init
 set scan_tests {}
@@ -43,11 +46,17 @@ foreach f [lsort [glob -nocomplain $srcdir/$subdir/*.c]] {
 }
 global board_info
 set tboard [target_info name]
-set saved_cflags [board_info $tboard cflags]
-regsub -all {(-m680[0-9]+(-[0-9]+)?|-mcpu=\S+|-march=\S+|-mtune=\S+|-m68881|-msoft-float|-mhard-float)(?=\s|$)} $saved_cflags "" scan_cflags
-set board_info($tboard,cflags) $scan_cflags
+foreach flagsvar {cflags multilib_flags} {
+    if { [board_info $tboard exists $flagsvar] } {
+	set saved_flags($flagsvar) [board_info $tboard $flagsvar]
+	regsub -all {(-m680[0-9]+(-[0-9]+)?|-mcpu=\S+|-march=\S+|-mtune=\S+|-m68881|-msoft-float|-mhard-float|-fbaserel32|-resident32)(?=\s|$)} $saved_flags($flagsvar) "" scan_flags
+	set board_info($tboard,$flagsvar) $scan_flags
+    }
+}
 dg-runtest $scan_tests "" ""
-set board_info($tboard,cflags) $saved_cflags
+foreach flagsvar [array names saved_flags] {
+    set board_info($tboard,$flagsvar) $saved_flags($flagsvar)
+}
 
 # Multilib selection.  Every spelling of a 68020-class or better CPU must
 # select the multilib built for it; before the MULTILIB_MATCHES entries in
