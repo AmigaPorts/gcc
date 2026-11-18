@@ -762,6 +762,9 @@ amigaos_prelink_hook(const_cast<const char **> (LD1_ARGV), (STRIP))
 
 #define MAKE_DECL_ONE_ONLY(DECL) (DECL_WEAK (DECL) = 1)
 
+/* An alias is a second symbol with the value of the first.  */
+#define SET_ASM_OP "\t.set\t"
+
 /* 1 if N is a possible register number for a function value.  For
    m68k/SVR4 allow d0, a0, or fp0 as return registers, for integral,
    pointer, or floating types, respectively.  Reject fp0 if not using
