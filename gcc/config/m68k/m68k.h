@@ -267,6 +267,16 @@ along with GCC; see the file COPYING3.  If not see
 #define TARGET_COLDFIRE		((m68k_cpu_flags & FL_COLDFIRE) != 0)
 #define TARGET_COLDFIRE_FPU	(m68k_fpu == FPUTYPE_COLDFIRE)
 #define TARGET_68881		(m68k_fpu == FPUTYPE_68881)
+
+/* A 68881 before the 68040 cannot round to float or double in a register:
+   a conversion from an integer of mode IMODE, wider than the mantissa of
+   MODE, leaves the extended value there.  With -fexcess-precision=standard
+   it goes through XFmode and a truncation, which stores it.  */
+#define M68K_FLOAT_VIA_XF_P(MODE, IMODE)				\
+  (TARGET_68881 && !TARGET_68040					\
+   && flag_excess_precision == EXCESS_PRECISION_STANDARD		\
+   && !flag_unsafe_math_optimizations					\
+   && ((MODE) == SFmode || ((MODE) == DFmode && (IMODE) == DImode)))
 #define TARGET_FIDOA		((m68k_cpu_flags & FL_FIDOA) != 0)
 #define TARGET_CAS		((m68k_cpu_flags & FL_CAS) != 0)
 
