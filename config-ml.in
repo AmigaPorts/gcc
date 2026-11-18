@@ -519,14 +519,18 @@ PWD_COMMAND=$${PWDCMD-pwd}
 # For DO=all, make schedules the multilib subdirectories as separate
 # targets, so each one costs a jobserver token and -j bounds the total.
 # Every other target (install, clean, check, ...) visits them in turn.
+# That make gets the flags this one was called with explicitly: a Makefile
+# that empties MAKEOVERRIDES, as libstdc++'s does, would otherwise give it
+# its own empty CXXFLAGS and the like.
+MULTIDO_FLAGS = $(FLAGS_TO_PASS) DO="$(DO)"
 multi-do:
 	@if [ -z "$(MULTIDIRS)" ]; then \
 	  true; \
 	elif [ "$(DO)" = all ]; then \
-	  $(MAKE) $(addprefix multi-do-one/,$(MULTIDIRS)); \
+	  $(MAKE) $(MULTIDO_FLAGS) $(addprefix multi-do-one/,$(MULTIDIRS)); \
 	else \
 	  for dir in $(MULTIDIRS); do \
-	    $(MAKE) multi-do-one/$$dir || exit 1; \
+	    $(MAKE) $(MULTIDO_FLAGS) multi-do-one/$$dir || exit 1; \
 	  done; \
 	fi
 
