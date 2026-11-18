@@ -1,6 +1,7 @@
 // { dg-do compile }
 // { dg-require-effective-target amigaos_gthreads }
 // { dg-options "-O2 -fomit-frame-pointer -m68000 -mregparm=2 -mmangle-regparm" }
+// { dg-skip-if "-m68000 has no 32-bit base-relative data" { *-*-* } { "-fbaserel32" "-resident32" } }
 
 // libgcc's out-of-line gthread functions are built once, so the amigaos
 // thread model's header fixes their convention whatever -mregparm and
