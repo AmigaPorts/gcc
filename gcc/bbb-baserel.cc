@@ -423,6 +423,21 @@ namespace
 	if (regCount0 + regCount1 <= 2)
 	  return;
 
+	/* (plus (plus i j) (plus k const)): sum i and j in a temp register
+	   and use (plus (plus t0 k) const), base, index and displacement.
+	   Replacing only op0 would leave (plus t0 (plus k const)), which is
+	   no address either, so its change would not validate.  */
+	if (regCount0 == 2 && GET_CODE (op1) == PLUS
+	    && REG_P (op10) && CONST_INT_P (op11))
+	  {
+	    rtx t0 = gen_reg_rtx (Pmode);
+	    emit_insn_before (gen_rtx_SET (t0, XEXP (plus, 0)), insn);
+	    validate_change (insn, &XEXP (plus, 0), gen_rtx_PLUS (Pmode, t0, op10), 1);
+	    validate_change (insn, &XEXP (plus, 1), op11, 1);
+	    if (apply_change_group ())
+	      return;
+	  }
+
 	// use a temp register for op0
 	if (regCount0 == 2)
 	  {
