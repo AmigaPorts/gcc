@@ -281,14 +281,17 @@ amigaos_declare_function_name (FILE *file, const char *name, tree decl)
 void
 amigaos_insert_attribute (tree decl, tree * attr)
 {
-  /* entrypoint and saveallregs change which registers the prologue saves,
-     but not the function type, so identical code folding would merge such
-     a function with a normal one that has the same body.  */
+  /* entrypoint, saveallregs and saveds change what the prologue does, but
+     not the function type as identical code folding compares it, so it
+     would merge such a function with a normal one that has the same
+     body.  */
   if (TREE_CODE (decl) == FUNCTION_DECL
       && (lookup_attribute ("entrypoint", *attr)
 	  || lookup_attribute ("saveallregs", *attr)
+	  || lookup_attribute ("saveds", *attr)
 	  || lookup_attribute ("entrypoint", TYPE_ATTRIBUTES (TREE_TYPE (decl)))
-	  || lookup_attribute ("saveallregs", TYPE_ATTRIBUTES (TREE_TYPE (decl))))
+	  || lookup_attribute ("saveallregs", TYPE_ATTRIBUTES (TREE_TYPE (decl)))
+	  || lookup_attribute ("saveds", TYPE_ATTRIBUTES (TREE_TYPE (decl))))
       && !lookup_attribute ("no_icf", *attr))
     *attr = tree_cons (get_identifier ("no_icf"), NULL_TREE, *attr);
 
