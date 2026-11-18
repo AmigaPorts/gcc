@@ -1,11 +1,15 @@
 ; Please try to keep this file in ASCII collating order.
 
+; -fbaserel, -fbaserel32, -resident and -resident32 negate each other in a
+; cycle, so the last one given decides the code, the multilib, the startup
+; code and the linker options.
+
 fbaserel
-Target Var(flag_pic,3) 
+Target Var(flag_pic,3) Negative(fbaserel32)
 data is addressed relative to a4
 
 fbaserel32
-Target Var(flag_pic,4)
+Target Var(flag_pic,4) Negative(resident)
 data is addressed relative to a4 with 32 bit offsets
 
 malways-restore-a4
@@ -49,9 +53,9 @@ Target RejectNegative
 Use libinitr.o as start file
 
 resident
-Target Common Var(flag_resident,3)
+Target Common Var(flag_resident,3) Negative(resident32)
 data is addressed relative to a4, linked as resident
 
 resident32
-Target Common Var(flag_resident,4)
+Target Common Var(flag_resident,4) Negative(fbaserel)
 data is addressed relative to a4 with 32 bit offsets, linked as resident
