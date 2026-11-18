@@ -3558,6 +3558,29 @@ output_move_simode (rtx *operands)
   return "move%.l %1,%0";
 }
 
+/* The number of instructions output_move_simode emits for OPERANDS: two
+   when it loads a constant into a data register with moveq and a not, neg
+   or swap, one otherwise.  For the sched_insns attribute.  */
+
+int
+m68k_move_simode_insns (rtx *operands)
+{
+  if (DATA_REG_P (operands[0])
+      && CONST_INT_P (operands[1])
+      && INTVAL (operands[1]) != 0)
+    switch (m68k_const_method (INTVAL (operands[1])))
+      {
+      case NOTB:
+      case NOTW:
+      case NEGW:
+      case SWAP:
+	return 2;
+      default:
+	break;
+      }
+  return 1;
+}
+
 const char *
 output_move_himode (rtx *operands)
 {

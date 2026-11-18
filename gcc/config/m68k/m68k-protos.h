@@ -29,6 +29,7 @@ extern void m68k_expand_mulsidi3 (rtx, rtx, rtx, bool);
 extern bool valid_mov3q_const (HOST_WIDE_INT);
 extern bool check_move_simode (const rtx *);
 extern const char *output_move_simode (rtx *);
+extern int m68k_move_simode_insns (rtx *);
 extern const char *output_move_himode (rtx *);
 extern const char *output_move_qimode (rtx *);
 extern const char *output_move_stricthi (rtx *);
