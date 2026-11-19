@@ -522,6 +522,9 @@ PWD_COMMAND=$${PWDCMD-pwd}
 # That make gets the flags this one was called with explicitly: a Makefile
 # that empties MAKEOVERRIDES, as libstdc++'s does, would otherwise give it
 # its own empty CXXFLAGS and the like.
+# A library's Makefile can set MULTI_CXXFLAGS_<multilib directory> to add
+# flags after the multilib's own when it compiles that multilib's C++, such
+# as -O2 where CXXFLAGS asks for -Os.
 MULTIDO_FLAGS = $(FLAGS_TO_PASS) DO="$(DO)"
 multi-do:
 	@if [ -z "$(MULTIDIRS)" ]; then \
@@ -558,7 +561,7 @@ $(addprefix multi-do-one/,$(MULTIDIRS)): multi-do-one/%:
 				GOCFLAGS="$(GOCFLAGS) $${flags}" \
 				GDCFLAGS="$(GDCFLAGS) $${flags}" \
 				A68FLAGS="$(A68FLAGS) $${flags}" \
-				CXXFLAGS="$(CXXFLAGS) $${flags}" \
+				CXXFLAGS="$(CXXFLAGS) $${flags} $(MULTI_CXXFLAGS_$*)" \
 				LIBCFLAGS="$(LIBCFLAGS) $${flags}" \
 				LIBCXXFLAGS="$(LIBCXXFLAGS) $${flags}" \
 				LDFLAGS="$(LDFLAGS) $${flags}" \
