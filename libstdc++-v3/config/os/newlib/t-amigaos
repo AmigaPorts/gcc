@@ -49,3 +49,13 @@ install-new-noexc: src/.libs/libnew_noexc.a
 clean-local: clean-new-noexc
 clean-new-noexc:
 	rm -f src/.libs/libnew_noexc.a $(new_noexc_objects)
+
+# m68k-amigaos-gcc builds the C++ libraries at -Os (CXXFLAGS), as libnix: the
+# 68000 and the 68020-60 without an FPU, baserel or not, are for machines short
+# of memory.  The multilibs with an FPU are for accelerated machines, where
+# speed matters more, and get -O2 after their multilib flags (see multi-do in
+# config-ml.in).  These are the directories of gcc/config/m68k/t-amigaos's
+# MULTILIB_DIRNAMES that end in libm881.
+MULTI_CXXFLAGS_libm020/libm881 = -O2
+MULTI_CXXFLAGS_libb/libm020/libm881 = -O2
+MULTI_CXXFLAGS_libb32/libm020/libm881 = -O2
