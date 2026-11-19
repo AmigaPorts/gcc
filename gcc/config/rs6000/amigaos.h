@@ -223,24 +223,33 @@ ASM_OPT_ANY
 #define CPP_CLIB2_SPEC "\
 -idirafter %(base_sdk)clib2/include -idirafter %(base_sdk)local/clib2/include"
 
-#define LIB_SUBDIR_CLIB2_SPEC "%{mcrt=clib2-ts:lib.threadsafe; :lib}%(lib_subdir_type)"
+/* clib2's SPE libraries (-mcpu=8548) are in a subdirectory spe of each
+   library directory, its classic ones use floating point registers.  */
+#define LIB_SUBDIR_CLIB2_SPE_SPEC "%{mcpu=8548|mfloat-gprs=double:/spe}"
 
+#define LIB_SUBDIR_CLIB2_SPEC "%{mcrt=clib2-ts:lib.threadsafe; :lib}%(lib_subdir_type)" \
+                              LIB_SUBDIR_CLIB2_SPE_SPEC
+
+/* clib2's SPE libraries are large data ones only.  */
 #define LINK_CLIB2_SPEC "\
+%{mcpu=8548|mfloat-gprs=double: \
+%{mbaserel|msdata|msdata=default|msdata=sysv: \
+%e-mbaserel and -msdata are not supported with -mcrt=clib2 for SPE, which has only large data libraries}} \
 -L%(base_sdk)clib2/%(lib_subdir_clib2) \
 -L%(base_gcc)lib/gcc/ppc-amigaos/%(version)/%{mcrt=clib2-ts:clib2-ts; :clib2}/lib%(lib_subdir_type) \
 -L%(base_sdk)local/clib2/%(lib_subdir_clib2)"
 
 #define STARTFILE_CLIB2_SPEC "\
 %(base_sdk)clib2/%{mcrt=clib2-ts:lib.threadsafe; :lib}" \
-                 "%{!msoft-float:%(lib_subdir_type)}/crtbegin.o \
+                 "%{!msoft-float:%(lib_subdir_type)}" LIB_SUBDIR_CLIB2_SPE_SPEC "/crtbegin.o \
 %(base_sdk)clib2/%{mcrt=clib2-ts:lib.threadsafe; :lib}" \
-                 "%{!msoft-float:%(lib_subdir_type)}/crt0.o"
+                 "%{!msoft-float:%(lib_subdir_type)}" LIB_SUBDIR_CLIB2_SPE_SPEC "/crt0.o"
 
 /* crtehend.o: see LINK_EH_BEGIN.  */
 #define ENDFILE_CLIB2_SPEC "\
 %{!shared:crtehend.o%s} \
 %(base_sdk)clib2/%{mcrt=clib2-ts:lib.threadsafe; :lib}" \
-                 "%{!msoft-float:%(lib_subdir_type)}/crtend.o"
+                 "%{!msoft-float:%(lib_subdir_type)}" LIB_SUBDIR_CLIB2_SPE_SPEC "/crtend.o"
 
 /* clib4 */
 
