@@ -6204,11 +6204,18 @@ m68k_hard_regno_mode_ok (unsigned int regno, machine_mode mode)
 
 static reg_class_t
 m68k_ira_change_pseudo_allocno_class (int regno, reg_class_t allocno_class,
-				      reg_class_t best_class ATTRIBUTE_UNUSED)
+				      reg_class_t best_class)
 {
   if (GET_MODE_SIZE (PSEUDO_REGNO_MODE (regno)) == 1
       && (allocno_class == GENERAL_REGS || allocno_class == ADDR_REGS))
     return DATA_REGS;
+  /* A long double that is best in an FPU register can also take three
+     data registers, which makes its class ALL_REGS.  There the allocator
+     charges all FPU registers but every third more, and gives it fp2,
+     which the prologue has to save, rather than fp0 or fp1.  */
+  if (PSEUDO_REGNO_MODE (regno) == XFmode
+      && allocno_class == ALL_REGS && best_class == FP_REGS)
+    return FP_REGS;
   return allocno_class;
 }
 
