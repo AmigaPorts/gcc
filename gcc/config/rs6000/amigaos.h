@@ -223,12 +223,13 @@ ASM_OPT_ANY
 #define CPP_CLIB2_SPEC "\
 -idirafter %(base_sdk)clib2/include -idirafter %(base_sdk)local/clib2/include"
 
-/* clib2's SPE libraries (-mcpu=8548) are in a subdirectory spe of each
-   library directory, its classic ones use floating point registers.  */
-#define LIB_SUBDIR_CLIB2_SPE_SPEC "%{mcpu=8548|mfloat-gprs=double:/spe}"
+/* The SPE libraries (-mcpu=8548) of clib2 and clib4 are in a subdirectory
+   spe of each library directory, their classic ones use floating point
+   registers.  */
+#define LIB_SUBDIR_SPE_SPEC "%{mcpu=8548|mfloat-gprs=double:/spe}"
 
 #define LIB_SUBDIR_CLIB2_SPEC "%{mcrt=clib2-ts:lib.threadsafe; :lib}%(lib_subdir_type)" \
-                              LIB_SUBDIR_CLIB2_SPE_SPEC
+                              LIB_SUBDIR_SPE_SPEC
 
 /* clib2's SPE libraries are large data ones only.  */
 #define LINK_CLIB2_SPEC "\
@@ -241,22 +242,22 @@ ASM_OPT_ANY
 
 #define STARTFILE_CLIB2_SPEC "\
 %(base_sdk)clib2/%{mcrt=clib2-ts:lib.threadsafe; :lib}" \
-                 "%{!msoft-float:%(lib_subdir_type)}" LIB_SUBDIR_CLIB2_SPE_SPEC "/crtbegin.o \
+                 "%{!msoft-float:%(lib_subdir_type)}" LIB_SUBDIR_SPE_SPEC "/crtbegin.o \
 %(base_sdk)clib2/%{mcrt=clib2-ts:lib.threadsafe; :lib}" \
-                 "%{!msoft-float:%(lib_subdir_type)}" LIB_SUBDIR_CLIB2_SPE_SPEC "/crt0.o"
+                 "%{!msoft-float:%(lib_subdir_type)}" LIB_SUBDIR_SPE_SPEC "/crt0.o"
 
 /* crtehend.o: see LINK_EH_BEGIN.  */
 #define ENDFILE_CLIB2_SPEC "\
 %{!shared:crtehend.o%s} \
 %(base_sdk)clib2/%{mcrt=clib2-ts:lib.threadsafe; :lib}" \
-                 "%{!msoft-float:%(lib_subdir_type)}" LIB_SUBDIR_CLIB2_SPE_SPEC "/crtend.o"
+                 "%{!msoft-float:%(lib_subdir_type)}" LIB_SUBDIR_SPE_SPEC "/crtend.o"
 
 /* clib4 */
 
 #define CPP_CLIB4_SPEC "\
 -idirafter %(base_sdk)clib4/include -idirafter %(base_sdk)local/clib4/include"
 
-#define LIB_SUBDIR_CLIB4_SPEC "lib%(lib_subdir_type)"
+#define LIB_SUBDIR_CLIB4_SPEC "lib%(lib_subdir_type)" LIB_SUBDIR_SPE_SPEC
 
 /* clib4 has baserel libraries but no small-data ones.  */
 #define LINK_CLIB4_SPEC "\
