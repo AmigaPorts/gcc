@@ -822,9 +822,26 @@ m68k_option_override (void)
     m68k_sched_cpu = CPU_CFV3;
   else if (TUNE_CFV4)
     m68k_sched_cpu = CPU_CFV4;
+  else if (TUNE_68060)
+    m68k_sched_cpu = CPU_M68060;
   else
+    m68k_sched_cpu = CPU_UNKNOWN;
+
+  /* 68060: only sched2 (post-reload), where the optimization level enables
+     it, to preserve autoincrements.  sched1 (pre-RA) would separate loads
+     from address increments before auto_inc_dec has a chance to form them.
+     Non-scheduling CPUs: disable all scheduling passes.  */
+  if (m68k_sched_cpu == CPU_M68060)
     {
-      m68k_sched_cpu = CPU_UNKNOWN;
+      if (!OPTION_SET_P (flag_schedule_insns))
+	flag_schedule_insns = 0;
+      if (!OPTION_SET_P (flag_modulo_sched))
+	flag_modulo_sched = 0;
+      if (!OPTION_SET_P (flag_live_range_shrinkage))
+	flag_live_range_shrinkage = 0;
+    }
+  else if (m68k_sched_cpu == CPU_UNKNOWN)
+    {
       flag_schedule_insns = 0;
       flag_schedule_insns_after_reload = 0;
       flag_modulo_sched = 0;
@@ -853,6 +870,15 @@ m68k_override_options_after_change (void)
       flag_schedule_insns_after_reload = 0;
       flag_modulo_sched = 0;
       flag_live_range_shrinkage = 0;
+    }
+  else if (m68k_sched_cpu == CPU_M68060)
+    {
+      if (!OPTION_SET_P (flag_schedule_insns))
+	flag_schedule_insns = 0;
+      if (!OPTION_SET_P (flag_modulo_sched))
+	flag_modulo_sched = 0;
+      if (!OPTION_SET_P (flag_live_range_shrinkage))
+	flag_live_range_shrinkage = 0;
     }
 }
 
@@ -3526,6 +3552,29 @@ output_move_simode (rtx *operands)
 	   && ADDRESS_REG_P (operands[0]))
     return "lea %a1,%0";
   return "move%.l %1,%0";
+}
+
+/* The number of instructions output_move_simode emits for OPERANDS: two
+   when it loads a constant into a data register with moveq and a not, neg
+   or swap, one otherwise.  For the sched_insns attribute.  */
+
+int
+m68k_move_simode_insns (rtx *operands)
+{
+  if (DATA_REG_P (operands[0])
+      && CONST_INT_P (operands[1])
+      && INTVAL (operands[1]) != 0)
+    switch (m68k_const_method (INTVAL (operands[1])))
+      {
+      case NOTB:
+      case NOTW:
+      case NEGW:
+      case SWAP:
+	return 2;
+      default:
+	break;
+      }
+  return 1;
 }
 
 const char *
@@ -6450,9 +6499,9 @@ sched_address_type (machine_mode mode, rtx addr_rtx)
   if (!m68k_decompose_address (mode, addr_rtx,
 			       reload_completed, &address))
     {
-      gcc_assert (!reload_completed);
-      /* Reload will likely fix the address to be in the register.  */
-      return OP_TYPE_MEM234;
+      /* Before reload: reload will likely fix the address.
+	 After reload (sched2): treat conservatively as indexed.  */
+      return reload_completed ? OP_TYPE_MEM6 : OP_TYPE_MEM234;
     }
 
   if (address.scale != 0)
@@ -6503,10 +6552,7 @@ sched_attr_op_type (rtx_insn *insn, bool opx_p, bool address_p)
   op = sched_get_operand (insn, opx_p);
 
   if (op == NULL)
-    {
-      gcc_assert (!reload_completed);
-      return OP_TYPE_RN;
-    }
+    return OP_TYPE_RN;
 
   if (address_p)
     return sched_address_type (QImode, op);
@@ -6535,22 +6581,16 @@ sched_attr_op_type (rtx_insn *insn, bool opx_p, bool address_p)
 	case TYPE_ALUQ_L:
 	  if (IN_RANGE (ival, 1, 8) || IN_RANGE (ival, -8, -1))
 	    return OP_TYPE_IMM_Q;
-
-	  gcc_assert (!reload_completed);
 	  break;
 
 	case TYPE_MOVEQ_L:
 	  if (USE_MOVQ (ival))
 	    return OP_TYPE_IMM_Q;
-
-	  gcc_assert (!reload_completed);
 	  break;
 
 	case TYPE_MOV3Q_L:
 	  if (valid_mov3q_const (ival))
 	    return OP_TYPE_IMM_Q;
-
-	  gcc_assert (!reload_completed);
 	  break;
 
 	default:
@@ -6602,8 +6642,6 @@ sched_attr_op_type (rtx_insn *insn, bool opx_p, bool address_p)
 	  return OP_TYPE_IMM_L;
 	}
     }
-
-  gcc_assert (!reload_completed);
 
   if (FLOAT_MODE_P (GET_MODE (op)))
     return OP_TYPE_FPN;
@@ -6773,11 +6811,7 @@ sched_get_attr_size_int (rtx_insn *insn)
     }
 
   if (size > 3)
-    {
-      gcc_assert (!reload_completed);
-
-      size = 3;
-    }
+    size = 3;
 
   return size;
 }
@@ -6912,50 +6946,36 @@ m68k_sched_attr_op_mem (rtx_insn *insn)
     return OP_MEM_10;
 
   if (opy == OP_TYPE_MEM1 && opx == OP_TYPE_MEM1)
-    {
-      switch (get_attr_opx_access (insn))
-	{
-	case OPX_ACCESS_W:
-	  return OP_MEM_11;
-
-	default:
-	  gcc_assert (!reload_completed);
-	  return OP_MEM_11;
-	}
-    }
+    return OP_MEM_11;
 
   if (opy == OP_TYPE_MEM1 && opx == OP_TYPE_MEM6)
-    {
-      switch (get_attr_opx_access (insn))
-	{
-	case OPX_ACCESS_W:
-	  return OP_MEM_1I;
-
-	default:
-	  gcc_assert (!reload_completed);
-	  return OP_MEM_1I;
-	}
-    }
+    return OP_MEM_1I;
 
   if (opy == OP_TYPE_MEM6 && opx == OP_TYPE_RN)
     return OP_MEM_I0;
 
   if (opy == OP_TYPE_MEM6 && opx == OP_TYPE_MEM1)
-    {
-      switch (get_attr_opx_access (insn))
-	{
-	case OPX_ACCESS_W:
-	  return OP_MEM_I1;
+    return OP_MEM_I1;
 
-	default:
-	  gcc_assert (!reload_completed);
-	  return OP_MEM_I1;
-	}
-    }
-
-  gcc_assert (opy == OP_TYPE_MEM6 && opx == OP_TYPE_MEM6);
-  gcc_assert (!reload_completed);
+  /* mem6+mem6 or other unusual combinations.  */
   return OP_MEM_I1;
+}
+
+/* Implement lea_index attribute: whether the address INSN computes, a lea
+   or an addsi3 output as one, has an index register.  Unknown counts as
+   indexed.  */
+enum attr_lea_index
+m68k_sched_attr_lea_index (rtx_insn *insn)
+{
+  rtx set = single_set (insn);
+  struct m68k_address address;
+
+  if (set == NULL_RTX
+      || !m68k_decompose_address (QImode, SET_SRC (set), reload_completed,
+				  &address))
+    return LEA_INDEX_YES;
+
+  return address.index != NULL_RTX ? LEA_INDEX_YES : LEA_INDEX_NO;
 }
 
 /* Data for ColdFire V4 index bypass.
@@ -6989,7 +7009,12 @@ m68k_sched_adjust_cost (rtx_insn *insn, int, rtx_insn *def_insn, int cost,
       || recog_memoized (insn) < 0)
     return cost;
 
-  if (sched_cfv4_bypass_data.scale == 1)
+  if (m68k_sched_cpu == CPU_M68060)
+    /* 68060: no ColdFire bypass logic, just respect DFA constraints.  */
+    gcc_assert (sched_cfv4_bypass_data.pro == NULL
+		&& sched_cfv4_bypass_data.con == NULL
+		&& sched_cfv4_bypass_data.scale == 0);
+  else if (sched_cfv4_bypass_data.scale == 1)
     /* Handle ColdFire V4 bypass for indexed address with 1x scale.  */
     {
       /* haifa-sched.cc: insn_cost () calls bypass_p () just before
@@ -7035,6 +7060,7 @@ m68k_sched_issue_rate (void)
       return 1;
 
     case CPU_CFV4:
+    case CPU_M68060:
       return 2;
 
     default:
@@ -7136,6 +7162,7 @@ m68k_sched_variable_issue (FILE *sched_dump ATTRIBUTE_UNUSED,
 	  break;
 
 	case CPU_CFV4:
+	case CPU_M68060:
 	  gcc_assert (!sched_ib.enabled_p);
 	  insn_size = 0;
 	  break;
@@ -7205,14 +7232,14 @@ m68k_sched_md_init_global (FILE *sched_dump ATTRIBUTE_UNUSED,
 
   /* Setup target cpu.  */
 
-  /* ColdFire V4 has a set of features to keep its instruction buffer full
-     (e.g., a separate memory bus for instructions) and, hence, we do not model
-     buffer for this CPU.  */
-  sched_ib.enabled_p = (m68k_sched_cpu != CPU_CFV4);
+  /* ColdFire V4 and 68060 do not use the instruction buffer model.  */
+  sched_ib.enabled_p = (m68k_sched_cpu != CPU_CFV4
+			&& m68k_sched_cpu != CPU_M68060);
 
   switch (m68k_sched_cpu)
     {
     case CPU_CFV4:
+    case CPU_M68060:
       sched_ib.filled = 0;
 
       /* FALLTHRU */
@@ -7234,14 +7261,19 @@ m68k_sched_md_init_global (FILE *sched_dump ATTRIBUTE_UNUSED,
       gcc_unreachable ();
     }
 
-  sched_mem_unit_code = get_cpu_unit_code ("cf_mem1");
+  if (m68k_sched_cpu != CPU_M68060)
+    {
+      sched_mem_unit_code = get_cpu_unit_code ("cf_mem1");
+
+      start_sequence ();
+      emit_insn (gen_ib ());
+      sched_ib.insn = end_sequence ();
+    }
+  else
+    sched_mem_unit_code = 0;
 
   sched_adjust_cost_state = xmalloc (state_size ());
   state_reset (sched_adjust_cost_state);
-
-  start_sequence ();
-  emit_insn (gen_ib ());
-  sched_ib.insn = end_sequence ();
 }
 
 /* Scheduling pass is now finished.  Free/reset static variables.  */
@@ -7286,6 +7318,7 @@ m68k_sched_md_init (FILE *sched_dump ATTRIBUTE_UNUSED,
       break;
 
     case CPU_CFV4:
+    case CPU_M68060:
       gcc_assert (!sched_ib.enabled_p);
       sched_ib.size = 0;
       break;

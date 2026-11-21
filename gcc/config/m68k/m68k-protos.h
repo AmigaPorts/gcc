@@ -29,6 +29,7 @@ extern void m68k_expand_mulsidi3 (rtx, rtx, rtx, bool);
 extern bool valid_mov3q_const (HOST_WIDE_INT);
 extern bool check_move_simode (const rtx *);
 extern const char *output_move_simode (rtx *);
+extern int m68k_move_simode_insns (rtx *);
 extern const char *output_move_himode (rtx *);
 extern const char *output_move_qimode (rtx *);
 extern const char *output_move_stricthi (rtx *);
@@ -103,6 +104,7 @@ extern enum attr_opx_type m68k_sched_attr_opx_type (rtx_insn *, int);
 extern enum attr_opy_type m68k_sched_attr_opy_type (rtx_insn *, int);
 extern enum attr_size m68k_sched_attr_size (rtx_insn *);
 extern enum attr_op_mem m68k_sched_attr_op_mem (rtx_insn *);
+extern enum attr_lea_index m68k_sched_attr_lea_index (rtx_insn *);
 #endif /* HAVE_ATTR_cpu */
 
 #endif /* RTX_CODE */
