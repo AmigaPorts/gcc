@@ -20,15 +20,15 @@ def run(flags):
 
 multilib = run(['-print-multi-lib'])
 assert multilib.returncode == 0, multilib.stderr
-expected = {'.', 'clib2', 'clib4', 'clib2/soft-float', 'spe',
-            'newlib/spe', 'clib2/spe', 'clib4/spe'}
+expected = {'.', 'clib2', 'clib4', 'clib2/soft-float', 'clib2/spe',
+            'clib4/spe'}
 assert {x.split(';')[0] for x in multilib.stdout.splitlines()} == expected
 accepted = [([], '.'), (['-mcpu=750'], '.'),
             (['-mcrt=clib2', '-msoft-float'], 'clib2/soft-float'),
-            (['-mcpu=8548'], 'spe'),
-            (['-mcpu=8540', '-mspe', '-mabi=spe', '-mfloat-gprs=double'], 'spe')]
-accepted += [(['-mcpu=8548', '-mcrt=' + crt], 'spe' if crt == 'newlib' else crt + '/spe')
-             for crt in ['newlib', 'clib2', 'clib4']]
+            (['-mcpu=8540', '-mspe', '-mabi=spe', '-mfloat-gprs=double',
+              '-mcrt=clib2'], 'clib2/spe')]
+accepted += [(['-mcpu=8548', '-mcrt=' + crt], crt + '/spe')
+             for crt in ['clib2', 'clib4']]
 for flags, directory in accepted:
     r = run(flags + ['-S', str(src), '-o', str(src.with_suffix('.s'))])
     assert r.returncode == 0, (flags, r.stderr)
@@ -45,7 +45,28 @@ for flags in rejected:
     for action in [['-S', str(src)], ['-###', str(src.with_suffix('.o'))]]:
         r = run(flags + action)
         assert r.returncode != 0 and 'AmigaOS4 SPE requires' in r.stderr, (flags, r)
+# Only clib2 and clib4 have SPE libraries: SPE code compiles with every C
+# runtime, but links only with those two, unless the link leaves out the C
+# library.
+spe = [['-mcpu=8548'], ['-mcpu=8540', '-mspe', '-mabi=spe', '-mfloat-gprs=double']]
+spe_crts = [['-mcrt=clib2'], ['-mcrt=clib2-ts'], ['-mcrt=clib4']]
+no_spe_crts = [[], ['-mcrt=default'], ['-mcrt=newlib'], ['-mcrt=libnix'],
+               ['-mcrt=ixemul']]
+for flags in [s + c for s in spe for c in spe_crts + no_spe_crts]:
+    r = run(flags + ['-S', str(src), '-o', str(src.with_suffix('.s'))])
+    assert r.returncode == 0, (flags, r.stderr)
+    for link in [[], ['-shared']]:
+        r = run(flags + link + ['-###', str(src.with_suffix('.o'))])
+        if flags[-1:] in spe_crts:
+            assert 'link only with' not in r.stderr, (flags + link, r)
+        else:
+            assert r.returncode != 0 and 'AmigaOS4 SPE programs link only with' in r.stderr, (flags + link, r)
+    for link in [['-c'], ['-r'], ['-nostdlib'], ['-nodefaultlibs']]:
+        r = run(flags + link + ['-###', str(src)])
+        assert r.returncode == 0, (flags + link, r.stderr)
 report = {'multilibs': multilib.stdout.splitlines(), 'accepted': accepted,
-          'rejected_at_compile_and_link': rejected}
+          'rejected_at_compile_and_link': rejected,
+          'linked_only_with': [c[0] for c in spe_crts],
+          'rejected_at_link': [c[0] if c else '(none)' for c in no_spe_crts]}
 (a.output / 'options.json').write_text(json.dumps(report, indent=2) + '\n')
 print(json.dumps(report, indent=2))
