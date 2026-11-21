@@ -25,6 +25,7 @@ extern HOST_WIDE_INT m68k_initial_elimination_offset (int from, int to);
 
 extern void split_di (rtx[], int, rtx[], rtx[]);
 extern void m68k_expand_mulsidi3 (rtx, rtx, rtx, bool);
+extern void m68k_expand_floatunssi (rtx, rtx);
 
 extern bool valid_mov3q_const (HOST_WIDE_INT);
 extern bool check_move_simode (const rtx *);
