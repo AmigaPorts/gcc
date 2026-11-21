@@ -54,8 +54,11 @@ clean-new-noexc:
 # 68000 and the 68020-60 without an FPU, baserel or not, are for machines short
 # of memory.  The multilibs with an FPU are for accelerated machines, where
 # speed matters more, and get -O2 after their multilib flags (see multi-do in
-# config-ml.in).  These are the directories of gcc/config/m68k/t-amigaos's
-# MULTILIB_DIRNAMES that end in libm881.
-MULTI_CXXFLAGS_libm020/libm881 = -O2
-MULTI_CXXFLAGS_libb/libm020/libm881 = -O2
-MULTI_CXXFLAGS_libb32/libm020/libm881 = -O2
+# config-ml.in), but only in place of that -Os: a build with other flags, -O0
+# -g to debug say, gets them on these multilibs too.  These are the
+# directories of gcc/config/m68k/t-amigaos's MULTILIB_DIRNAMES that end in
+# libm881.
+amigaos_fpu_cxxflags = $(if $(filter -Os,$(CXXFLAGS)),-O2)
+MULTI_CXXFLAGS_libm020/libm881 = $(amigaos_fpu_cxxflags)
+MULTI_CXXFLAGS_libb/libm020/libm881 = $(amigaos_fpu_cxxflags)
+MULTI_CXXFLAGS_libb32/libm020/libm881 = $(amigaos_fpu_cxxflags)
