@@ -827,16 +827,14 @@ m68k_option_override (void)
   else
     m68k_sched_cpu = CPU_UNKNOWN;
 
-  /* 68060: enable only sched2 (post-reload) to preserve autoincrements.
-     sched1 (pre-RA) would separate loads from address increments before
-     auto_inc_dec has a chance to form them.
+  /* 68060: only sched2 (post-reload), where the optimization level enables
+     it, to preserve autoincrements.  sched1 (pre-RA) would separate loads
+     from address increments before auto_inc_dec has a chance to form them.
      Non-scheduling CPUs: disable all scheduling passes.  */
   if (m68k_sched_cpu == CPU_M68060)
     {
       if (!OPTION_SET_P (flag_schedule_insns))
 	flag_schedule_insns = 0;
-      if (!OPTION_SET_P (flag_schedule_insns_after_reload))
-	flag_schedule_insns_after_reload = 1;
       if (!OPTION_SET_P (flag_modulo_sched))
 	flag_modulo_sched = 0;
       if (!OPTION_SET_P (flag_live_range_shrinkage))
@@ -877,8 +875,6 @@ m68k_override_options_after_change (void)
     {
       if (!OPTION_SET_P (flag_schedule_insns))
 	flag_schedule_insns = 0;
-      if (!OPTION_SET_P (flag_schedule_insns_after_reload))
-	flag_schedule_insns_after_reload = 1;
       if (!OPTION_SET_P (flag_modulo_sched))
 	flag_modulo_sched = 0;
       if (!OPTION_SET_P (flag_live_range_shrinkage))
@@ -6965,6 +6961,23 @@ m68k_sched_attr_op_mem (rtx_insn *insn)
   return OP_MEM_I1;
 }
 
+/* Implement lea_index attribute: whether the address INSN computes, a lea
+   or an addsi3 output as one, has an index register.  Unknown counts as
+   indexed.  */
+enum attr_lea_index
+m68k_sched_attr_lea_index (rtx_insn *insn)
+{
+  rtx set = single_set (insn);
+  struct m68k_address address;
+
+  if (set == NULL_RTX
+      || !m68k_decompose_address (QImode, SET_SRC (set), reload_completed,
+				  &address))
+    return LEA_INDEX_YES;
+
+  return address.index != NULL_RTX ? LEA_INDEX_YES : LEA_INDEX_NO;
+}
+
 /* Data for ColdFire V4 index bypass.
    Producer modifies register that is used as index in consumer with
    specified scale.  */
@@ -7197,10 +7210,7 @@ m68k_sched_md_init_global (FILE *sched_dump ATTRIBUTE_UNUSED,
 {
   /* Check that all instructions have DFA reservations and
      that all instructions can be issued from a clean state.  */
-  /* Skip DFA validation for 68060: not all patterns have type attributes
-     yet, so some instructions lack proper DFA reservations.  The m68060
-     catch-all reservation handles these at runtime via type "unknown".  */
-  if (flag_checking && m68k_sched_cpu != CPU_M68060)
+  if (flag_checking)
     {
       rtx_insn *insn;
       state_t state;
