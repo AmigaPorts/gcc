@@ -44,7 +44,13 @@ selects native SPE floating point and the GPR ABI automatically. Rebuild
 matching objects together and keep conventional SDK boundaries separate.
 Plain `-mcpu=8540`/SPEv1 and soft-float SPE combinations are rejected,
 including link-only invocations, because no matching runtime is provided.
-The supported set contains eight multilib directories; the conventional
+SPE programs link only with clib2 (`-mcrt=clib2` or `-mcrt=clib2-ts`)
+or clib4 (`-mcrt=clib4`), the C runtimes with SPE libraries, and the
+driver rejects linking SPE code with any other: newlib.library takes and
+returns floating point in FPRs, also on the A1222, and libnix and ixemul
+have no SPE libraries. SPE translation units in a conventional program are
+linked without `-mcpu=8548`; see below.
+The supported set contains six multilib directories; the conventional
 clib2 soft-float directory remains available.
 
 ## AmigaOS4 interface boundaries
@@ -146,4 +152,4 @@ follow-up results; `validation.json` retains the initial port's results.
 See [REVIEW.md](REVIEW.md) for the multilib corrections, conventional
 unwinder layout preservation, static alignment audit, and scheduler
 references. Run `check-options.py --gcc-build BUILD --output OUTPUT` to
-check supported driver options and all eight multilib selections.
+check supported driver options and all six multilib selections.

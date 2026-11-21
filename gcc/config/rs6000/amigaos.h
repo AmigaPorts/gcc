@@ -361,7 +361,14 @@ mcrt=default|!mcrt=*: %{mcrt=default|!nostdinc: %(cpp_amiga_default)}; \
 %{mbaserel: %{msdata|msdata=default|msdata=sysv: %e-mbaserel and -msdata options are incompatible}} \
 %{newlib: %e-newlib is obsolete, use -mcrt=newlib instead}"
 
-/* LINK_SPEC - patch 0043: add --eh-frame-hdr */
+/* LINK_SPEC - patch 0043: add --eh-frame-hdr
+   SPE code passes floating point in GPRs, so it links only with a C
+   runtime that has SPE libraries: clib2 and clib4.  newlib.library takes
+   and returns floating point in FPRs, also on the A1222, and its libc.a's
+   functions are only stubs that call into it; libnix and ixemul have no
+   SPE libraries, and their -mcpu=8548 links would get the conventional
+   libgcc.  -r, -nostdlib and -nodefaultlibs still work,
+   for SPE code in a conventional program, linked without -mcpu=8548.  */
 #undef LINK_SPEC
 #define LINK_SPEC "\
 --defsym __amigaos4__=1 \
@@ -372,6 +379,8 @@ mcrt=default|!mcrt=*: %{mcrt=default|!nostdinc: %(cpp_amiga_default)}; \
 %{Qy:} %{!Qn:-Qy} \
 %(link_eh_begin) %(link_thread) %(link_shlib) %(link_text) \
 %{mbaserel: %{msdata|msdata=default|msdata=sysv: %e-mbaserel and -msdata options are incompatible}} \
+%{mcpu=8548|mfloat-gprs=double:%{!mcrt=clib2:%{!mcrt=clib2-ts:%{!mcrt=clib4:%{!nostdlib:%{!nodefaultlibs:%{!r: \
+%eAmigaOS4 SPE programs link only with -mcrt=clib2, -mcrt=clib2-ts or -mcrt=clib4}}}}}}} \
 %{mcrt=clib2|mcrt=clib2-ts: %(link_clib2); \
 mcrt=clib4: %(link_clib4); \
 mcrt=ixemul: %(link_ixemul); \

@@ -30,3 +30,8 @@ MULTILIB_MATCHES += mcpu?8548=mfloat-gprs?double
 
 # No soft-float SPE runtime is supported by the A1222 port.
 MULTILIB_EXCEPTIONS += *msoft-float*mcpu=8548*
+
+# Nor a newlib one: newlib.library passes floating point in FPRs, so SPE
+# programs don't link with newlib, and its SPE multilibs would only hold
+# a libstdc++ that can't call it.
+MULTILIB_EXCEPTIONS += mcpu=8548 mcrt=newlib/mcpu=8548
