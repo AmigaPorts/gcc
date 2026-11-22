@@ -189,6 +189,11 @@ do									\
       }									\
     if (!TARGET_68020 && flag_pic==4)					\
       error ("%<-fbaserel32%> is not supported on the 68000 or 68010");	\
+    /* Base-relative data and -mpcrel's pc-relative data don't mix yet:	\
+       AmigaPorts/m68k-amigaos-gcc#404.  */				\
+    if (TARGET_PCREL && flag_pic >= 3)					\
+      error ("%<-mpcrel%> and %<-fbaserel%> or %<-resident%> are mutually " \
+	     "exclusive");						\
     /* flag_pic 1 and 2 are the generic -fpic/-fPIC (and -fpie/-fPIE);	\
        the hunk linker has no GOT, so only the a4-relative modes 3 and 4 \
        above are valid; the generic ones are warned about and dropped,	\
