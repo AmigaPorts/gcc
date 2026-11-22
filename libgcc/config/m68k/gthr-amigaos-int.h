@@ -31,6 +31,11 @@ void __gthread_amigaos_start_keys (void);
 void __gthread_amigaos_cancel_keys (void);
 void __gthread_amigaos_end_keys (struct Task *);
 
+/* For the C library: a pointer of its own that follows the running
+   thread, see gthr-amigaos.c.  */
+__stdargs void __gthread_amigaos_thread_pointer
+  (void **, void *(__stdargs *) (void), void (__stdargs *) (void *));
+
 /* The same for a task that another thread library starts, which calls
    __gthread_amigaos_task_new(), _start(), _cancel() and _end()
    (amigaos-task-end.c).  */
