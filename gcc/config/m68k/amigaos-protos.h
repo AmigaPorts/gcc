@@ -58,6 +58,9 @@ extern void
 amigaos_init_libfuncs (void);
 
 extern void
+amigaos_set_current_function (tree);
+
+extern void
 amigaos_output_labelref (FILE *file, const char *name);
 
 extern void

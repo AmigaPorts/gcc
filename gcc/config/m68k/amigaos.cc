@@ -236,22 +236,45 @@ amigaos_mangle_decl_assembler_name (tree decl, tree id)
   return id;
 }
 
-/* TARGET_INIT_LIBFUNCS.  With the 68881, libgcc's __floatdidf and
-   __floatundidf return the exact integer in fp0, in extended precision.
-   With -fexcess-precision=standard a long long converted to double has to
-   be rounded to double, so their _rounded versions store and reload it.
-   The conversions to float already round.  */
+/* With the 68881, libgcc's __floatdidf and __floatundidf return the exact
+   integer in fp0, in extended precision.  With -fexcess-precision=standard
+   a long long converted to double has to be rounded to double, so their
+   _rounded versions store and reload it.  The conversions to float already
+   round.
+
+   The flags are per function: lto1 defaults to -fexcess-precision=fast
+   while the functions keep the standard that -std=c11 implied, and the
+   optimize attribute can change either.  So the libcalls are chosen when
+   the current function changes, not once at init.  -1 means not chosen
+   since the libcalls were last reset, -2 that they don't exist yet.  */
+
+static int amigaos_floatdidf_rounded = -2;
+
+/* TARGET_INIT_LIBFUNCS.  */
 
 void
 amigaos_init_libfuncs (void)
 {
-  if (TARGET_68881 && TARGET_68020
-      && flag_excess_precision == EXCESS_PRECISION_STANDARD
-      && !flag_unsafe_math_optimizations)
-    {
-      set_conv_libfunc (sfloat_optab, DFmode, DImode, "__floatdidf_rounded");
-      set_conv_libfunc (ufloat_optab, DFmode, DImode, "__floatundidf_rounded");
-    }
+  amigaos_floatdidf_rounded = -1;
+}
+
+/* TARGET_SET_CURRENT_FUNCTION.  */
+
+void
+amigaos_set_current_function (tree)
+{
+  int rounded = (TARGET_68881 && TARGET_68020
+		 && flag_excess_precision == EXCESS_PRECISION_STANDARD
+		 && !flag_unsafe_math_optimizations);
+
+  if (amigaos_floatdidf_rounded == -2
+      || rounded == amigaos_floatdidf_rounded)
+    return;
+  amigaos_floatdidf_rounded = rounded;
+  set_conv_libfunc (sfloat_optab, DFmode, DImode,
+		    rounded ? "__floatdidf_rounded" : "__floatdidf");
+  set_conv_libfunc (ufloat_optab, DFmode, DImode,
+		    rounded ? "__floatundidf_rounded" : "__floatundidf");
 }
 
 /* ASM_OUTPUT_LABELREF.  A name mangled by -mmangle-regparm already has
