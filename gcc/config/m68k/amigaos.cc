@@ -240,7 +240,10 @@ amigaos_mangle_decl_assembler_name (tree decl, tree id)
    integer in fp0, in extended precision.  With -fexcess-precision=standard
    a long long converted to double has to be rounded to double, so their
    _rounded versions store and reload it.  The conversions to float already
-   round.
+   round.  The _rounded functions are only in the 68020 multilibs with the
+   68881: t-amigaos has no 68881 multilib without -m68020-60, so with
+   -m68000 -m68881 an int converted to float rounds, and a long long
+   converted to double doesn't.
 
    The flags are per function: lto1 defaults to -fexcess-precision=fast
    while the functions keep the standard that -std=c11 implied, and the
