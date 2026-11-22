@@ -268,20 +268,18 @@ along with GCC; see the file COPYING3.  If not see
 #define TARGET_COLDFIRE_FPU	(m68k_fpu == FPUTYPE_COLDFIRE)
 #define TARGET_68881		(m68k_fpu == FPUTYPE_68881)
 
-/* With -fexcess-precision=standard, a conversion from an integer of mode
-   IMODE, wider than the mantissa of MODE, goes through XFmode and a
-   truncation, which rounds it to MODE.  A 68881 before the 68040 cannot
-   round to float or double in a register, so the truncation stores the
-   value, and (float) of an int needs it too.  libgcc's conversions from
-   DImode to DFmode return the extended value on every CPU; on the 68040
-   and 68060 the truncation is an fdmove.  The default,
-   -fexcess-precision=fast, keeps the code as it was.  */
-#define M68K_FLOAT_VIA_XF_P(MODE, IMODE)				\
+/* With -fexcess-precision=standard, an int converted to float has to be
+   rounded to float by itself, not as part of an operation: fadd.l and
+   friends round only their result.  The default, -fexcess-precision=fast,
+   keeps the code as it was.  */
+#define M68K_ROUND_FLOATSISF_P						\
   (TARGET_68881								\
    && flag_excess_precision == EXCESS_PRECISION_STANDARD		\
-   && !flag_unsafe_math_optimizations					\
-   && (((MODE) == DFmode && (IMODE) == DImode)			\
-       || ((MODE) == SFmode && !TARGET_68040)))
+   && !flag_unsafe_math_optimizations)
+
+/* A 68881 before the 68040 cannot round to float in a register, so the
+   conversion goes through XFmode and a truncation, which stores it.  */
+#define M68K_FLOATSISF_VIA_XF_P (M68K_ROUND_FLOATSISF_P && !TARGET_68040)
 #define TARGET_FIDOA		((m68k_cpu_flags & FL_FIDOA) != 0)
 #define TARGET_CAS		((m68k_cpu_flags & FL_CAS) != 0)
 

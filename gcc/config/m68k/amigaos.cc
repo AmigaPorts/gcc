@@ -43,6 +43,8 @@
 #include "langhooks.h"
 #include "function.h"
 #include "stor-layout.h"
+#include "memmodel.h"
+#include "optabs.h"
 #include "config/m68k/amigaos.h"
 
 //#define MYDEBUG 1
@@ -232,6 +234,24 @@ amigaos_mangle_decl_assembler_name (tree decl, tree id)
   id = get_identifier (mangled);
   free (regs);
   return id;
+}
+
+/* TARGET_INIT_LIBFUNCS.  With the 68881, libgcc's __floatdidf and
+   __floatundidf return the exact integer in fp0, in extended precision.
+   With -fexcess-precision=standard a long long converted to double has to
+   be rounded to double, so their _rounded versions store and reload it.
+   The conversions to float already round.  */
+
+void
+amigaos_init_libfuncs (void)
+{
+  if (TARGET_68881 && TARGET_68020
+      && flag_excess_precision == EXCESS_PRECISION_STANDARD
+      && !flag_unsafe_math_optimizations)
+    {
+      set_conv_libfunc (sfloat_optab, DFmode, DImode, "__floatdidf_rounded");
+      set_conv_libfunc (ufloat_optab, DFmode, DImode, "__floatundidf_rounded");
+    }
 }
 
 /* ASM_OUTPUT_LABELREF.  A name mangled by -mmangle-regparm already has

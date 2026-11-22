@@ -7622,35 +7622,6 @@ m68k_excess_precision (enum excess_precision_type type)
   return FLT_EVAL_METHOD_UNPREDICTABLE;
 }
 
-/* Convert the unsigned SImode FROM to the SFmode or DFmode TARGET, when
-   M68K_FLOAT_VIA_XF_P: as a signed number, plus 2^32 if that was negative.
-   Without this, the conversion would widen FROM to DImode and call
-   libgcc.  DFmode holds every value; SFmode is rounded from XFmode.  */
-
-void
-m68k_expand_floatunssi (rtx target, rtx from)
-{
-  machine_mode mode = GET_MODE (target) == SFmode ? XFmode : DFmode;
-  rtx tmp = gen_reg_rtx (mode);
-  rtx_code_label *label = gen_label_rtx ();
-  REAL_VALUE_TYPE offset;
-
-  from = force_reg (SImode, from);
-  expand_float (tmp, from, 0);
-  emit_cmp_and_jump_insns (from, const0_rtx, GE, NULL_RTX, SImode, 0, label);
-  real_2expN (&offset, 32, mode);
-  rtx sum = expand_binop (mode, add_optab, tmp,
-			  const_double_from_real_value (offset, mode),
-			  tmp, 0, OPTAB_LIB_WIDEN);
-  if (sum != tmp)
-    emit_move_insn (tmp, sum);
-  emit_label (label);
-  if (mode == XFmode)
-    emit_insn (gen_truncxfsf2 (target, tmp));
-  else
-    emit_move_insn (target, tmp);
-}
-
 /* Implement PUSH_ROUNDING.  On the 680x0, sp@- in a byte insn really pushes
    a word.  On the ColdFire, sp@- in a byte insn pushes just a byte.  */
 

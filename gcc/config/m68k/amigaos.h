@@ -259,3 +259,6 @@ while (0)
 #undef TARGET_MANGLE_DECL_ASSEMBLER_NAME
 #define TARGET_MANGLE_DECL_ASSEMBLER_NAME amigaos_mangle_decl_assembler_name
 
+#undef TARGET_INIT_LIBFUNCS
+#define TARGET_INIT_LIBFUNCS amigaos_init_libfuncs
+

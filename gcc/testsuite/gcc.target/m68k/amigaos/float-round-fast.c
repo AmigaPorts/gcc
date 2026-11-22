@@ -18,4 +18,5 @@ di_df (long long i)
 
 /* { dg-final { scan-assembler-times {fmove\.l} 1 } } */
 /* { dg-final { scan-assembler {___floatdidf} } } */
+/* { dg-final { scan-assembler-not {_rounded} } } */
 /* { dg-final { scan-assembler-not {___floatdixf} } } */
