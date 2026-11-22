@@ -35,6 +35,8 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
      didn't start after all, so that the block it kept goes back;
    - __gthread_amigaos_task_end() as the task ends, after its own
      destructors, so that those of its keys run and its block goes back.
+     After it, the task may call exec but not the C library, whose
+     pointers no longer follow it.
 
    They are in libgcc with every thread model, so that the caller links
    with any: the key code sets the hooks as the program starts, and

@@ -73,8 +73,11 @@ struct key_block {
   struct Task *_Atomic task;		/* or null on the free list */
   const void *values[KEYS_MAX];
   void (*old_launch) ();
-  /* jsr old.L, then move.l #values,__gthread_amigaos_values.L and rts */
-  unsigned short launch[9];
+  void *thread_ptr;			/* this task's value of *thread_var */
+  void **launch_var;			/* the thread_var launch[] stores to */
+  /* jsr old.L, then move.l #values,__gthread_amigaos_values.L,
+     move.l thread_ptr.L,thread_var.L and rts */
+  unsigned short launch[14];
   unsigned char old_flags;
   bool hooked;				/* launch[] is the task's tc_Launch */
 };
@@ -92,6 +95,36 @@ const void *const *__gthread_amigaos_values = no_values;
 static struct key_block *blocks, *free_blocks;
 static unsigned int free_count, starting;
 static bool threaded;
+
+/* A pointer of the C library's that follows the running thread, as
+   __gthread_amigaos_values does: newlib's _impure_ptr, behind errno and
+   the rest of struct _reent.  The library registers it before the program
+   starts a thread; each new thread then gets a value of its own from
+   thread_ptr_new(), which tc_Launch stores in the pointer whenever the
+   thread gets the CPU, and thread_ptr_free() takes it back when the
+   thread ends.  The main task keeps the value the pointer had.  A program
+   that registers nothing, or starts no thread, pays nothing for it.  A
+   task that the program starts itself, with CreateNewProc() rather than
+   through libgcc or libpthread, has no tc_Launch of ours: once a thread
+   exists, it uses whichever thread's value was stored last.  */
+static void **thread_var;
+static void *first_ptr;
+static void *(__stdargs *thread_ptr_new) (void);
+static void (__stdargs *thread_ptr_free) (void *);
+
+/* Called by the C library, which declares it itself: on the stack and by
+   its plain name whatever -mregparm the library is built with, as the
+   functions of gthr-amigaos.h.  */
+__stdargs void
+__gthread_amigaos_thread_pointer (void **var,
+				  void *(__stdargs *new_ptr) (void),
+				  void (__stdargs *free_ptr) (void *))
+{
+  thread_var = var;
+  first_ptr = *var;
+  thread_ptr_new = new_ptr;
+  thread_ptr_free = free_ptr;
+}
 
 static void (*key_destroy[KEYS_MAX]) (void *);
 static bool key_used[KEYS_MAX];
@@ -188,23 +221,54 @@ install_launch_hook (struct key_block *b)
 {
   struct Task *me = SysBase->ThisTask;
   unsigned short *p = b->launch;
+  void (*old_launch) ();
 
   Forbid ();
   b->old_flags = me->tc_Flags & TF_LAUNCH;
-  b->old_launch = b->old_flags ? me->tc_Launch : 0;
-  if (b->old_launch)
+  old_launch = b->old_flags ? me->tc_Launch : 0;
+  /* A task that gets here without a value of its own is the main task, or
+     one that no thread library started: it has the main task's.  */
+  if (thread_var && !b->thread_ptr)
+    b->thread_ptr = first_ptr;
+  /* The code names the block, and of the task only its old tc_Launch: a
+     block that another thread had before mostly has this code already,
+     and then nothing is written and the caches need no flush.  */
+  if (!*p || old_launch != b->old_launch || b->launch_var != thread_var)
     {
-      *p++ = 0x4eb9;			/* jsr old.L */
-      p = put32 (p, (const void *) b->old_launch);
+      b->old_launch = old_launch;
+      b->launch_var = thread_var;
+      if (old_launch)
+	{
+	  *p++ = 0x4eb9;		/* jsr old.L */
+	  p = put32 (p, (const void *) old_launch);
+	}
+      *p++ = 0x23fc;			/* move.l #values,...L */
+      p = put32 (put32 (p, b->values), &__gthread_amigaos_values);
+      if (thread_var)
+	{
+	  *p++ = 0x23f9;		/* move.l thread_ptr.L,...L */
+	  p = put32 (put32 (p, &b->thread_ptr), thread_var);
+	}
+      *p = 0x4e75;			/* rts */
+      flush_caches ();
     }
-  *p++ = 0x23fc;			/* move.l #values,...L */
-  p = put32 (put32 (p, b->values), &__gthread_amigaos_values);
-  *p = 0x4e75;				/* rts */
-  flush_caches ();
   me->tc_Launch = (void (*) ()) b->launch;
   me->tc_Flags |= TF_LAUNCH;
   b->hooked = true;
   __gthread_amigaos_values = b->values;
+  if (thread_var)
+    *thread_var = b->thread_ptr;
+  Permit ();
+}
+
+/* Give the running task, which has a value of its own of the C library's
+   pointer, the main task's from now on.  */
+static void
+drop_thread_ptr (struct key_block *b)
+{
+  Forbid ();
+  b->thread_ptr = first_ptr;
+  *thread_var = first_ptr;
   Permit ();
 }
 
@@ -250,12 +314,29 @@ __gthread_amigaos_new_keys (void)
 void
 __gthread_amigaos_start_keys (void)
 {
+  struct key_block *b = 0;
+  void *ptr;
+
   benaphore_lock (&key_lock);
   if (starting)
     starting--;
   if (!reserve ())
-    install_launch_hook (attach_block ());
+    {
+      b = attach_block ();
+      install_launch_hook (b);
+    }
   benaphore_unlock (&key_lock);
+
+  /* The hook is on with the main task's value.  The thread's own is made
+     outside key_lock, since it allocates; without memory for it, the
+     thread keeps the main task's.  */
+  if (b && thread_var && (ptr = thread_ptr_new ()))
+    {
+      Forbid ();
+      b->thread_ptr = ptr;
+      *thread_var = ptr;
+      Permit ();
+    }
 }
 
 /* In the creator, when the task that __gthread_amigaos_new_keys() kept a
@@ -362,7 +443,17 @@ __gthread_amigaos_end_keys (struct Task *me)
       if (!again)
 	break;
     }
+  /* The thread's value is freed with the hook still on, storing the main
+     task's: free_ptr() may wait, and other threads run meanwhile.  */
+  if (thread_var && b->thread_ptr != first_ptr)
+    {
+      void *ptr = b->thread_ptr;
+
+      drop_thread_ptr (b);
+      thread_ptr_free (ptr);
+    }
   remove_launch_hook (b);
+  b->thread_ptr = 0;
   for (i = 0; i < KEYS_MAX; i++)
     b->values[i] = 0;
   benaphore_lock (&key_lock);
