@@ -27,6 +27,27 @@ if { ![istarget m68k-*-amigaos*] } {
     return
 }
 
+# With the amigaos thread model, a newlib program starts threads only with
+# -pthread, which links newlib-threads.o.  The extra flags of the gthread
+# tests: -pthread when they run with newlib, nothing otherwise.  The other
+# tests keep the libc of a program without threads.
+proc amigaos_thread_flags { } {
+    set tboard [target_info name]
+    set flags "[board_info $tboard cflags] [board_info $tboard multilib_flags]"
+    if { [string match "*-mcrt=newlib*" $flags]
+	 && [check_effective_target_amigaos_gthreads] } {
+	return "-pthread"
+    }
+    return ""
+}
+
+# Run the tests of a list with a dg runtest proc, the gthread ones with
+# amigaos_thread_flags.
+proc amigaos_runtest { runtest tests } {
+    $runtest [lsearch -all -inline -not -glob $tests */gthread-*] "" ""
+    $runtest [lsearch -all -inline -glob $tests */gthread-*] [amigaos_thread_flags] ""
+}
+
 # Codegen (scan-assembler) tests.  Each fixes its own -O and CPU via
 # dg-options, so a single run is enough.  A board that pins a CPU or FPU
 # would change the test's: in its cflags, which come after dg-options on
@@ -53,7 +74,7 @@ foreach flagsvar {cflags multilib_flags} {
 	set board_info($tboard,$flagsvar) $scan_flags
     }
 }
-dg-runtest $scan_tests "" ""
+amigaos_runtest dg-runtest $scan_tests
 foreach flagsvar [array names saved_flags] {
     set board_info($tboard,$flagsvar) $saved_flags($flagsvar)
 }
@@ -276,7 +297,7 @@ foreach f [lsort [glob -nocomplain $srcdir/$subdir/*-run.c]] {
 	lappend run_tests $f
     }
 }
-gcc-dg-runtest $run_tests "" ""
+amigaos_runtest gcc-dg-runtest $run_tests
 torture-finish
 
 # Run tests for the newlib runtime.  A test cannot drop a board flag, and two
@@ -295,7 +316,7 @@ if { ![string match "*-mcrt=*" $variant_flags]
 	set saved_cflags [board_info $tboard cflags]
 	regsub -all {(-mcrt=\S+|-noixemul)} $saved_cflags "" newlib_cflags
 	set board_info($tboard,cflags) "$newlib_cflags -mcrt=newlib"
-	dg-runtest $newlib_tests "" ""
+	amigaos_runtest dg-runtest $newlib_tests
 	set board_info($tboard,cflags) $saved_cflags
     }
 } else {

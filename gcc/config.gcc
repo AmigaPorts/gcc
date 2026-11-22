@@ -2514,10 +2514,13 @@ m68k*-*-amigaos*)
 	case ${enable_threads} in
 	yes | posix)
 		thread_file='posix'
-		tm_defines="${tm_defines} AMIGAOS_GTHREADS_POSIX=1"
+		tm_defines="${tm_defines} AMIGAOS_GTHREADS_POSIX=1 AMIGAOS_GTHREADS_AMIGAOS=0"
+		;;
+	amigaos)
+		tm_defines="${tm_defines} AMIGAOS_GTHREADS_POSIX=0 AMIGAOS_GTHREADS_AMIGAOS=1"
 		;;
 	*)
-		tm_defines="${tm_defines} AMIGAOS_GTHREADS_POSIX=0"
+		tm_defines="${tm_defines} AMIGAOS_GTHREADS_POSIX=0 AMIGAOS_GTHREADS_AMIGAOS=0"
 		;;
 	esac
 	;;
