@@ -173,9 +173,11 @@ __gthread_create (__gthread_t *thread, void *(*func) (void *), void *args)
   struct Process *proc;
   struct thread *t;
   BPTR in = 0, out = 0;
+  int err;
 
-  if (__gthread_amigaos_new_keys ())
-    return EAGAIN;
+  /* ENOSYS for a newlib program built without -pthread.  */
+  if ((err = __gthread_amigaos_new_keys ()))
+    return err;
   if (!(t = AllocMem (sizeof (*t), MEMF_ANY | MEMF_CLEAR)))
     {
       __gthread_amigaos_cancel_keys ();

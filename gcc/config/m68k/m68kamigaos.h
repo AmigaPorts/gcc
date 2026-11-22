@@ -418,9 +418,24 @@ extern const char *amigaos_crt_check (int argc, const char **argv);
 
 /* Not crt0.o: on this target crt0.o and friends are ixemul's, and newlib
    installs its startup file in every multilib directory, where a %s search
-   finds it before ixemul's flat ixemul/lib.  */
+   finds it before ixemul's flat ixemul/lib.
+
+   With the amigaos thread model, newlib's libc takes its locks through
+   functions that do nothing.  -pthread or -lpthread adds newlib-threads.o,
+   which has the real ones and gives each thread its struct _reent.  It is
+   a startup file so that it comes before every library on the command
+   line: its functions are then in the program before the linker looks for
+   them in libc.  libgcc refuses to start a thread in a newlib program
+   without it.  */
+#if AMIGAOS_GTHREADS_AMIGAOS
+  #define STARTFILE_NEWLIB_THREADS_SPEC "%{pthread|lpthread:newlib-threads.o%s} "
+#else
+  #define STARTFILE_NEWLIB_THREADS_SPEC ""
+#endif
+
 #define STARTFILE_NEWLIB_SPEC \
-    "newlib-crt0.o%s "
+    "newlib-crt0.o%s " \
+    STARTFILE_NEWLIB_THREADS_SPEC
 
 #define SELF_SPEC \
  "%{noixemul:-B %:find-file(../libnix/lib/)} " \

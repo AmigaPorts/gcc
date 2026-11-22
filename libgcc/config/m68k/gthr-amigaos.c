@@ -287,6 +287,11 @@ remove_launch_hook (struct key_block *b)
   Permit ();
 }
 
+/* Defined by newlib's startup file.  A newlib program starts threads only
+   with -pthread, whose newlib-threads.o registers _impure_ptr before the
+   constructors run: without it, libc has no locks.  */
+extern const char __newlib_crt0[] __attribute__ ((weak));
+
 /* Before the running task starts a task: give it a block and its
    tc_Launch, if it has none yet, and keep a block ready for the new
    task.  */
@@ -296,6 +301,8 @@ __gthread_amigaos_new_keys (void)
   struct key_block *b;
   int err = 0;
 
+  if (__newlib_crt0 && !thread_var)
+    return ENOSYS;
   benaphore_lock (&key_lock);
   threaded = true;
   if (!(b = my_block ()) && !(err = reserve ()))
