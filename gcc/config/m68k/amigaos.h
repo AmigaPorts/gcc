@@ -199,12 +199,19 @@ do									\
        above are valid; the generic ones are warned about and dropped,	\
        since configure scripts probe them.  -mpcrel also sets flag_pic \
        to 1 but uses direct pc-relative addressing, not a GOT, so let it	\
-       through.  */							\
+       through.  With -mpcrel, -fPIC's flag_pic 2 would make its	\
+       references 32-bit, but ld can't resolve them across hunks either, \
+       so it is ignored too.  */					\
     if ((flag_pic == 1 || flag_pic == 2) && !TARGET_PCREL)		\
       {								\
 	warning (0, "%<-fpic%>, %<-fPIC%> and %<-fpie%> are not supported on " \
 		 "this target and are ignored, use %<-fbaserel%> instead"); \
 	flag_pic = flag_pie = 0;					\
+      }								\
+    else if (flag_pic == 2 && TARGET_PCREL)				\
+      {								\
+	warning (0, "%<-fPIC%> and %<-fPIE%> are ignored with %<-mpcrel%>"); \
+	flag_pic = 1;							\
       }								\
     /* finish_options sets flag_shlib for any flag_pic, which makes	\
        every global symbol interposable, so global functions are not	\
