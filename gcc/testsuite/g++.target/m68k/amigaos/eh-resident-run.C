@@ -2,7 +2,7 @@
    and the only way to the base-relative multilibs without an explicit
    -fbaserel: a wrong multilib match linked this against the absolute
    libgcc and libstdc++, which crashed before reaching the throw.  */
-/* { dg-do run { target m68k-*-amigaos* } } */
+/* { dg-do run } */
 /* { dg-options "-O2 -resident" } */
 
 __attribute__((noinline)) static void

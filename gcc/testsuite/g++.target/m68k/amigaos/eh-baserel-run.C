@@ -1,6 +1,6 @@
 /* Base-relative code must use absolute EH pointers and select a matching
    runtime multilib.  */
-/* { dg-do run { target m68k-*-amigaos* } } */
+/* { dg-do run } */
 /* { dg-options "-O2 -fbaserel" } */
 
 __attribute__((noinline)) static void

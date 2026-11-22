@@ -23,8 +23,51 @@ if { ![istarget m68k-*-amigaos*] } {
     return
 }
 
+# g++_init points -I and -L at the build tree's libstdc++ for the multilib
+# that the board's flags select.  A test whose own options select another
+# one, such as -fbaserel or -resident, runs with that multilib's instead, as
+# the driver would link it: mixing the two hangs or crashes.
+
+proc amigaos_test_options { test } {
+    set fd [open $test r]
+    set text [read $fd]
+    close $fd
+    if { [regexp {dg-options "([^"]*)"} $text -> opts] } {
+	return $opts
+    }
+    return ""
+}
+
 dg-init
 
-dg-runtest [lsort [glob -nocomplain $srcdir/$subdir/*.C]] "" ""
+global ALWAYS_CXXFLAGS ld_library_path
+set tboard [target_info name]
+set board_flags ""
+if { [board_info $tboard exists multilib_flags] } {
+    set board_flags [board_info $tboard multilib_flags]
+}
+set board_paths [get_multilibs]
+set board_inc "additional_flags=[g++_include_flags $board_paths]"
+set board_link "ldflags=[g++_link_flags $board_paths]"
+set saved_cxxflags $ALWAYS_CXXFLAGS
+set saved_ld_library_path $ld_library_path
+
+foreach test [lsort [glob -nocomplain $srcdir/$subdir/*.C]] {
+    set paths [get_multilibs "$board_flags [amigaos_test_options $test]"]
+    if { $paths ne $board_paths } {
+	set ALWAYS_CXXFLAGS {}
+	foreach f $saved_cxxflags {
+	    if { $f eq $board_inc } {
+		set f "additional_flags=[g++_include_flags $paths]"
+	    } elseif { $f eq $board_link } {
+		set f "ldflags=[g++_link_flags $paths]"
+	    }
+	    lappend ALWAYS_CXXFLAGS $f
+	}
+    }
+    dg-runtest [list $test] "" ""
+    set ALWAYS_CXXFLAGS $saved_cxxflags
+    set ld_library_path $saved_ld_library_path
+}
 
 dg-finish
