@@ -261,4 +261,6 @@ while (0)
 
 #undef TARGET_INIT_LIBFUNCS
 #define TARGET_INIT_LIBFUNCS amigaos_init_libfuncs
+#undef TARGET_SET_CURRENT_FUNCTION
+#define TARGET_SET_CURRENT_FUNCTION amigaos_set_current_function
 
