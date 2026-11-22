@@ -55,6 +55,9 @@ extern tree
 amigaos_mangle_decl_assembler_name (tree decl, tree id);
 
 extern void
+amigaos_init_libfuncs (void);
+
+extern void
 amigaos_output_labelref (FILE *file, const char *name);
 
 extern void

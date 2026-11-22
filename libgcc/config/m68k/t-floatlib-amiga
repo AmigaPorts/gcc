@@ -1,5 +1,6 @@
 LIB2ADD += $(srcdir)/config/m68k/fpextendsfdf2.S \
 	$(srcdir)/config/m68k/fptruncdfsf2.S \
+	$(srcdir)/config/m68k/fpfloatdidf.S \
 	xfpgnulib.c xfpgnulib__unordsf2.c xfpgnulib__unorddf2.c \
 	xfpgnulib__floatunsidf.c xfpgnulib__floatsidf.c xfpgnulib__floatunsisf.c \
 	xfpgnulib__floatsisf.c xfpgnulib__extendsfdf2.c xfpgnulib__truncdfsf2.c \
