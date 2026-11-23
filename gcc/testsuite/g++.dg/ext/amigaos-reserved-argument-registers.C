@@ -2,6 +2,7 @@
 /* { dg-do compile } */
 /* { dg-skip-if "Amiga register parameters" { ! { m68k-*-amigaos* } } } */
 /* { dg-options "-m68000 -Os -fomit-frame-pointer" } */
+/* { dg-skip-if "-m68000 has no 32-bit base-relative data" { *-*-* } { "-fbaserel32" "-resident32" } } */
 void bad_a5 (unsigned long *p __asm("a5")) /* { dg-error "reserved for the frame or stack pointer" } */
 { p[0] = 1; }
 void bad_pair (unsigned long long x __asm("a4")) /* { dg-error "reserved for the frame or stack pointer" } */

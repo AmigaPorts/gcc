@@ -1,5 +1,5 @@
 // { dg-skip-if "m68k AmigaOS only" { ! m68k-*-amigaos* } }
-// { dg-options "-m68000 -mregparm=3 -std=gnu++11" }
+// { dg-options "-mregparm=3 -std=gnu++11" }
 
 __attribute__ ((__stkparm__)) int stk_fn (int);
 int reg_fn (int);
