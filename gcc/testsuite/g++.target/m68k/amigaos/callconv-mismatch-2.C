@@ -5,6 +5,7 @@
 
 // { dg-do compile { target c++11 } }
 // { dg-options "-m68000 -Os -mregparm=3" }
+// { dg-skip-if "-m68000 has no 32-bit base-relative data" { *-*-* } { "-fbaserel32" "-resident32" } }
 
 struct S
 {

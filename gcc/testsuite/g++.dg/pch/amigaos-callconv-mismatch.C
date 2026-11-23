@@ -1,4 +1,4 @@
-// { dg-options "-m68000 -mregparm=3 -std=gnu++11" }
+// { dg-options "-mregparm=3 -std=gnu++11" }
 
 #include "amigaos-callconv-mismatch.H"
 
