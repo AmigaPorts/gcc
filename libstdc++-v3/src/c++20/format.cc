@@ -23,6 +23,17 @@
 // <http://www.gnu.org/licenses/>.
 
 #define _GLIBCXX_USE_CXX11_ABI 1
+
+// This file is compiled as C++26, where <string> has no extern template
+// declarations.  Use the explicit instantiations in string-inst.cc.
+#include <string>
+namespace std _GLIBCXX_VISIBILITY(default)
+{
+_GLIBCXX_BEGIN_NAMESPACE_VERSION
+  extern template class basic_string<char>;
+_GLIBCXX_END_NAMESPACE_VERSION
+}
+
 #include "../c++26/text_encoding.cc"
 
 #ifdef _GLIBCXX_USE_NL_LANGINFO_L
