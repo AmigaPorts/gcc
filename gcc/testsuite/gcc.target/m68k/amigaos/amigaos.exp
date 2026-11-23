@@ -60,7 +60,7 @@ proc amigaos_runtest { runtest tests } {
 dg-init
 set scan_tests {}
 foreach f [lsort [glob -nocomplain $srcdir/$subdir/*.c]] {
-    if { ![string match "*-run.c" $f] && ![string match "*-run-lib.c" $f]
+    if { ![string match "*-run.c" $f] && ![string match "*-lib.c" $f]
 	 && ![string match "*-ixemul-link.c" $f] } {
 	lappend scan_tests $f
     }
