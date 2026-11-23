@@ -6961,21 +6961,115 @@ m68k_sched_attr_op_mem (rtx_insn *insn)
   return OP_MEM_I1;
 }
 
-/* Implement lea_index attribute: whether the address INSN computes, a lea
-   or an addsi3 output as one, has an index register.  Unknown counts as
-   indexed.  */
-enum attr_lea_index
-m68k_sched_attr_lea_index (rtx_insn *insn)
+/* Whether the 68060's secondary pipeline takes the effective address ADDR,
+   of a MODE access (MC68060 User's Manual, 10.1.3).  It doesn't take the
+   PC-relative modes, nor the full format (bd,An,Xn), which a displacement
+   needs when it is wider than the 8 bits of the brief index format or the
+   16 bits of (d16,An).  An address that doesn't decompose counts as full.  */
+static bool
+m68060_soep_address_p (machine_mode mode, rtx addr)
 {
-  rtx set = single_set (insn);
   struct m68k_address address;
 
-  if (set == NULL_RTX
-      || !m68k_decompose_address (QImode, SET_SRC (set), reload_completed,
-				  &address))
-    return LEA_INDEX_YES;
+  if (!m68k_decompose_address (mode, addr, reload_completed, &address))
+    return false;
 
-  return address.index != NULL_RTX ? LEA_INDEX_YES : LEA_INDEX_NO;
+  /* (xxx).W and (xxx).L; with -mpcrel a symbol is (d16,PC), and with an
+     index it is a jump table, (d8,PC,Xn), or a suppressed base.  */
+  if (address.base == NULL_RTX)
+    return (address.index == NULL_RTX
+	    && !(TARGET_PCREL && !CONST_INT_P (address.offset)));
+
+  if (address.offset == NULL_RTX)
+    return true;
+
+  /* A base-relative symbol: sym:W(a4) with -fbaserel, but sym:L(a4) with
+     -fbaserel32.  */
+  if (!CONST_INT_P (address.offset))
+    return address.index == NULL_RTX && flag_pic != 4;
+
+  if (address.index != NULL_RTX)
+    return IN_RANGE (INTVAL (address.offset), -128, 127);
+  return IN_RANGE (INTVAL (address.offset), -32768, 32767);
+}
+
+/* Implement m68060_pair attribute: how the 68060 can pair INSN, a pattern
+   that emits one instruction (MC68060 User's Manual, 10.1, Tables 10-2 and
+   10-4).  BOTH goes in either pipeline.  FIRST goes in the primary one and
+   lets an instruction of the secondary one go beside it: an address the
+   secondary pipeline doesn't take, an immediate with a memory operand,
+   and the FPU instructions.  ALONE has no instruction beside it.  */
+enum attr_m68060_pair
+m68k_sched_attr_m68060_pair (rtx_insn *insn)
+{
+  rtx set = single_set (insn);
+  enum attr_type type = get_attr_type (insn);
+  rtx x, y;
+
+  /* SWAP is pOEP-only.  */
+  if (set != NULL_RTX
+      && GET_CODE (SET_SRC (set)) == ROTATE
+      && GET_MODE (SET_SRC (set)) == SImode
+      && CONST_INT_P (XEXP (SET_SRC (set), 1))
+      && INTVAL (XEXP (SET_SRC (set), 1)) == 16)
+    return M68060_PAIR_ALONE;
+
+  /* lea, or an addsi3 that outputs one.  */
+  if (type == TYPE_LEA)
+    return (set != NULL_RTX && m68060_soep_address_p (QImode, SET_SRC (set))
+	    ? M68060_PAIR_BOTH : M68060_PAIR_FIRST);
+
+  x = sched_get_operand (insn, true);
+  y = sched_get_operand (insn, false);
+
+  switch (type)
+    {
+    case TYPE_FALU:
+    case TYPE_FCMP:
+    case TYPE_FDIV:
+    case TYPE_FMOVE:
+    case TYPE_FMUL:
+    case TYPE_FNEG:
+    case TYPE_FSQRT:
+    case TYPE_FTST:
+      /* pOEP-but-allows-sOEP, but pOEP-only from an integer register, an
+	 immediate or an extended memory operand.  */
+      if (y != NULL_RTX
+	  && ((REG_P (y) && !FP_REG_P (y))
+	      || CONSTANT_P (y)
+	      || (MEM_P (y) && GET_MODE (y) == XFmode)))
+	return M68060_PAIR_ALONE;
+      return M68060_PAIR_FIRST;
+
+    default:
+      break;
+    }
+
+  if ((x != NULL_RTX && MEM_P (x)
+       && !m68060_soep_address_p (GET_MODE (x), XEXP (x, 0)))
+      || (y != NULL_RTX && MEM_P (y)
+	  && !m68060_soep_address_p (GET_MODE (y), XEXP (y, 0))))
+    return M68060_PAIR_FIRST;
+
+  /* An immediate with extension words and a memory operand: pOEP-until-last
+     for a MOVE, and for the others unless the address is (An), (An)+ or
+     -(An), which have none of their own.  */
+  if (type != TYPE_ALUQ_L && type != TYPE_MOVEQ_L && type != TYPE_MOV3Q_L)
+    {
+      rtx mem = x != NULL_RTX && MEM_P (x) ? x : y;
+      rtx imm = mem == x ? y : x;
+      struct m68k_address address;
+
+      if (mem != NULL_RTX && MEM_P (mem)
+	  && imm != NULL_RTX && CONSTANT_P (imm)
+	  && (type == TYPE_MOVE || type == TYPE_MOVE_L
+	      || !m68k_decompose_address (GET_MODE (mem), XEXP (mem, 0),
+					  reload_completed, &address)
+	      || address.offset != NULL_RTX))
+	return M68060_PAIR_FIRST;
+    }
+
+  return M68060_PAIR_BOTH;
 }
 
 /* Data for ColdFire V4 index bypass.
