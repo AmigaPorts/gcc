@@ -2,6 +2,7 @@
    User's Manual, 10.1.3): with -mpcrel, lea (_table+16:w,pc) goes in the
    primary pipeline, with a secondary instruction beside it.  */
 /* { dg-do compile } */
+/* { dg-skip-if "a4-relative data" { *-*-* } { "-fbaserel*" "-resident*" } { "" } } */
 /* { dg-options "-O2 -m68060 -mpcrel -fomit-frame-pointer -fsched-verbose=1 -fdump-rtl-sched2" } */
 
 static int table[16];

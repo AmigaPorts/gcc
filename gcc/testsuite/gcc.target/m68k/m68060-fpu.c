@@ -2,6 +2,7 @@
    takes 37 cycles, so the add of its result issues 37 cycles after it, and
    an FPU instruction from a data register is pOEP-only, alone.  */
 /* { dg-do compile } */
+/* { dg-skip-if "a4-relative or pc-relative addresses" { *-*-* } { "-fbaserel*" "-resident*" "-mpcrel" } { "" } } */
 /* { dg-options "-O2 -m68060 -m68881 -fomit-frame-pointer -fsched-verbose=1 -fdump-rtl-sched2" } */
 
 double

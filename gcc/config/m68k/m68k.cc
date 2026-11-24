@@ -5891,6 +5891,25 @@ strict_low_part_peephole_ok (machine_mode mode, rtx_insn *first_insn,
    ***************************************************************************/
 
 
+/* The bit that output_andsi3, output_iorsi3 or output_xorsi3 clears, sets
+   or changes with bclr, bset or bchg for CODE and OPERANDS, or -1 if they
+   emit a logical instruction.  A mask that only touches the low word gets
+   a word instruction instead.  */
+
+int
+m68k_logical_bit_op (enum rtx_code code, rtx *operands)
+{
+  if (!CONST_INT_P (operands[2])
+      || !(DATA_REG_P (operands[0]) || offsettable_memref_p (operands[0])))
+    return -1;
+
+  HOST_WIDE_INT mask = INTVAL (operands[2]);
+  if (!TARGET_COLDFIRE
+      && (code == AND ? (mask | 0xffff) == -1 : mask >> 16 == 0))
+    return -1;
+  return exact_log2 ((code == AND ? ~mask : mask) & 0xffffffff);
+}
+
 const char *
 output_andsi3 (rtx *operands)
 {
@@ -5909,10 +5928,7 @@ output_andsi3 (rtx *operands)
         return "clr%.w %0";
       return "and%.w %2,%0";
     }
-  if (GET_CODE (operands[2]) == CONST_INT
-      && (logval = exact_log2 (~ INTVAL (operands[2]) & 0xffffffff)) >= 0
-      && (DATA_REG_P (operands[0])
-          || offsettable_memref_p (operands[0])))
+  if ((logval = m68k_logical_bit_op (AND, operands)) >= 0)
     {
       if (DATA_REG_P (operands[0]))
 	operands[1] = GEN_INT (logval);
@@ -5948,10 +5964,7 @@ output_iorsi3 (rtx *operands)
 	return "mov%.w %2,%0";
       return "or%.w %2,%0";
     }
-  if (GET_CODE (operands[2]) == CONST_INT
-      && (logval = exact_log2 (INTVAL (operands[2]) & 0xffffffff)) >= 0
-      && (DATA_REG_P (operands[0])
-	  || offsettable_memref_p (operands[0])))
+  if ((logval = m68k_logical_bit_op (IOR, operands)) >= 0)
     {
       if (DATA_REG_P (operands[0]))
 	operands[1] = GEN_INT (logval);
@@ -5986,10 +5999,7 @@ output_xorsi3 (rtx *operands)
 	return "not%.w %0";
       return "eor%.w %2,%0";
     }
-  if (GET_CODE (operands[2]) == CONST_INT
-      && (logval = exact_log2 (INTVAL (operands[2]) & 0xffffffff)) >= 0
-      && (DATA_REG_P (operands[0])
-	  || offsettable_memref_p (operands[0])))
+  if ((logval = m68k_logical_bit_op (XOR, operands)) >= 0)
     {
       if (DATA_REG_P (operands[0]))
 	operands[1] = GEN_INT (logval);
@@ -6983,10 +6993,15 @@ m68060_soep_address_p (machine_mode mode, rtx addr)
   if (address.offset == NULL_RTX)
     return true;
 
-  /* A base-relative symbol: sym:W(a4) with -fbaserel, but sym:L(a4) with
-     -fbaserel32.  */
+  /* A symbol is a 16-bit displacement only from the PIC register:
+     sym@GOT(a5) with -fpic, sym:W(a4) with -fbaserel.  It is sym:L(a4)
+     with -fbaserel32, and the full format (bd.L,An) from any other
+     register.  */
   if (!CONST_INT_P (address.offset))
-    return address.index == NULL_RTX && flag_pic != 4;
+    return (address.index == NULL_RTX
+	    && (flag_pic == 1 || flag_pic == 3)
+	    && REG_P (address.base)
+	    && REGNO (address.base) == PIC_OFFSET_TABLE_REGNUM);
 
   if (address.index != NULL_RTX)
     return IN_RANGE (INTVAL (address.offset), -128, 127);
@@ -7013,6 +7028,32 @@ m68k_sched_attr_m68060_pair (rtx_insn *insn)
       && CONST_INT_P (XEXP (SET_SRC (set), 1))
       && INTVAL (XEXP (SET_SRC (set), 1)) == 16)
     return M68060_PAIR_ALONE;
+
+  /* PEA is pOEP-only: output_move_simode pushes a symbol, or a nonzero
+     16-bit constant, with it.  */
+  if (set != NULL_RTX
+      && GET_MODE (SET_DEST (set)) == SImode
+      && push_operand (SET_DEST (set), SImode)
+      && (GET_CODE (SET_SRC (set)) == SYMBOL_REF
+	  || GET_CODE (SET_SRC (set)) == CONST
+	  || (CONST_INT_P (SET_SRC (set))
+	      && INTVAL (SET_SRC (set)) != 0
+	      && IN_RANGE (INTVAL (SET_SRC (set)), -0x8000, 0x7fff))))
+    return M68060_PAIR_ALONE;
+
+  /* BSET, BCLR and BCHG #<imm>, from a single-bit mask, are
+     pOEP-until-last.  */
+  if (set != NULL_RTX
+      && GET_MODE (SET_DEST (set)) == SImode
+      && (GET_CODE (SET_SRC (set)) == AND
+	  || GET_CODE (SET_SRC (set)) == IOR
+	  || GET_CODE (SET_SRC (set)) == XOR))
+    {
+      rtx ops[3] = { SET_DEST (set), XEXP (SET_SRC (set), 0),
+		     XEXP (SET_SRC (set), 1) };
+      if (m68k_logical_bit_op (GET_CODE (SET_SRC (set)), ops) >= 0)
+	return M68060_PAIR_FIRST;
+    }
 
   /* lea, or an addsi3 that outputs one.  */
   if (type == TYPE_LEA)
