@@ -2512,15 +2512,16 @@ m68k*-*-amigaos*)
 	gnu_ld=yes
 	CFLAGS="-Os"
 	case ${enable_threads} in
-	yes | posix)
-		thread_file='posix'
-		tm_defines="${tm_defines} AMIGAOS_GTHREADS_POSIX=1 AMIGAOS_GTHREADS_AMIGAOS=0"
+	yes | amigaos)
+		thread_file='amigaos'
+		tm_defines="${tm_defines} AMIGAOS_GTHREADS_AMIGAOS=1"
 		;;
-	amigaos)
-		tm_defines="${tm_defines} AMIGAOS_GTHREADS_POSIX=0 AMIGAOS_GTHREADS_AMIGAOS=1"
+	posix)
+		echo "--enable-threads=posix is not supported for ${target}; use amigaos" 1>&2
+		exit 1
 		;;
 	*)
-		tm_defines="${tm_defines} AMIGAOS_GTHREADS_POSIX=0 AMIGAOS_GTHREADS_AMIGAOS=0"
+		tm_defines="${tm_defines} AMIGAOS_GTHREADS_AMIGAOS=0"
 		;;
 	esac
 	;;
