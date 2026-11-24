@@ -4,6 +4,7 @@
    store in its cycle, while a register-only FPU instruction still pairs
    with one.  */
 /* { dg-do compile } */
+/* { dg-skip-if "a4-relative or pc-relative addresses" { *-*-* } { "-fbaserel*" "-resident*" "-mpcrel" } { "" } } */
 /* { dg-options "-O2 -m68060 -m68881 -fsched-verbose=1 -fdump-rtl-sched2" } */
 
 double

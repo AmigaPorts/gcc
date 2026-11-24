@@ -4,6 +4,7 @@
    pattern that emits two instructions, asr.l and roxr.l for a long long
    shifted right by one, takes two cycles.  */
 /* { dg-do compile } */
+/* { dg-skip-if "a4-relative or pc-relative addresses" { *-*-* } { "-fbaserel*" "-resident*" "-mpcrel" } { "" } } */
 /* { dg-options "-O2 -m68060 -fsched-verbose=1 -fdump-rtl-sched2" } */
 
 int
