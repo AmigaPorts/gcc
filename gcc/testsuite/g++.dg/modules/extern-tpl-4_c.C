@@ -28,15 +28,17 @@ int main() {
 }
 
 
-// 'int': imported explicit instantiation decls should not be emitted here:
+// 'int': imported explicit instantiation decls should not be emitted here.
+// A variable's label ends its line: m68k-amigaos base-relative code
+// references it as _Z2hcIiE:L(a4).
 // { dg-final { scan-assembler-not "_Z2haIiEvv:" } }
 // { dg-final { scan-assembler-not "_Z2hbIiEvv:" } }
-// { dg-final { scan-assembler-not "_Z2hcIiE:" } }
-// { dg-final { scan-assembler-not "_Z2hdIiE:" } }
+// { dg-final { scan-assembler-not "(?n)_Z2hcIiE:$" } }
+// { dg-final { scan-assembler-not "(?n)_Z2hdIiE:$" } }
 // { dg-final { scan-assembler-not "_ZW1M2maIiEvv:" } }
 // { dg-final { scan-assembler-not "_ZW1M2mbIiEvv:" } }
-// { dg-final { scan-assembler-not "_ZW1M2mcIiE:" } }
-// { dg-final { scan-assembler-not "_ZW1M2mdIiE:" } }
+// { dg-final { scan-assembler-not "(?n)_ZW1M2mcIiE:$" } }
+// { dg-final { scan-assembler-not "(?n)_ZW1M2mdIiE:$" } }
 
 // 'char': explicit instantiation definitions don't need to be emitted for
 // modules, but need to be emitted for header units (as there's no other TU):
@@ -46,8 +48,8 @@ int main() {
 // { dg-final { scan-assembler "_Z2hdIcE:" } }
 // { dg-final { scan-assembler-not "_ZW1M2maIcEvv:" } }
 // { dg-final { scan-assembler-not "_ZW1M2mbIcEvv:" } }
-// { dg-final { scan-assembler-not "_ZW1M2mcIcE:" } }
-// { dg-final { scan-assembler-not "_ZW1M2mdIcE:" } }
+// { dg-final { scan-assembler-not "(?n)_ZW1M2mcIcE:$" } }
+// { dg-final { scan-assembler-not "(?n)_ZW1M2mdIcE:$" } }
 
 // 'double': these are not explicitly instantiated and should be emitted here:
 // { dg-final { scan-assembler "_Z2haIdEvv:" } }

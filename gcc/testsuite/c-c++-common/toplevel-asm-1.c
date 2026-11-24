@@ -1,5 +1,6 @@
 /* PR c/41045 */
 /* { dg-do compile } */
+/* { dg-require-effective-target nonpic } */
 /* { dg-options "-O0" } */
 /* { dg-additional-options "-fno-pie" { target pie } } */
 
