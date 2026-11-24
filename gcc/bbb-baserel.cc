@@ -149,8 +149,12 @@ namespace
 
     if (secname == 0 || strcmp(".data", secname))
       {
+	/* The linker scripts put .data.rel.ro* in the text hunk too.  A
+	   COMDAT vtable gets its .data.rel.ro.* name when it is emitted,
+	   which at -O0 and with LTO comes before its users are compiled.  */
 	section * sec = get_variable_section(decl, false);
-	if ( (sec->common.flags & SECTION_WRITE) == 0)
+	if ((sec->common.flags & SECTION_WRITE) == 0
+	    || (sec->common.flags & SECTION_RELRO) != 0)
 	  return false;
       }
 
