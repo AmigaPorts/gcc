@@ -31,6 +31,7 @@
 #include "memmodel.h"
 #include "emit-rtl.h"
 #include "tree.h"
+#include "cgraph.h"
 #include "tree-pass.h"
 #include "conditions.h"
 #include "langhooks.h"
@@ -149,6 +150,13 @@ namespace
 
     if (secname == 0 || strcmp(".data", secname))
       {
+	/* get_variable_section reads the initializer, which an LTRANS unit
+	   doesn't have for a variable of another partition.  */
+	varpool_node *vnode = varpool_node::get (decl);
+	if (vnode && vnode->in_other_partition)
+	  return !TREE_READONLY (decl)
+		 && !(secname && startswith (secname, ".data.rel.ro"));
+
 	/* The linker scripts put .data.rel.ro* in the text hunk too.  A
 	   COMDAT vtable gets its .data.rel.ro.* name when it is emitted,
 	   which at -O0 and with LTO comes before its users are compiled.  */
