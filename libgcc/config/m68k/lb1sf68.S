@@ -66,7 +66,7 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 /* On AmigaOS every C library defines the integer multiply and divide
    helpers too, and its own must win: these are weak, for programs without
    one.  Then a C library's __udivsi3 doesn't clash with this one, which a
-   long long division can bring in through __udivsi3_internal.  */
+   later reference to __divsi3 can bring in through __udivsi3_internal.  */
 #ifdef __amigaos__
 #define AMIGAOS_WEAK(x) .weak SYM (x)
 #else
