@@ -63,10 +63,9 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #define FUNC(x) .proc
 #endif
 
-/* On AmigaOS every C library defines the integer multiply and divide
-   helpers too, and its own must win: these are weak, for programs without
-   one.  Then a C library's __udivsi3 doesn't clash with this one, which a
-   later reference to __divsi3 can bring in through __udivsi3_internal.  */
+/* On AmigaOS every C library defines __mulsi3 too, and its own must win:
+   this one is weak, for programs without one.  lb1amigaos.S has the
+   division helpers.  */
 #ifdef __amigaos__
 #define AMIGAOS_WEAK(x) .weak SYM (x)
 #else
@@ -472,7 +471,6 @@ SYM (__mulsi3_internal):
 	.text
 	FUNC(__udivsi3)
 	.globl	SYM (__udivsi3)
-	AMIGAOS_WEAK (__udivsi3)
 	.globl	SYM (__udivsi3_internal)
 	.hidden	SYM (__udivsi3_internal)
 SYM (__udivsi3):
@@ -552,7 +550,6 @@ L2:	subql	IMM (1),d4
 	.text
 	FUNC(__divsi3)
 	.globl	SYM (__divsi3)
-	AMIGAOS_WEAK (__divsi3)
 	.globl	SYM (__divsi3_internal)
 	.hidden	SYM (__divsi3_internal)
 SYM (__divsi3):
@@ -594,7 +591,6 @@ L3:	movel	sp@+, d2
 	.text
 	FUNC(__umodsi3)
 	.globl	SYM (__umodsi3)
-	AMIGAOS_WEAK (__umodsi3)
 SYM (__umodsi3):
 	movel	sp@(8), d1	/* d1 = divisor */
 	movel	sp@(4), d0	/* d0 = dividend */
@@ -621,7 +617,6 @@ SYM (__umodsi3):
 	.text
 	FUNC(__modsi3)
 	.globl	SYM (__modsi3)
-	AMIGAOS_WEAK (__modsi3)
 SYM (__modsi3):
 	movel	sp@(8), d1	/* d1 = divisor */
 	movel	sp@(4), d0	/* d0 = dividend */
