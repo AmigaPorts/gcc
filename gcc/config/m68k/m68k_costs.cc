@@ -844,6 +844,10 @@ m68k_init_costs (bool speed ATTRIBUTE_UNUSED)
    divide costs are > 100, which is out of scale with the
    other entries). */
 #define COST_DIV_L              (COST_TABLE[IDX_DIV_L]*4)
+/* A 32-bit multiply or divide without the instruction for it: a jsr to
+   __mulsi3, __udivsi3 or kin, and the two pushes of its arguments.  */
+#define COST_LIBCALL            (COST_TABLE[IDX_CALL_OTHER] \
+                                 + 2 * COST_TABLE[IDX_MEM_PREDEC_EXTRA])
 #define COST_DIV_W              (COST_TABLE[IDX_DIV_W]*4)
 #define COST_ADD_L              (COST_TABLE[IDX_ADD_L])
 #define COST_SUB_L              (COST_TABLE[IDX_SUB_L])
@@ -988,6 +992,11 @@ m68k_costs_engine (rtx x, machine_mode mode, int outer_code,
              result: it takes four mulu.w and the adds between them.  */
           if ((GET_CODE (a) == ZERO_EXTEND || GET_CODE (a) == SIGN_EXTEND)
               && GET_MODE_SIZE (GET_MODE (XEXP (a, 0))) == 4) {
+	      if (!speed && !(TARGET_68020 || TARGET_COLDFIRE))
+		{
+		  *total = COST_LIBCALL;
+		  return true;
+		}
               *total = TUNE_68060 ? 4 * COST_TABLE[IDX_MULT_68000_WORD_MUL] + COST_TABLE[IDX_ADD_L]
                                   : COST_TABLE[IDX_MULT_68000_LONG_MUL];
               return true;
@@ -999,6 +1008,13 @@ m68k_costs_engine (rtx x, machine_mode mode, int outer_code,
           } else if (!m68k_costs_engine (a, mode, code, 0, total, speed)) {
               break;
           }
+
+	  if (!speed && SCALAR_INT_MODE_P (mode) && GET_MODE_SIZE (mode) > 2
+	      && !(TARGET_68020 || TARGET_COLDFIRE))
+	    {
+	      *total += COST_LIBCALL;
+	      return true;
+	    }
 
           if (speed) {
               int f = (GET_MODE_SIZE(mode) > 2) ? COST_TABLE[IDX_MULT_68000_LONG_MUL] : COST_TABLE[IDX_MULT_68000_WORD_MUL];
@@ -1027,11 +1043,23 @@ m68k_costs_engine (rtx x, machine_mode mode, int outer_code,
       case UMOD:
         {
           rtx a = XEXP(x, 0);
-          if (m68k_costs_engine (a, mode, code, 0, total, speed)) {
-              *total += GET_MODE_SIZE(mode) > 2 ? COST_DIV_L : COST_DIV_W;
-              return true;
-          }
-          break;
+	  bool libcall = (!speed && SCALAR_INT_MODE_P (mode)
+			  && GET_MODE_SIZE (mode) > 2
+			  && !(TARGET_68020 || TARGET_CF_HWDIV));
+	  if (m68k_costs_engine (a, mode, code, 0, total, speed))
+	    {
+	      if (libcall)
+		*total += COST_LIBCALL;
+	      else
+		*total += GET_MODE_SIZE (mode) > 2 ? COST_DIV_L : COST_DIV_W;
+	      return true;
+	    }
+	  if (libcall)
+	    {
+	      *total = COST_LIBCALL;
+	      return true;
+	    }
+	  break;
         }
       case ASHIFT:
       case ASHIFTRT:
