@@ -34,7 +34,12 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 
    Only AmigaOS uses this file, so that other m68k targets keep upstream's
    code.  There every C library defines these helpers too, and its own must
-   win: they are weak here, for programs without one.  */
+   win: they are weak here, for programs without one.
+
+   The helpers reach the cores in other objects with absolute jsr and jmp,
+   not lb1sf68.S's PICCALL and PICJUMP: with -fbaserel and -resident those
+   make a 16-bit bra, which fails to link once the linker places the two
+   more than 32 KB apart.  */
 
 #include "lb1sf68.S"
 
@@ -141,18 +146,18 @@ SYM (__divmodsi_internal):
 	tstl	d1
 	jpl	1f
 	negl	d1
-	PICCALL	SYM (__udivmodsi_internal)
+	jsr	SYM (__udivmodsi_internal)
 	negl	d1
 	rts
-1:	PICCALL	SYM (__udivmodsi_internal)
+1:	jsr	SYM (__udivmodsi_internal)
 	negl	d0
 	negl	d1
 	rts
 2:	tstl	d1
 	jmi	3f
-	PICJUMP	SYM (__udivmodsi_internal)
+	jmp	SYM (__udivmodsi_internal)
 3:	negl	d1
-	PICCALL	SYM (__udivmodsi_internal)
+	jsr	SYM (__udivmodsi_internal)
 	negl	d0
 	rts
 #endif /* L_amigaos_divmodsi */
@@ -164,7 +169,7 @@ SYM (__divmodsi_internal):
 	.weak	SYM (__udivsi3)
 SYM (__udivsi3):
 	moveml	sp@(4), d0/d1
-	PICJUMP	SYM (__udivmodsi_internal)
+	jmp	SYM (__udivmodsi_internal)
 #endif /* L_amigaos_udivsi3 */
 
 #ifdef L_amigaos_umodsi3
@@ -174,7 +179,7 @@ SYM (__udivsi3):
 	.weak	SYM (__umodsi3)
 SYM (__umodsi3):
 	moveml	sp@(4), d0/d1
-	PICCALL	SYM (__udivmodsi_internal)
+	jsr	SYM (__udivmodsi_internal)
 	movel	d1, d0
 	rts
 #endif /* L_amigaos_umodsi3 */
@@ -186,7 +191,7 @@ SYM (__umodsi3):
 	.weak	SYM (__divsi3)
 SYM (__divsi3):
 	moveml	sp@(4), d0/d1
-	PICJUMP	SYM (__divmodsi_internal)
+	jmp	SYM (__divmodsi_internal)
 #endif /* L_amigaos_divsi3 */
 
 #ifdef L_amigaos_modsi3
@@ -196,7 +201,7 @@ SYM (__divsi3):
 	.weak	SYM (__modsi3)
 SYM (__modsi3):
 	moveml	sp@(4), d0/d1
-	PICCALL	SYM (__divmodsi_internal)
+	jsr	SYM (__divmodsi_internal)
 	movel	d1, d0
 	rts
 #endif /* L_amigaos_modsi3 */
