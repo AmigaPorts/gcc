@@ -1497,17 +1497,24 @@ m68k_analyze_ipa_call_saves (cgraph_node *node)
   info->call_free_return = fast;
 }
 
-/* Implement TARGET_IPA_CALL_SAVE_COST.  The unit is 1/100 of a JSR and
-   RTS pair.  On the 68000 that pair takes 36 cycles (JSR to an absolute
-   address 20, RTS 16).  MOVEM.L to -(sp) takes 8 + 8n cycles and from (sp)+
-   12 + 8n, so each register costs 16 cycles (45/100) and the pair of
-   instructions 20 cycles (55/100).  The later CPUs keep about the same
-   proportions.
+/* Implement TARGET_IPA_CALL_SAVE_COST.  The unit is 1/100 of a call and
+   return.  Each added register, and the MOVEM pair itself, counts as one
+   whole call.
+
+   That is more than the instructions cost: on the 68000, MOVEM.L takes 16
+   cycles per register for the save and the restore together, and JSR with
+   RTS takes 36.  The price is set by measurement.  A price from the cycle
+   counts (45 per register) keeps too few calls out of line: on the 68060
+   it gives ADoom 2% to 5% and Heretic 1% to 3%, where this price gives
+   15% to 19%.  Prices from 100 to 250 differ by about 1%.  The inliner
+   underestimates what a merged body does to the callback: the register
+   estimate comes from GIMPLE, and the branch frequencies are guesses.
 
    Below MIN_MOVEM_REGS the function saves with single moves and the extra
    work is small; leave those inlines to the ordinary heuristics.  A caller
    that has a MOVEM pair already is left alone too: charging it for added
-   registers vetoed many more inlines for no measured gain.  */
+   registers changed nothing in those workloads and vetoed more inlines
+   elsewhere.  */
 static unsigned
 m68k_ipa_call_save_cost (unsigned caller_saves, unsigned callee_saves,
 			 unsigned live)
@@ -1517,7 +1524,7 @@ m68k_ipa_call_save_cost (unsigned caller_saves, unsigned callee_saves,
   unsigned combined = MIN (11U, callee_saves + live);
   if (caller_saves >= MIN_MOVEM_REGS || combined < MIN_MOVEM_REGS)
     return 0;
-  return (combined - caller_saves) * 45 + 55;
+  return (combined - caller_saves + 1) * 100;
 }
 
 /* Emit RTL for the "prologue" define_expand.  */
