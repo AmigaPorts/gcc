@@ -519,7 +519,7 @@ enum can_inline_edge_by_limits_flags
 };
 
 /* Return true if inlining E would cost more than it saves because CALLER
-   has a path that returns without a call, and the body of CALLEE would make
+   has a return path that bypasses E, and the body of CALLEE would make
    that path save and restore more registers.
 
    With the call executed FREQ times per entry of CALLER, inlining removes

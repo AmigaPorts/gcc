@@ -153,7 +153,7 @@ DEFCIFCODE(UNREACHABLE, CIF_FINAL_ERROR,
 DEFCIFCODE(CALLBACK_EDGE, CIF_FINAL_ERROR,
 	   N_("callback edges cannot be inlined"))
 
-/* Inlining would add register saves to a path of the caller that returns
-   without a call.  */
+/* Inlining would add register saves to a return path that bypasses the candidate
+   call.  */
 DEFCIFCODE(EARLY_RETURN_SAVES, CIF_FINAL_NORMAL,
-	   N_("inlining adds register saves to a call-free return path"))
+	   N_("inlining adds register saves on a path that bypasses this call"))

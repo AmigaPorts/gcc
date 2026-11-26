@@ -1579,7 +1579,8 @@ input_edge (class lto_input_block *ib, vec<symtab_node *> nodes,
   count = profile_count::stream_in (ib);
 
   bp = streamer_read_bitpack (ib);
-  inline_failed = bp_unpack_enum (&bp, cgraph_inline_failed_t, CIF_CALLBACK_EDGE + 1);
+  inline_failed = bp_unpack_enum (&bp, cgraph_inline_failed_t,
+				CIF_CALLBACK_EDGE + 1);
   stmt_id = bp_unpack_var_len_unsigned (&bp);
   speculative_id = bp_unpack_value (&bp, 16);
 

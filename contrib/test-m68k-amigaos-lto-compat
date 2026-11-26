@@ -1,0 +1,45 @@
+#!/bin/sh
+# Check the LTO call graph format across two m68k-amigaos toolchain builds.
+# Use the stock compiler from before the change as the first argument.
+# Each reader links all four pairs of objects and runs the result in Volamos.
+# Use absolute paths or commands on PATH for the three programs, and an
+# absolute path to the Volamos volumes directory.
+set -eu
+if [ "$#" -ne 4 ]; then
+  echo "usage: $0 STOCK_GCC CANDIDATE_GCC VOLAMOS VOLUMES_DIR" >&2
+  exit 2
+fi
+stock=$1 candidate=$2 vm=$3 volumes=$4
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' 0
+cd "$tmp"
+cat > helper.c <<'SRC'
+extern volatile int seed;
+__attribute__((noinline)) int add_seed(int x) { return x + seed; }
+int twice(int x) { return add_seed(x) + add_seed(x + 1); }
+SRC
+cat > main.c <<'SRC'
+extern int twice(int);
+volatile int seed = 3;
+int main(void) { return twice(5) != 17; }
+SRC
+flags="-Os -m68060 -flto -fno-fat-lto-objects -noixemul"
+for producer in stock candidate; do
+  cc=$stock
+  test "$producer" = stock || cc=$candidate
+  for unit in helper main; do
+    "$cc" $flags -c "$unit.c" -o "$producer-$unit.o"
+  done
+done
+for reader in stock candidate; do
+  cc=$stock
+  test "$reader" = stock || cc=$candidate
+  for helper in stock candidate; do
+    for main in stock candidate; do
+      exe="$reader-$helper-$main"
+      "$cc" $flags "$helper-helper.o" "$main-main.o" -o "$exe"
+      "$vm" --cpu 68060 --volumes-dir "$volumes" "$tmp/$exe"
+      echo "PASS reader=$reader helper=$helper main=$main"
+    done
+  done
+done
