@@ -15483,7 +15483,8 @@ put all often executed code together, minimizing the number of branches
 executed by making extra copies of code.
 
 The default is @samp{simple} at levels @option{-O1}, @option{-Os}, and
-@samp{stc} at levels @option{-O2}, @option{-O3}.
+@samp{stc} at levels @option{-O2}, @option{-O3}.  On m68k AmigaOS,
+@samp{stc} is also the default at @option{-Os} and @option{-Oz}.
 
 @opindex freorder-blocks-and-partition
 @opindex fno-reorder-blocks-and-partition
