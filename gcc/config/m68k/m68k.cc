@@ -7057,6 +7057,17 @@ m68k_sched_attr_m68060_pair (rtx_insn *insn)
 	return M68060_PAIR_FIRST;
     }
 
+  /* ST, which output_move_qimode emits for a byte of all ones, is an Scc:
+     pOEP-but-allows-sOEP.  */
+  if (type == TYPE_MOVE
+      && set != NULL_RTX
+      && GET_MODE (SET_DEST (set)) == QImode
+      && GET_CODE (SET_DEST (set)) != STRICT_LOW_PART
+      && !ADDRESS_REG_P (SET_DEST (set))
+      && CONST_INT_P (SET_SRC (set))
+      && (INTVAL (SET_SRC (set)) & 255) == 255)
+    return M68060_PAIR_FIRST;
+
   /* lea, or an addsi3 that outputs one.  */
   if (type == TYPE_LEA)
     return (set != NULL_RTX && m68060_soep_address_p (QImode, SET_SRC (set))
@@ -7105,7 +7116,8 @@ m68k_sched_attr_m68060_pair (rtx_insn *insn)
 
   /* An immediate with extension words and a memory operand: pOEP-until-last
      for a MOVE, and for the others unless the address is (An), (An)+ or
-     -(An), which have none of their own.  A zero is a CLR or a TST.  */
+     -(An), which have none of their own.  A zero is a CLR or a TST, but
+     *insv_32_mem moves it.  */
   if (type != TYPE_ALUQ_L && type != TYPE_MOVEQ_L && type != TYPE_MOV3Q_L)
     {
       rtx mem = x != NULL_RTX && MEM_P (x) ? x : y;
@@ -7114,7 +7126,9 @@ m68k_sched_attr_m68060_pair (rtx_insn *insn)
 
       if (mem != NULL_RTX && MEM_P (mem)
 	  && imm != NULL_RTX && CONSTANT_P (imm)
-	  && imm != CONST0_RTX (GET_MODE (mem))
+	  && (imm != CONST0_RTX (GET_MODE (mem))
+	      || (set != NULL_RTX
+		  && GET_CODE (SET_DEST (set)) == ZERO_EXTRACT))
 	  && (type == TYPE_MOVE || type == TYPE_MOVE_L
 	      || !m68k_decompose_address (GET_MODE (mem), XEXP (mem, 0),
 					  reload_completed, &address)
