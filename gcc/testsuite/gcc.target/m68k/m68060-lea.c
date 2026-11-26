@@ -4,7 +4,7 @@
    format (d8,An,Xn) pair, and the full format, here a 32-bit displacement
    with a suppressed base register, goes in the primary pipeline.  */
 /* { dg-do compile } */
-/* { dg-skip-if "a4-relative or pc-relative addresses, register arguments, 16-bit int" { *-*-* } { "-fbaserel*" "-resident*" "-mpcrel" "-mregparm*" "-msasregparm" "-mshort" } { "" } } */
+/* { dg-skip-if "a4-relative, pc-relative or GOT addresses, register arguments, 16-bit int" { *-*-* } { "-fbaserel*" "-resident*" "-mpcrel" "-fpic" "-fPIC" "-msep-data" "-mid-shared-library" "-mregparm*" "-msasregparm" "-mshort" } { "" } } */
 /* { dg-options "-O2 -m68060 -fomit-frame-pointer -fsched-verbose=1 -fdump-rtl-sched2" } */
 
 struct s

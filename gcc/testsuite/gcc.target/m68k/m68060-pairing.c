@@ -3,7 +3,8 @@
    another one that can go in the secondary pipeline in the same cycle, and a
    clr.w to memory, which has no immediate, goes in either pipeline.  A
    pattern that emits two instructions, asr.l and roxr.l or add.l and addx.l
-   for a long long shifted by one, takes two cycles.  */
+   for a long long shifted by one, takes two cycles, and add.l, subx.l and
+   neg.l for an unsigned shifted right by 31 take three.  */
 /* { dg-do compile } */
 /* { dg-skip-if "a4-relative or pc-relative addresses, register arguments, 16-bit int" { *-*-* } { "-fbaserel*" "-resident*" "-mpcrel" "-mregparm*" "-msasregparm" "-mshort" } { "" } } */
 /* { dg-options "-O2 -m68060 -fsched-verbose=1 -fdump-rtl-sched2" } */
@@ -37,7 +38,14 @@ shift_left (long long x)
   return x << 1;
 }
 
+unsigned
+top_bit (unsigned x)
+{
+  return x >> 31;
+}
+
 /* { dg-final { scan-rtl-dump {;;\s+(\d+)--> [^\n]*:m68060_pOEP\|m68060_sOEP\n;;\s+\1--> [^\n]*m68060_sOEP} "sched2" } } */
 /* { dg-final { scan-rtl-dump {\[%?a\d\]=0 +:\(m68060_pOEP\+m68060_mem\)\|\(m68060_sOEP\+m68060_mem\)\n} "sched2" } } */
 /* { dg-final { scan-rtl-dump {>>0x1 +:m68060_single\*2} "sched2" } } */
 /* { dg-final { scan-rtl-dump {<<0x1 +:m68060_single\*2} "sched2" } } */
+/* { dg-final { scan-rtl-dump { 0>>0x1f +:m68060_single\*3} "sched2" } } */
