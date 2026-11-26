@@ -1035,6 +1035,18 @@ m68k_costs_engine (rtx x, machine_mode mode, int outer_code,
           } else {
               *total += GET_MODE_SIZE(mode) > 2 ? COST_TABLE[IDX_MULT_68000_LONG_MUL] : COST_TABLE[IDX_MULT_68000_WORD_MUL];
           }
+	  /* A 68020/30 long multiply by a constant also needs the immediate
+	     source or a register holding it.  Include that cost when
+	     comparing with shifts and adds, as for multiplication by 52.  */
+	  if (speed && (m68k_tune == u68020 || m68k_tune == u68020_40
+			|| m68k_tune == u68030)
+	      && mode == SImode
+	      && CONST_INT_P (b))
+	    {
+	      if (!m68k_costs_engine (b, mode, code, 1, &total2, speed))
+		return false;
+	      *total += total2;
+	    }
           return true;
         }
       case DIV:
