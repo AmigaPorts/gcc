@@ -7117,7 +7117,8 @@ m68k_sched_attr_m68060_pair (rtx_insn *insn)
   /* An immediate with extension words and a memory operand: pOEP-until-last
      for a MOVE, and for the others unless the address is (An), (An)+ or
      -(An), which have none of their own.  A zero is a CLR or a TST, but
-     *insv_32_mem moves it.  */
+     *insv_32_mem moves it, and so does the 68000 to a volatile MEM, which
+     its CLR would read.  */
   if (type != TYPE_ALUQ_L && type != TYPE_MOVEQ_L && type != TYPE_MOV3Q_L)
     {
       rtx mem = x != NULL_RTX && MEM_P (x) ? x : y;
@@ -7128,7 +7129,9 @@ m68k_sched_attr_m68060_pair (rtx_insn *insn)
 	  && imm != NULL_RTX && CONSTANT_P (imm)
 	  && (imm != CONST0_RTX (GET_MODE (mem))
 	      || (set != NULL_RTX
-		  && GET_CODE (SET_DEST (set)) == ZERO_EXTRACT))
+		  && GET_CODE (SET_DEST (set)) == ZERO_EXTRACT)
+	      || ((type == TYPE_MOVE || type == TYPE_MOVE_L)
+		  && !TARGET_68010 && MEM_VOLATILE_P (mem)))
 	  && (type == TYPE_MOVE || type == TYPE_MOVE_L
 	      || !m68k_decompose_address (GET_MODE (mem), XEXP (mem, 0),
 					  reload_completed, &address)
