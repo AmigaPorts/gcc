@@ -54,9 +54,10 @@ proc amigaos_runtest { runtest tests } {
 # the command line (volamos-fpu: -m68020 -m68881), or in its variant
 # (volamos/-m68020-60/-m68881), which comes before and still changes the
 # code: the FPU stays on, and -m68020-60 -m68000 is not -m68000.
-# Both are dropped here, with -fbaserel32 and -resident32, which need the
-# 68020 that just went.  The runtime test and its companion are handled
-# separately below.
+# Both are dropped here, and so are the board's -fbaserel, -resident and
+# their 32-bit forms: base-relative code calls, jumps and addresses its data
+# differently, and the tests about it ask for it in their own dg-options.
+# The runtime test and its companion are handled separately below.
 dg-init
 set scan_tests {}
 foreach f [lsort [glob -nocomplain $srcdir/$subdir/*.c]] {
@@ -70,7 +71,7 @@ set tboard [target_info name]
 foreach flagsvar {cflags multilib_flags} {
     if { [board_info $tboard exists $flagsvar] } {
 	set saved_flags($flagsvar) [board_info $tboard $flagsvar]
-	regsub -all {(-m680[0-9]+(-[0-9]+)?|-mcpu=\S+|-march=\S+|-mtune=\S+|-m68881|-msoft-float|-mhard-float|-fbaserel32|-resident32)(?=\s|$)} $saved_flags($flagsvar) "" scan_flags
+	regsub -all {(-m680[0-9]+(-[0-9]+)?|-mcpu=\S+|-march=\S+|-mtune=\S+|-m68881|-msoft-float|-mhard-float|-fbaserel(32)?|-resident(32)?)(?=\s|$)} $saved_flags($flagsvar) "" scan_flags
 	set board_info($tboard,$flagsvar) $scan_flags
     }
 }
