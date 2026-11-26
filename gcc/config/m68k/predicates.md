@@ -283,3 +283,17 @@
 
 (define_predicate "address_reg_operand"
   (match_test ("ADDRESS_REG_P (op)")))
+
+;; A bare base-relative symbol.  Symbol-plus-addend expressions have a PLUS
+;; outside the UNSPEC and are deliberately left to the existing patterns.
+;; The second UNSPEC element is the relocation kind (zero for RELOC_GOT),
+;; not an addend.
+(define_predicate "baserel16_symbol_operand"
+  (match_code "const")
+{
+  rtx x = XEXP (op, 0);
+  return GET_CODE (x) == UNSPEC && XINT (x, 1) == UNSPEC_RELOC16
+    && XVECLEN (x, 0) == 2
+    && GET_CODE (XVECEXP (x, 0, 0)) == SYMBOL_REF
+    && XVECEXP (x, 0, 1) == const0_rtx;
+})
