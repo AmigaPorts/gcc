@@ -967,18 +967,20 @@ m68k_costs_engine (rtx x, machine_mode mode, int outer_code,
           if (GET_CODE(b) == CONST_INT)
             {
               unsigned HOST_WIDE_INT n = absu_hwi (INTVAL(b));
-	      /* Negative powers with an immediate shift count also need a
-		 negation.  Cost the multiply before strength reduction instead
-		 of treating it as an already reduced, plain shift.  Keep larger
-		 counts on the existing path: their register-count shifts and
-		 multi-insn sequences need a separate cost-model correction.  */
+	      /* A negative power also needs a negation.  For counts above
+		 eight, preserve the register-shift estimate on targets with
+		 long multiply.  On 68000 and 68010 it hides a libcall.  */
 	      if (pow2p_hwi (n)
-		  && (INTVAL (b) > 0 || exact_log2 (n) > 8)) {
-                  int x_shift = exact_log2 (n);
-                  *total = (GET_MODE_SIZE(mode) > 2 ? COST_SHIFT_CONST : COST_SHIFT_CONST_W);
-                  *total += COST_TABLE[IDX_LSL_SHIFT_STEP] * x_shift;
-                  return true;
-              }
+		  && (INTVAL (b) > 0
+		      || (exact_log2 (n) > 8
+			  && (TARGET_68020 || TARGET_COLDFIRE))))
+		{
+		  int x_shift = exact_log2 (n);
+		  *total = (GET_MODE_SIZE (mode) > 2
+			    ? COST_SHIFT_CONST : COST_SHIFT_CONST_W);
+		  *total += COST_TABLE[IDX_LSL_SHIFT_STEP] * x_shift;
+		  return true;
+		}
             }
 
           /* A 32 x 32 -> 64 multiply, the high part of which a division
