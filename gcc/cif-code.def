@@ -63,6 +63,11 @@ DEFCIFCODE(OVERWRITABLE, CIF_FINAL_ERROR,
 DEFCIFCODE(FUNCTION_NOT_INLINE_CANDIDATE, CIF_FINAL_NORMAL,
 	   N_("function not inline candidate"))
 
+/* Inlining would add register saves to a path of the caller that returns
+   without a call.  */
+DEFCIFCODE(EARLY_RETURN_SAVES, CIF_FINAL_NORMAL,
+	   N_("inlining adds register saves to a call-free return path"))
+
 /* Inlining failed because of various limit parameters.  */
 DEFCIFCODE(LARGE_FUNCTION_GROWTH_LIMIT, CIF_FINAL_NORMAL,
 	   N_("--param large-function-growth limit reached"))

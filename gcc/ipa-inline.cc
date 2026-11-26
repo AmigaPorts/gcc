@@ -518,16 +518,24 @@ enum can_inline_edge_by_limits_flags
   CAN_INLINE_REPORT = 8,
 };
 
-/* Compare the extra unconditional save/restore work with call transfers
-   avoided on the conditional path.  */
+/* Return true if inlining E would cost more than it saves because CALLER
+   has a path that returns without a call, and the body of CALLEE would make
+   that path save and restore more registers.
+
+   With the call executed FREQ times per entry of CALLER, inlining removes
+   FREQ call and return sequences.  It adds the target's cost of the extra
+   saves on each of the (1 - FREQ) entries that do not reach the call; the
+   entries that reach it pay for the saves in either case, in CALLER or in
+   CALLEE.  The target gives its cost in hundredths of a call and return.
+
+   This is a late decision on purpose: it applies after the size limits, so
+   it also keeps a function with one call site out of line, at -Os too.  */
 static bool
 inline_saves_costly_p (cgraph_edge *e, cgraph_node *caller,
 		       cgraph_node *callee)
 {
   if (!targetm.target_option.ipa_call_save_cost || !in_lto_p
       || !caller->address_taken || caller->count.quality () >= AFDO
-      /* The splitter has already priced its own residual function.  */
-      || caller != e->caller || callee->split_part
       || DECL_DECLARED_INLINE_P (callee->decl)
       || DECL_DISREGARD_INLINE_LIMITS (callee->decl)
       || lookup_attribute ("flatten", DECL_ATTRIBUTES (caller->decl)))
@@ -544,12 +552,12 @@ inline_saves_costly_p (cgraph_edge *e, cgraph_node *caller,
     return false;
   unsigned cost = targetm.target_option.ipa_call_save_cost
     (caller_saves, callee_saves, call->live_across_call);
-  bool costly = cost && (sreal (1) - freq) * cost > freq;
+  bool costly = cost && (sreal (1) - freq) * cost > freq * 100;
   if (dump_file && (dump_flags & TDF_DETAILS))
     fprintf (dump_file, "IPA call saves %s -> %s: %u -> %u live %u "
-	     "freq %.3f reject %d\n",
+	     "cost %u freq %.3f reject %d\n",
 	     caller->name (), callee->name (), caller_saves, callee_saves,
-	     call->live_across_call, freq.to_double (), costly);
+	     call->live_across_call, cost, freq.to_double (), costly);
   return costly;
 }
 
@@ -586,12 +594,6 @@ can_inline_edge_by_limits_p (struct cgraph_edge *e, int flags)
 			 DECL_ATTRIBUTES (caller->decl))))
       && !caller_growth_limits (e))
     inlinable = false;
-  else if (!(flags & (CAN_INLINE_EARLY | CAN_INLINE_DISREGARD_LIMITS))
-	   && inline_saves_costly_p (e, caller, callee))
-    {
-      e->inline_failed = CIF_FUNCTION_NOT_INLINE_CANDIDATE;
-      inlinable = false;
-    }
   else if (callee->externally_visible
 	   && !DECL_DISREGARD_INLINE_LIMITS (callee->decl)
 	   && flag_live_patching == LIVE_PATCHING_INLINE_ONLY_STATIC)
@@ -1026,6 +1028,11 @@ want_inline_small_function_p (struct cgraph_edge *e, bool report)
       e->inline_failed = CIF_FUNCTION_NOT_INLINE_CANDIDATE;
       want_inline = false;
     }
+  else if (inline_saves_costly_p (e, to, callee))
+    {
+      e->inline_failed = CIF_EARLY_RETURN_SAVES;
+      want_inline = false;
+    }
 
   /* Early return before lookup of summaries.  */
   if (!want_inline)
@@ -1259,6 +1266,13 @@ check_callers (struct cgraph_node *node, void *has_hot_call)
 	return true;
       if (!can_inline_edge_by_limits_p (e, CAN_INLINE_REPORT))
 	return true;
+      if (inline_saves_costly_p (e, (e->caller->inlined_to
+				     ? e->caller->inlined_to : e->caller),
+				 node))
+	{
+	  e->inline_failed = CIF_EARLY_RETURN_SAVES;
+	  return true;
+	}
       /* Inlining large functions to large loop depth is often harmful because
 	 of register pressure it implies.  */
       if ((int)ipa_call_summaries->get (e)->loop_depth

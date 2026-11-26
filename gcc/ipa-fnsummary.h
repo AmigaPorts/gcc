@@ -169,7 +169,10 @@ public:
   unsigned int fp_expressions : 1;
   /* Cache for analysis of can_early_inline_edge_p.  */
   unsigned int safe_to_inline_to_always_inline : 2;
-  /* Target estimate before any whole-program inlining.  */
+  /* Target estimate of the call-preserved registers the function uses, and
+     whether a path from entry to exit has no call.  The analysis sets them
+     before whole-program inlining; ipa_merge_fn_summary_after_inlining
+     raises the register estimate.  */
   unsigned int self_saved_regs : 4;
   unsigned int call_free_return : 1;
   /* Like fp_expressions field above, but it's to hold some target specific

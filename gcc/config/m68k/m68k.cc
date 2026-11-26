@@ -83,6 +83,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "ipa-cp.h"
 #include "ipa-prop.h"
 #include "ipa-fnsummary.h"
+#include "builtins.h"
 
 /* This file should be included last.  */
 #include "target-def.h"
@@ -1453,7 +1454,9 @@ m68k_analyze_ipa_call_saves (cgraph_node *node)
 	  ssa_op_iter iter;
 	  FOR_EACH_SSA_TREE_OPERAND (name, stmt, iter, SSA_OP_DEF)
 	    account (name, false);
-	  if (is_gimple_call (stmt) && !gimple_call_internal_p (stmt))
+	  if (is_gimple_call (stmt) && !gimple_call_internal_p (stmt)
+	      && !(gimple_call_builtin_p (stmt, BUILT_IN_NORMAL)
+		   && is_inexpensive_builtin (gimple_call_fndecl (stmt))))
 	    {
 	      bitmap_set_bit (calls, bb->index);
 	      peak = MAX (peak, data + addr);
@@ -1494,19 +1497,27 @@ m68k_analyze_ipa_call_saves (cgraph_node *node)
   info->call_free_return = fast;
 }
 
-/* Price transfers in units of one return-address stack round trip.  */
+/* Implement TARGET_IPA_CALL_SAVE_COST.  The unit is 1/100 of a JSR and
+   RTS pair.  On the 68000 that pair takes 36 cycles (JSR to an absolute
+   address 20, RTS 16).  MOVEM.L to -(sp) takes 8 + 8n cycles and from (sp)+
+   12 + 8n, so each register costs 16 cycles (45/100) and the pair of
+   instructions 20 cycles (55/100).  The later CPUs keep about the same
+   proportions.
+
+   Below MIN_MOVEM_REGS the function saves with single moves and the extra
+   work is small; leave those inlines to the ordinary heuristics.  A caller
+   that has a MOVEM pair already is left alone too: charging it for added
+   registers vetoed many more inlines for no measured gain.  */
 static unsigned
 m68k_ipa_call_save_cost (unsigned caller_saves, unsigned callee_saves,
 			 unsigned live)
 {
-  if (!m68k_ipa_callback_saves || TARGET_COLDFIRE
-      || caller_saves >= MIN_MOVEM_REGS || callee_saves <= caller_saves)
+  if (!m68k_ipa_callback_saves || TARGET_COLDFIRE)
     return 0;
   unsigned combined = MIN (11U, callee_saves + live);
-  if (combined < MIN_MOVEM_REGS)
+  if (caller_saves >= MIN_MOVEM_REGS || combined < MIN_MOVEM_REGS)
     return 0;
-  /* Include setup of the new MOVEM save/restore pair.  */
-  return combined - caller_saves + 1;
+  return (combined - caller_saves) * 45 + 55;
 }
 
 /* Emit RTL for the "prologue" define_expand.  */

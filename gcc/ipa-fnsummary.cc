@@ -4508,6 +4508,12 @@ ipa_merge_fn_summary_after_inlining (struct cgraph_edge *edge)
 
   info->fp_expressions |= callee_info->fp_expressions;
   info->target_info |= callee_info->target_info;
+  /* The body of the callee now uses the registers of TO, with the values
+     that are live across the call.  */
+  info->self_saved_regs
+    = MIN (15U, MAX ((unsigned) info->self_saved_regs,
+		     (unsigned) callee_info->self_saved_regs
+		     + es->live_across_call));
 
   if (callee_info->conds)
     {
@@ -4760,6 +4766,10 @@ read_ipa_call_summary (class lto_input_block *ib, struct cgraph_edge *e,
   else
     bp_unpack_value (&bp, 1);
 
+  /* The estimate uses spare bits of the word that holds the flag above.
+     An object written without it gives zero here, which means "no
+     estimate".  If the word runs out of bits, this needs a stream
+     version change.  */
   unsigned live_across = bp_unpack_value (&bp, 4);
   if (es)
     es->live_across_call = live_across;
@@ -4857,6 +4867,7 @@ inline_read_section (struct lto_file_decl_data *file_data, const char *data,
 	{
 	  info->inlinable = bp_unpack_value (&bp, 1);
 	  info->fp_expressions = bp_unpack_value (&bp, 1);
+	  /* Spare bits of the same word; see read_ipa_call_summary.  */
 	  info->self_saved_regs = bp_unpack_value (&bp, 4);
 	  info->call_free_return = bp_unpack_value (&bp, 1);
 	  if (!lto_stream_offload_p)

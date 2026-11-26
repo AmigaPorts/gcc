@@ -11075,7 +11075,7 @@ and its outgoing call edges before LTO inlining.
 Return the cost of additional unconditional register saves and restores
 if a function using @var{callee} preserved registers is inlined into one
 using @var{caller}, with @var{live} register words live across the call.
-Units are the cost of a call and return.  Zero leaves the ordinary inliner
+The unit is 1/100 of the cost of a call and return.  Zero leaves the ordinary inliner
 decision in place.
 @end deftypefn
 

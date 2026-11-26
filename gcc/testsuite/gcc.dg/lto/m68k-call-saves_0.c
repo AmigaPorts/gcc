@@ -3,6 +3,7 @@
 /* { dg-require-effective-target int32 } */
 /* { dg-lto-options { { -Os -flto -fdump-ipa-inline-details } } } */
 /* { dg-final { scan-wpa-ipa-dump {IPA call saves tick -> update: [^\n]*reject 1} "inline" } } */
+/* { dg-final { scan-wpa-ipa-dump "inlining adds register saves to a call-free return path" "inline" } } */
 
 extern unsigned update (unsigned *, unsigned);
 

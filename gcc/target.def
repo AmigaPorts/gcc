@@ -7034,7 +7034,7 @@ DEFHOOK
  "Return the cost of additional unconditional register saves and restores\n\
 if a function using @var{callee} preserved registers is inlined into one\n\
 using @var{caller}, with @var{live} register words live across the call.\n\
-Units are the cost of a call and return.  Zero leaves the ordinary inliner\n\
+The unit is 1/100 of the cost of a call and return.  Zero leaves the ordinary inliner\n\
 decision in place.",
  unsigned int, (unsigned int caller, unsigned int callee, unsigned int live),
  NULL)
