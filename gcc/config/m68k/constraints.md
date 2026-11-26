@@ -117,6 +117,11 @@
   "Used for const_call_operands."
   (match_operand 0 "const_call_operand"))
 
+(define_constraint "Cb"
+  "A bare 16-bit base-relative symbol, suitable for a LEA displacement."
+  (and (match_operand 0 "baserel16_symbol_operand")
+       (match_test "flag_pic == 3")))
+
 (define_constraint "Cs"
   "symbol_ref or const."
   (match_code "symbol_ref,const"))
