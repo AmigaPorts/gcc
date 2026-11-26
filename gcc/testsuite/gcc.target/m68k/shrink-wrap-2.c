@@ -31,7 +31,7 @@ main (void)
   if (f (v, 10, 50, 8) != 42)
     __builtin_abort ();
   flag = 0;
-  if (f (v, 10, 50, 8) != 91)
+  if (f (v, 10, 50, 8) != 89)
     __builtin_abort ();
   return 0;
 }

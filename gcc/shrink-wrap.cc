@@ -1028,13 +1028,15 @@ try_shrink_wrapping (edge *entry_edge, rtx_insn *prologue_seq)
   if (dump_file)
     fprintf (dump_file, "Performing shrink-wrapping.\n");
 
-  /* The blocks that are not reachable from PRO run without the prologue.
-     Rebase their incoming stack references now; the copies made below
-     get theirs afterwards.  */
+  /* The blocks that are not reachable from PRO run without the prologue,
+     and so do the copies made below.  Their incoming stack references
+     need the offsets of function entry.  BB_WITH does not have the blocks
+     that PRO took in when it moved back; PRO dominates those.  */
   auto_vec<basic_block> rebase_bbs;
   if (prologue_sp_adjust > 0)
     FOR_EACH_BB_FN (bb, cfun)
-      if (!bitmap_bit_p (bb_with, bb->index))
+      if (!bitmap_bit_p (bb_with, bb->index)
+	  && !dominated_by_p (CDI_DOMINATORS, bb, pro))
 	rebase_bbs.safe_push (bb);
 
   /* Copy the blocks that can run both with and without prologue.  The
