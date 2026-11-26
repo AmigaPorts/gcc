@@ -11066,6 +11066,19 @@ default, inlining is not allowed if the callee function has function
 specific target options and the caller does not use the same options.
 @end deftypefn
 
+@deftypefn {Target Hook} void TARGET_ANALYZE_IPA_CALL_SAVES (cgraph_node *@var{node})
+Record target estimates of call-preserved register use for @var{node}
+and its outgoing call edges before LTO inlining.
+@end deftypefn
+
+@deftypefn {Target Hook} {unsigned int} TARGET_IPA_CALL_SAVE_COST (unsigned int @var{caller}, unsigned int @var{callee}, unsigned int @var{live})
+Return the cost of additional unconditional register saves and restores
+if a function using @var{callee} preserved registers is inlined into one
+using @var{caller}, with @var{live} register words live across the call.
+Units are the cost of a call and return.  Zero leaves the ordinary inliner
+decision in place.
+@end deftypefn
+
 @deftypefn {Target Hook} bool TARGET_UPDATE_IPA_FN_TARGET_INFO (unsigned int& @var{info}, const gimple* @var{stmt})
 Allow target to analyze all gimple statements for the given function to
 record and update some target specific information for inlining.  A typical

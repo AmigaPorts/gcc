@@ -241,3 +241,7 @@ v    be verbose\n
 V    be very verbose\n
 x    dump insns\n
 Default: -fbbb=+ which yields -fbbb=abcefilmnprsz0
+
+mipa-callback-saves
+Target Var(m68k_ipa_callback_saves) Init(1)
+Account for extra register saves when inlining into callbacks at link time.

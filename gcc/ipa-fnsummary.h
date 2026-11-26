@@ -127,6 +127,7 @@ public:
     : min_size (0),
       inlinable (false), single_caller (false),
       fp_expressions (false), safe_to_inline_to_always_inline (0),
+      self_saved_regs (0), call_free_return (false),
       target_info (0), estimated_stack_size (false),
       time (0), conds (NULL),
       size_time_table (), call_size_time_table (vNULL),
@@ -141,6 +142,7 @@ public:
     : min_size (s.min_size),
     inlinable (s.inlinable), single_caller (s.single_caller),
     fp_expressions (s.fp_expressions),
+    self_saved_regs (s.self_saved_regs), call_free_return (s.call_free_return),
     target_info (s.target_info),
     estimated_stack_size (s.estimated_stack_size),
     time (s.time), conds (s.conds), size_time_table (),
@@ -167,6 +169,9 @@ public:
   unsigned int fp_expressions : 1;
   /* Cache for analysis of can_early_inline_edge_p.  */
   unsigned int safe_to_inline_to_always_inline : 2;
+  /* Target estimate before any whole-program inlining.  */
+  unsigned int self_saved_regs : 4;
+  unsigned int call_free_return : 1;
   /* Like fp_expressions field above, but it's to hold some target specific
      information, such as some target specific isa flags.  Note that for
      offloading target compilers, this field isn't streamed.  */
@@ -280,7 +285,7 @@ public:
      This is useful for debugging.  */
   ipa_call_summary ()
     : predicate (NULL), param (vNULL), call_stmt_size (0), call_stmt_time (0),
-      loop_depth (0), is_return_callee_uncaptured (false)
+      loop_depth (0), live_across_call (0), is_return_callee_uncaptured (false)
     {
     }
 
@@ -288,6 +293,7 @@ public:
   ipa_call_summary (const ipa_call_summary &s):
     predicate (s.predicate), param (s.param), call_stmt_size (s.call_stmt_size),
     call_stmt_time (s.call_stmt_time), loop_depth (s.loop_depth),
+    live_across_call (s.live_across_call),
     is_return_callee_uncaptured (s.is_return_callee_uncaptured)
   {
   }
@@ -303,6 +309,8 @@ public:
   int call_stmt_time;
   /* Depth of loop nest, 0 means no nesting.  */
   unsigned int loop_depth;
+  /* Estimated general register words live across this call, capped at 15.  */
+  unsigned char live_across_call;
   /* Indicates whether the caller returns the value of it's callee.  */
   bool is_return_callee_uncaptured;
 };

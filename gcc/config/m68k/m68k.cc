@@ -73,6 +73,17 @@ along with GCC; see the file COPYING3.  If not see
 #include "cfgloop.h"
 
 
+#include "gimple.h"
+#include "ssa.h"
+#include "cgraph.h"
+#include "gimple-iterator.h"
+#include "tree-ssa-live.h"
+#include "symbol-summary.h"
+#include "sreal.h"
+#include "ipa-cp.h"
+#include "ipa-prop.h"
+#include "ipa-fnsummary.h"
+
 /* This file should be included last.  */
 #include "target-def.h"
 
@@ -483,6 +494,14 @@ TARGET_GNU_ATTRIBUTES (m68k_attribute_table,
 
 #undef TARGET_DOCUMENTATION_NAME
 #define TARGET_DOCUMENTATION_NAME "m68k"
+
+static void m68k_analyze_ipa_call_saves (cgraph_node *);
+static unsigned m68k_ipa_call_save_cost (unsigned, unsigned, unsigned);
+
+#undef TARGET_ANALYZE_IPA_CALL_SAVES
+#define TARGET_ANALYZE_IPA_CALL_SAVES m68k_analyze_ipa_call_saves
+#undef TARGET_IPA_CALL_SAVE_COST
+#define TARGET_IPA_CALL_SAVE_COST m68k_ipa_call_save_cost
 
 struct gcc_target targetm = TARGET_INITIALIZER;
 
@@ -1374,6 +1393,120 @@ m68k_set_frame_related (rtx_insn *insn)
   if (GET_CODE (body) == PARALLEL)
     for (i = 0; i < XVECLEN (body, 0); i++)
       RTX_FRAME_RELATED_P (XVECEXP (body, 0, i)) = 1;
+}
+
+/* Estimate simultaneous SSA integer and pointer values in a block.  Both
+   classes have two scratch registers in the usual m68k C ABI.  */
+static void
+m68k_analyze_ipa_call_saves (cgraph_node *node)
+{
+  if (TARGET_COLDFIRE || !m68k_ipa_callback_saves
+      || m68k_get_function_kind (node->decl) != m68k_fk_normal_function)
+    return;
+
+  function *fun = cfun;
+  unsigned data_scratch = 0, addr_scratch = 0;
+  for (unsigned reg = D0_REG; reg < SP_REG; ++reg)
+    if (!fixed_regs[reg] && this_target_hard_regs->x_call_used_regs[reg])
+      {
+	if (reg < A0_REG)
+	  ++data_scratch;
+	else
+	  ++addr_scratch;
+      }
+  unsigned peak = 0;
+  var_map map = init_var_map (num_ssa_names);
+  tree_live_info_p ranges = calculate_live_ranges (map, false);
+  auto_bitmap calls, seen;
+  basic_block bb;
+  FOR_EACH_BB_FN (bb, fun)
+    {
+      auto_bitmap live;
+      unsigned int data = 0, addr = 0;
+      auto account = [&] (tree name, bool add)
+	{
+	  if (virtual_operand_p (name))
+	    return;
+	  bool pointer = POINTER_TYPE_P (TREE_TYPE (name));
+	  if (!pointer && !INTEGRAL_TYPE_P (TREE_TYPE (name)))
+	    return;
+	  unsigned id = SSA_NAME_VERSION (name);
+	  unsigned &n = pointer ? addr : data;
+	  unsigned bits = TYPE_PRECISION (TREE_TYPE (name));
+	  unsigned words = MIN (2U, (bits + 31U) / 32U);
+	  if (add && bitmap_set_bit (live, id))
+	    n += words;
+	  else if (!add && bitmap_clear_bit (live, id))
+	    n -= words;
+	};
+      unsigned part;
+      bitmap_iterator bi;
+      EXECUTE_IF_SET_IN_BITMAP (live_on_exit (ranges, bb), 0, part, bi)
+	account (partition_to_var (map, part), true);
+      for (gimple_stmt_iterator i = gsi_last_bb (bb); !gsi_end_p (i);
+	   gsi_prev (&i))
+	{
+	  gimple *stmt = gsi_stmt (i);
+	  if (is_gimple_debug (stmt))
+	    continue;
+	  tree name;
+	  ssa_op_iter iter;
+	  FOR_EACH_SSA_TREE_OPERAND (name, stmt, iter, SSA_OP_DEF)
+	    account (name, false);
+	  if (is_gimple_call (stmt) && !gimple_call_internal_p (stmt))
+	    {
+	      bitmap_set_bit (calls, bb->index);
+	      peak = MAX (peak, data + addr);
+	      if (cgraph_edge *call = node->get_edge (stmt))
+		ipa_call_summaries->get_create (call)->live_across_call
+		  = MIN (data + addr, 15U);
+	    }
+	  FOR_EACH_SSA_TREE_OPERAND (name, stmt, iter, SSA_OP_USE)
+	    account (name, true);
+	  unsigned excess = (data > data_scratch ? data - data_scratch : 0)
+			    + (addr > addr_scratch ? addr - addr_scratch : 0);
+	  peak = MAX (peak, excess);
+	}
+    }
+  delete_tree_live_info (ranges);
+  delete_var_map (map);
+  auto_vec<basic_block> todo;
+  todo.safe_push (ENTRY_BLOCK_PTR_FOR_FN (fun));
+  bool fast = false;
+  while (!todo.is_empty ())
+    {
+      bb = todo.pop ();
+      if (bb == EXIT_BLOCK_PTR_FOR_FN (fun))
+	{
+	  fast = true;
+	  break;
+	}
+      if (!bitmap_set_bit (seen, bb->index) || bitmap_bit_p (calls, bb->index))
+	continue;
+      edge e;
+      edge_iterator ei;
+      FOR_EACH_EDGE (e, ei, bb->succs)
+	if (!(e->flags & (EDGE_ABNORMAL | EDGE_EH | EDGE_FAKE)))
+	  todo.safe_push (e->dest);
+    }
+  ipa_fn_summary *info = ipa_fn_summaries->get (node);
+  info->self_saved_regs = MIN (peak, 11U);
+  info->call_free_return = fast;
+}
+
+/* Price transfers in units of one return-address stack round trip.  */
+static unsigned
+m68k_ipa_call_save_cost (unsigned caller_saves, unsigned callee_saves,
+			 unsigned live)
+{
+  if (!m68k_ipa_callback_saves || TARGET_COLDFIRE
+      || caller_saves >= MIN_MOVEM_REGS || callee_saves <= caller_saves)
+    return 0;
+  unsigned combined = MIN (11U, callee_saves + live);
+  if (combined < MIN_MOVEM_REGS)
+    return 0;
+  /* Include setup of the new MOVEM save/restore pair.  */
+  return combined - caller_saves + 1;
 }
 
 /* Emit RTL for the "prologue" define_expand.  */

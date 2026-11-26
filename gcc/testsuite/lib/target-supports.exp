@@ -10663,6 +10663,16 @@ proc check_effective_target_thread_fence {} {
     } ""]
 }
 
+# Return 1 for classic m68k processors.
+
+proc check_effective_target_classic_m68k { } {
+    return [check_no_compiler_messages classic_m68k assembly {
+	#if !defined (__m68k__) || defined (__mcoldfire__)
+	#error not classic m68k
+	#endif
+    }]
+}
+
 # Return 1 if the target uses a ColdFire FPU.
 
 proc check_effective_target_coldfire_fpu { } {

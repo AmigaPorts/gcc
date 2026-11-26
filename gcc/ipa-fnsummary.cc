@@ -2951,6 +2951,8 @@ analyze_function_body (struct cgraph_node *node, bool early)
     && targetm.target_option.need_ipa_fn_target_info (node->decl,
 						      info->target_info);
 
+  if (!early && flag_lto && targetm.target_option.analyze_ipa_call_saves)
+    targetm.target_option.analyze_ipa_call_saves (node);
   if (fbi.info)
     compute_bb_predicates (&fbi, node, info, params_summary);
   find_necessary_statements (node);
@@ -4758,6 +4760,10 @@ read_ipa_call_summary (class lto_input_block *ib, struct cgraph_edge *e,
   else
     bp_unpack_value (&bp, 1);
 
+  unsigned live_across = bp_unpack_value (&bp, 4);
+  if (es)
+    es->live_across_call = live_across;
+
   p.stream_in (ib);
   if (es)
     edge_set_predicate (e, &p);
@@ -4851,6 +4857,8 @@ inline_read_section (struct lto_file_decl_data *file_data, const char *data,
 	{
 	  info->inlinable = bp_unpack_value (&bp, 1);
 	  info->fp_expressions = bp_unpack_value (&bp, 1);
+	  info->self_saved_regs = bp_unpack_value (&bp, 4);
+	  info->call_free_return = bp_unpack_value (&bp, 1);
 	  if (!lto_stream_offload_p)
 	    info->target_info = streamer_read_uhwi (&ib);
 	}
@@ -5037,6 +5045,7 @@ write_ipa_call_summary (struct output_block *ob, struct cgraph_edge *e)
 
   bitpack_d bp = bitpack_create (ob->main_stream);
   bp_pack_value (&bp, es->is_return_callee_uncaptured, 1);
+  bp_pack_value (&bp, es->live_across_call, 4);
   streamer_write_bitpack (&bp);
 
   if (es->predicate)
@@ -5097,6 +5106,8 @@ ipa_fn_summary_write (void)
 	  bp = bitpack_create (ob->main_stream);
 	  bp_pack_value (&bp, info->inlinable, 1);
 	  bp_pack_value (&bp, info->fp_expressions, 1);
+	  bp_pack_value (&bp, info->self_saved_regs, 4);
+	  bp_pack_value (&bp, info->call_free_return, 1);
 	  streamer_write_bitpack (&bp);
 	  if (!lto_stream_offload_p)
 	    streamer_write_uhwi (ob, info->target_info);
