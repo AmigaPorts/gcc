@@ -1429,7 +1429,10 @@ m68k_analyze_ipa_call_saves (cgraph_node *node)
 	  if (virtual_operand_p (name))
 	    return;
 	  bool pointer = POINTER_TYPE_P (TREE_TYPE (name));
-	  if (!pointer && !INTEGRAL_TYPE_P (TREE_TYPE (name)))
+	  /* Without an FPU a floating-point value is in data registers.  */
+	  if (!pointer && !INTEGRAL_TYPE_P (TREE_TYPE (name))
+	      && !(!TARGET_HARD_FLOAT
+		   && SCALAR_FLOAT_TYPE_P (TREE_TYPE (name))))
 	    return;
 	  unsigned id = SSA_NAME_VERSION (name);
 	  unsigned &n = pointer ? addr : data;
@@ -1444,6 +1447,15 @@ m68k_analyze_ipa_call_saves (cgraph_node *node)
       bitmap_iterator bi;
       EXECUTE_IF_SET_IN_BITMAP (live_on_exit (ranges, bb), 0, part, bi)
 	account (partition_to_var (map, part), true);
+      auto sample = [&] ()
+	{
+	  unsigned excess = (data > data_scratch ? data - data_scratch : 0)
+			    + (addr > addr_scratch ? addr - addr_scratch : 0);
+	  peak = MAX (peak, excess);
+	};
+      /* The end of the block: a block can have no statement, and its last
+	 statement can set a value that is live on exit.  */
+      sample ();
       for (gimple_stmt_iterator i = gsi_last_bb (bb); !gsi_end_p (i);
 	   gsi_prev (&i))
 	{
@@ -1466,9 +1478,7 @@ m68k_analyze_ipa_call_saves (cgraph_node *node)
 	    }
 	  FOR_EACH_SSA_TREE_OPERAND (name, stmt, iter, SSA_OP_USE)
 	    account (name, true);
-	  unsigned excess = (data > data_scratch ? data - data_scratch : 0)
-			    + (addr > addr_scratch ? addr - addr_scratch : 0);
-	  peak = MAX (peak, excess);
+	  sample ();
 	}
     }
   delete_tree_live_info (ranges);
@@ -1494,6 +1504,12 @@ m68k_analyze_ipa_call_saves (cgraph_node *node)
     }
   ipa_fn_summary *info = ipa_fn_summaries->get (node);
   info->self_saved_regs = MIN (peak, 11U);
+  /* An entrypoint function saves no register and a saveallregs function
+     saves all of them: an inlined body cannot add saves to either.  */
+  tree attrs = TYPE_ATTRIBUTES (TREE_TYPE (node->decl));
+  if (lookup_attribute ("entrypoint", attrs)
+      || lookup_attribute ("saveallregs", attrs))
+    fast = false;
   info->call_free_return = fast;
 }
 
@@ -1509,6 +1525,11 @@ m68k_analyze_ipa_call_saves (cgraph_node *node)
    15% to 19%.  Prices from 100 to 250 differ by about 1%.  The inliner
    underestimates what a merged body does to the callback: the register
    estimate comes from GIMPLE, and the branch frequencies are guesses.
+
+   With nine or more added registers the price is above what a 90%
+   branch probability pays for, so __builtin_expect on the path to the call
+   does not change the decision for such a callee.  An inline declaration
+   or always_inline on the callee does; so does a profile.
 
    Below MIN_MOVEM_REGS the function saves with single moves and the extra
    work is small; leave those inlines to the ordinary heuristics.  A caller

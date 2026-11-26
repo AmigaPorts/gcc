@@ -4,6 +4,7 @@
 /* { dg-lto-options { { -Os -flto -mno-ipa-callback-saves -fdump-ipa-inline-details } } } */
 /* -mno-ipa-callback-saves leaves the inline decision alone.  */
 /* { dg-final { scan-wpa-ipa-dump-not {IPA call saves tick -> update: [^\n]*reject 1} "inline" } } */
+/* { dg-final { scan-wpa-ipa-dump {to be inlined into tick/} "inline" } } */
 
 extern unsigned update (unsigned *, unsigned);
 

@@ -4308,10 +4308,13 @@ ipa_get_stack_frame_offset (struct cgraph_node *node)
 
 
 /* Update summary information of inline clones after inlining.
-   Compute peak stack usage.  */
+   Compute peak stack usage.  
+   A value that is live across the inlined call is live across each call in
+   the inlined body: add LIVE to their estimates.  */
 
 static void
-inline_update_callee_summaries (struct cgraph_node *node, int depth)
+inline_update_callee_summaries (struct cgraph_node *node, int depth,
+				unsigned live)
 {
   struct cgraph_edge *e;
 
@@ -4319,12 +4322,20 @@ inline_update_callee_summaries (struct cgraph_node *node, int depth)
   for (e = node->callees; e; e = e->next_callee)
     {
       if (!e->inline_failed)
-	inline_update_callee_summaries (e->callee, depth);
+	inline_update_callee_summaries (e->callee, depth, live);
       else
-	ipa_call_summaries->get (e)->loop_depth += depth;
+	{
+	  ipa_call_summary *es = ipa_call_summaries->get (e);
+	  es->loop_depth += depth;
+	  es->live_across_call = MIN (15U, es->live_across_call + live);
+	}
     }
   for (e = node->indirect_calls; e; e = e->next_callee)
-    ipa_call_summaries->get (e)->loop_depth += depth;
+    {
+      ipa_call_summary *es = ipa_call_summaries->get (e);
+      es->loop_depth += depth;
+      es->live_across_call = MIN (15U, es->live_across_call + live);
+    }
 }
 
 /* Update change_prob and points_to_local_or_readonly_memory of EDGE after
@@ -4509,7 +4520,10 @@ ipa_merge_fn_summary_after_inlining (struct cgraph_edge *edge)
   info->fp_expressions |= callee_info->fp_expressions;
   info->target_info |= callee_info->target_info;
   /* The body of the callee now uses the registers of TO, with the values
-     that are live across the call.  */
+     that are live across the call.  The inliner does not look again at
+     the edges of TO that it rejected with the lower estimate; the new
+     value serves the calls of the inlined body and the pass that inlines
+     functions called once.  */
   info->self_saved_regs
     = MIN (15U, MAX ((unsigned) info->self_saved_regs,
 		     (unsigned) callee_info->self_saved_regs
@@ -4611,7 +4625,8 @@ ipa_merge_fn_summary_after_inlining (struct cgraph_edge *edge)
   if (info->estimated_stack_size < peak)
     info->estimated_stack_size = peak;
 
-  inline_update_callee_summaries (edge->callee, es->loop_depth);
+  inline_update_callee_summaries (edge->callee, es->loop_depth,
+				  es->live_across_call);
   if (info->call_size_time_table.length ())
     {
       int edge_size = 0;
@@ -4876,6 +4891,8 @@ inline_read_section (struct lto_file_decl_data *file_data, const char *data,
       else
 	{
 	  bp_unpack_value (&bp, 1);
+	  bp_unpack_value (&bp, 1);
+	  bp_unpack_value (&bp, 4);
 	  bp_unpack_value (&bp, 1);
 	  if (!lto_stream_offload_p)
 	    streamer_read_uhwi (&ib);

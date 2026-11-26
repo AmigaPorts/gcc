@@ -28569,6 +28569,10 @@ may have to save on paths that bypass an inlined call.  This optimization
 is enabled by default on classic M680x0 targets.  ColdFire targets use
 the ordinary inlining policy.  To disable the optimization for a build,
 pass @option{-mno-ipa-callback-saves} when compiling and linking.
+To get one call inlined in spite of the decision, declare the callee
+@code{inline} or give it the @code{always_inline} attribute; for a
+callee that uses many registers, @code{__builtin_expect} on the path to
+the call is not enough.
 
 @item -mshort
 @itemx -mno-short
