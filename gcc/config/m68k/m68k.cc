@@ -1537,6 +1537,26 @@ m68k_expand_prologue (void)
 #endif
 }
 
+/* Return true if a path through the current function can return without
+   the prologue.  The prologue of an interrupt function, a stack-checked
+   function or a function that loads a4 does work that is not a register
+   save.  */
+
+bool
+m68k_simple_return_ok_p (void)
+{
+  if (m68k_get_function_kind (current_function_decl)
+      != m68k_fk_normal_function)
+    return false;
+  if (crtl->limit_stack)
+    return false;
+#if defined(TARGET_AMIGAOS)
+  if (amigaos_restores_a4_p ())
+    return false;
+#endif
+  return true;
+}
+
 /* Return true if a simple (return) instruction is sufficient for this
    instruction (i.e. if no epilogue is needed).  */
 

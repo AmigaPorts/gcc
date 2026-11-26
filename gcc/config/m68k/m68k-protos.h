@@ -112,6 +112,7 @@ extern enum reg_class m68k_secondary_reload_class (enum reg_class,
 extern enum reg_class m68k_preferred_reload_class (rtx, enum reg_class);
 extern void m68k_expand_prologue (void);
 extern bool m68k_use_return_insn (void);
+extern bool m68k_simple_return_ok_p (void);
 extern void m68k_expand_epilogue (bool);
 extern const char *m68k_cpp_cpu_ident (const char *);
 extern const char *m68k_cpp_cpu_family (const char *);
