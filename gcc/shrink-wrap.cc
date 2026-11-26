@@ -42,8 +42,11 @@ along with GCC; see the file COPYING3.  If not see
 #include "regcprop.h"
 #include "rtl-iter.h"
 #include "valtrack.h"
+#include "recog.h"
 #include "function-abi.h"
 #include "print-rtl.h"
+
+static bool sp_refs_incoming_only_p (rtx_insn *);
 
 /* Return true if INSN requires the stack frame to be set up.
    PROLOGUE_USED contains the hard registers used in the function
@@ -87,6 +90,12 @@ requires_stack_frame_p (rtx_insn *insn, HARD_REG_SET prologue_used,
       rtx reg = DF_REF_REG (use);
 
       if (!REG_P (reg))
+	continue;
+
+      /* A read or write of an incoming stack location does not need the
+	 prologue; try_shrink_wrapping rebases its address.  */
+      if (REGNO (reg) == STACK_POINTER_REGNUM
+	  && sp_refs_incoming_only_p (insn))
 	continue;
 
       add_to_hard_reg_set (&hardregs, GET_MODE (reg),
@@ -149,6 +158,77 @@ live_edge_for_reg (basic_block bb, int regno, int end_regno)
    after INSN in BB.  SPLIT_P indicates whether a live edge from BB
    is splitted or not.  */
 
+/* The amount by which the prologue lowers the stack pointer, if the target
+   says that it is a constant; else zero.  Valid during
+   try_shrink_wrapping.  */
+static HOST_WIDE_INT prologue_sp_adjust;
+
+/* True if an insn after the one prepare_shrink_wrap looks at, in the same
+   block, can store to memory.  */
+static bool mem_stored_later;
+
+/* Return true if X is a MEM at a constant offset from the stack pointer
+   that is not below the stack pointer on function entry.  Such a location
+   (the return address, an incoming argument) exists with and without the
+   prologue; only its offset differs.  */
+
+static bool
+incoming_stack_mem_p (const_rtx x)
+{
+  if (prologue_sp_adjust <= 0 || !MEM_P (x))
+    return false;
+  rtx addr = XEXP (x, 0);
+  return (GET_CODE (addr) == PLUS
+	  && XEXP (addr, 0) == stack_pointer_rtx
+	  && CONST_INT_P (XEXP (addr, 1))
+	  && INTVAL (XEXP (addr, 1)) >= prologue_sp_adjust);
+}
+
+/* Return true if every reference to the stack pointer in INSN is the
+   address of an incoming_stack_mem_p location.  */
+
+static bool
+sp_refs_incoming_only_p (rtx_insn *insn)
+{
+  if (prologue_sp_adjust <= 0)
+    return false;
+  subrtx_iterator::array_type array;
+  FOR_EACH_SUBRTX (iter, array, PATTERN (insn), NONCONST)
+    {
+      const_rtx x = *iter;
+      if (incoming_stack_mem_p (x))
+	iter.skip_subrtxes ();
+      else if (REG_P (x) && REGNO (x) == STACK_POINTER_REGNUM)
+	return false;
+    }
+  return true;
+}
+
+/* INSN runs without the prologue.  Rebase its incoming_stack_mem_p
+   addresses to the stack pointer on function entry.  */
+
+static void
+rebase_incoming_stack_mems (rtx_insn *insn)
+{
+  subrtx_ptr_iterator::array_type array;
+  FOR_EACH_SUBRTX_PTR (iter, array, &PATTERN (insn), NONCONST)
+    {
+      rtx *loc = *iter;
+      if (incoming_stack_mem_p (*loc))
+	{
+	  rtx addr = XEXP (*loc, 0);
+	  rtx new_addr
+	    = plus_constant (Pmode, stack_pointer_rtx,
+			     INTVAL (XEXP (addr, 1)) - prologue_sp_adjust);
+	  validate_change (insn, loc,
+			   replace_equiv_address_nv (*loc, new_addr), 1);
+	  iter.skip_subrtxes ();
+	}
+    }
+  if (!apply_change_group ())
+    gcc_unreachable ();
+}
+
 static bool
 move_insn_for_shrink_wrap (basic_block bb, rtx_insn *insn,
 			   const_hard_reg_set uses,
@@ -161,6 +241,7 @@ move_insn_for_shrink_wrap (basic_block bb, rtx_insn *insn,
   unsigned int i, dregno, end_dregno;
   unsigned int sregno = FIRST_PSEUDO_REGISTER;
   unsigned int end_sregno = FIRST_PSEUDO_REGISTER;
+  bool mem_src = false;
   basic_block next_block;
   edge live_edge;
   rtx_insn *dinsn;
@@ -231,6 +312,15 @@ move_insn_for_shrink_wrap (basic_block bb, rtx_insn *insn,
 		case PC:
 		case LO_SUM:
 		  /* Ok.  Continue.  */
+		  break;
+
+		case MEM:
+		  /* A load of an incoming stack argument can move one
+		     block down if nothing stores to memory after it.  */
+		  if (!incoming_stack_mem_p (x) || mem_stored_later
+		      || MEM_VOLATILE_P (x))
+		    return false;
+		  mem_src = true;
 		  break;
 
 		case REG:
@@ -379,6 +469,10 @@ move_insn_for_shrink_wrap (basic_block bb, rtx_insn *insn,
 	    }
 	}
 
+      /* A load does not move past the insns of BB: they can store.  */
+      if (mem_src)
+	next_block = NULL;
+
       /* If we don't need to add the move to BB, look for a single
 	 successor block.  */
       if (next_block)
@@ -452,6 +546,7 @@ prepare_shrink_wrap (basic_block entry_block)
     }
 
   dead_debug_local_init (&debug, NULL, NULL);
+  mem_stored_later = false;
   CLEAR_HARD_REG_SET (uses);
   CLEAR_HARD_REG_SET (defs);
 
@@ -460,6 +555,16 @@ prepare_shrink_wrap (basic_block entry_block)
 	&& !move_insn_for_shrink_wrap (entry_block, insn, uses, defs,
 				       &split_p, &debug))
       {
+	if (CALL_P (insn))
+	  mem_stored_later = true;
+	else
+	  note_stores (insn, [] (rtx dest, const_rtx, void *)
+		       {
+			 if (!REG_P (dest)
+			     && !(SUBREG_P (dest) && REG_P (SUBREG_REG (dest))))
+			   mem_stored_later = true;
+		       }, NULL);
+
 	/* Add all defined registers to DEFs.  */
 	FOR_EACH_INSN_DEF (def, insn)
 	  {
@@ -667,6 +772,10 @@ try_shrink_wrapping (edge *entry_edge, rtx_insn *prologue_seq)
       }
   if (empty_prologue)
     return;
+
+  prologue_sp_adjust = 0;
+  if (targetm.shrink_wrap.prologue_sp_adjust && !frame_pointer_needed)
+    prologue_sp_adjust = targetm.shrink_wrap.prologue_sp_adjust ();
 
   /* Move some code down to expose more shrink-wrapping opportunities.  */
 
@@ -919,6 +1028,15 @@ try_shrink_wrapping (edge *entry_edge, rtx_insn *prologue_seq)
   if (dump_file)
     fprintf (dump_file, "Performing shrink-wrapping.\n");
 
+  /* The blocks that are not reachable from PRO run without the prologue.
+     Rebase their incoming stack references now; the copies made below
+     get theirs afterwards.  */
+  auto_vec<basic_block> rebase_bbs;
+  if (prologue_sp_adjust > 0)
+    FOR_EACH_BB_FN (bb, cfun)
+      if (!bitmap_bit_p (bb_with, bb->index))
+	rebase_bbs.safe_push (bb);
+
   /* Copy the blocks that can run both with and without prologue.  The
      originals run with prologue, the copies without.  Store a pointer to
      the copy in the ->aux field of the original.  */
@@ -930,6 +1048,8 @@ try_shrink_wrapping (edge *entry_edge, rtx_insn *prologue_seq)
 	basic_block dup = duplicate_block (bb, 0, 0);
 
 	bb->aux = dup;
+	if (prologue_sp_adjust > 0)
+	  rebase_bbs.safe_push (dup);
 
 	if (JUMP_P (BB_END (dup)) && !any_condjump_p (BB_END (dup)))
 	  emit_barrier_after_bb (dup);
@@ -944,6 +1064,14 @@ try_shrink_wrapping (edge *entry_edge, rtx_insn *prologue_seq)
 	  bb->count = bb->count.apply_scale (num, den);
 	dup->count -= bb->count;
       }
+
+  for (basic_block rbb : rebase_bbs)
+    {
+      rtx_insn *insn;
+      FOR_BB_INSNS (rbb, insn)
+	if (NONDEBUG_INSN_P (insn))
+	  rebase_incoming_stack_mems (insn);
+    }
 
   /* Now change the edges to point to the copies, where appropriate.  */
 

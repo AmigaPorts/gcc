@@ -241,3 +241,7 @@ v    be verbose\n
 V    be very verbose\n
 x    dump insns\n
 Default: -fbbb=+ which yields -fbbb=abcefilmnprsz0
+
+mshrink-wrap-stack-args
+Target Var(m68k_shrink_wrap_stack_args) Init(1)
+Let code that runs before a shrink-wrapped prologue access stack arguments.

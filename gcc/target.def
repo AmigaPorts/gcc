@@ -7122,6 +7122,16 @@ of a non-void function.  Return false if no such check should be made.",
 HOOK_VECTOR (TARGET_SHRINK_WRAP_HOOKS, shrink_wrap)
 
 DEFHOOK
+(prologue_sp_adjust,
+ "Return the number of bytes by which the prologue of the current function\n\
+lowers the stack pointer, if that number is a compile-time constant and\n\
+the function has no frame pointer.  Return zero otherwise.  When the hook\n\
+returns a positive value, shrink-wrapping lets code that runs without the\n\
+prologue access incoming stack locations, and adjusts the offsets of\n\
+those accesses by the returned value.",
+ HOST_WIDE_INT, (void), NULL)
+
+DEFHOOK
 (get_separate_components,
  "This hook should return an @code{sbitmap} with the bits set for those\n\
 components that can be separately shrink-wrapped in the current function.\n\
