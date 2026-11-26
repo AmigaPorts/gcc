@@ -1,17 +1,13 @@
 /* libgcc's 68000 division helpers, checked against a shift-and-subtract
    division for divisors of every width and the cases where the quotient
    estimate is one too large: divisors whose low bits are all ones, with
-   dividends next to their multiples.  -nostdlib, so that the helpers are
-   libgcc's and not a C library's.
-
-   No startup code: the jump goes first, and start's return value is the
-   program's exit status.  */
+   dividends next to their multiples, and the boundaries: LONG_MIN, and
+   divisors next to 2^16.  -lgcc comes before the C library on the link
+   line, so the helpers are libgcc's weak ones and not the C library's.  */
 
 /* { dg-do run } */
-/* { dg-skip-if "a4 needs the startup code, and the 68000 has no -fbaserel32" { *-*-* } { "-fbaserel*" "-resident*" } { "" } } */
-/* { dg-options "-m68000 -O2 -nostdlib -lgcc" } */
-
-__asm__ ("\t.text\n\tjra _start");
+/* { dg-skip-if "the 68000 has no -fbaserel32" { *-*-* } { "-fbaserel32" "-resident32" } { "" } } */
+/* { dg-options "-m68000 -O2 -lgcc" } */
 
 static unsigned long
 ref (unsigned long n, unsigned long d, unsigned long *r)
@@ -47,8 +43,8 @@ check (unsigned long n, unsigned long d)
 
   unsigned long an = sn < 0 ? -n : n, ad = sd < 0 ? -d : d, ar;
   unsigned long aq = ref (an, ad, &ar);
-  long wq = (sn < 0) != (sd < 0) ? -(long) aq : (long) aq;
-  long wr = sn < 0 ? -(long) ar : (long) ar;
+  long wq = (sn < 0) != (sd < 0) ? (long) -aq : (long) aq;
+  long wr = sn < 0 ? (long) -ar : (long) ar;
 
   return sn / sd != wq || sn % sd != wr;
 }
@@ -62,11 +58,21 @@ next (void)
   return (seed >> 16) | (seed << 16);
 }
 
-__attribute__ ((used)) long
-start (void)
+int
+main (void)
 {
   static const unsigned short tops[] = { 0x8000, 0x8001, 0xc000, 0xfffe, 0xffff };
+  static const unsigned long edges[] = {
+    0, 1, 2, 3, 0x7fff, 0x8000, 0xfffe, 0xffff, 0x10000, 0x10001, 0x1ffff,
+    0x7fffffff, 0x80000000, 0x80000001, 0xfffeffff, 0xffff0000, 0xfffffffe,
+    0xffffffff
+  };
+  const int nedges = sizeof (edges) / sizeof (edges[0]);
 
+  for (int i = 0; i < nedges; i++)
+    for (int j = 1; j < nedges; j++)
+      if (check (edges[i], edges[j]))
+	return 3;
   for (int i = 0; i < 3000; i++)
     {
       unsigned long d = next () >> (next () & 31);
