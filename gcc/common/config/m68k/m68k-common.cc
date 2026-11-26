@@ -75,4 +75,17 @@ m68k_handle_option (struct gcc_options *opts,
 #undef TARGET_HANDLE_OPTION
 #define TARGET_HANDLE_OPTION m68k_handle_option
 
+#ifdef TARGET_AMIGAOS
+/* Prefer STC for size on m68k AmigaOS, where it usually saves text.  */
+static const struct default_options amigaos_option_optimization_table[] =
+  {
+    { OPT_LEVELS_SIZE, OPT_freorder_blocks_algorithm_, NULL,
+      REORDER_BLOCKS_ALGORITHM_STC },
+    { OPT_LEVELS_NONE, 0, NULL, 0 }
+  };
+
+#undef TARGET_OPTION_OPTIMIZATION_TABLE
+#define TARGET_OPTION_OPTIMIZATION_TABLE amigaos_option_optimization_table
+#endif
+
 struct gcc_targetm_common targetm_common = TARGETM_COMMON_INITIALIZER;
