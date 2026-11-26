@@ -4,7 +4,7 @@
    store in its cycle, while a register-only FPU instruction still pairs
    with one.  */
 /* { dg-do compile } */
-/* { dg-skip-if "a4-relative or pc-relative addresses" { *-*-* } { "-fbaserel*" "-resident*" "-mpcrel" } { "" } } */
+/* { dg-skip-if "a4-relative or pc-relative addresses, register arguments, 16-bit int" { *-*-* } { "-fbaserel*" "-resident*" "-mpcrel" "-mregparm*" "-msasregparm" "-mshort" } { "" } } */
 /* { dg-options "-O2 -m68060 -m68881 -fsched-verbose=1 -fdump-rtl-sched2" } */
 
 double
@@ -31,6 +31,6 @@ fpu_reg (double a, const int *q, int *r, int n)
   return acc;
 }
 
-/* { dg-final { scan-rtl-dump {fp\d=fp\d\+\[a\d\+\+\] +:\(m68060_pOEP\+m68060_mem\)\n} "sched2" } } */
-/* { dg-final { scan-rtl-dump-not {;;\s+(\d+)--> [^\n]* fp\d=fp\d\+\[[^\n]*\n;;\s+\1--> [^\n]*m68060_mem} "sched2" } } */
-/* { dg-final { scan-rtl-dump {;;\s+(\d+)--> [^\n]* fp\d=fp\d\+fp\d +:m68060_pOEP\n;;\s+\1--> [^\n]*m68060_mem} "sched2" } } */
+/* { dg-final { scan-rtl-dump {%?fp\d=%?fp\d\+\[%?a\d\+\+\] +:\(m68060_pOEP\+m68060_mem\)\n} "sched2" } } */
+/* { dg-final { scan-rtl-dump-not {;;\s+(\d+)--> [^\n]* %?fp\d=%?fp\d\+\[[^\n]*\n;;\s+\1--> [^\n]*m68060_mem} "sched2" } } */
+/* { dg-final { scan-rtl-dump {;;\s+(\d+)--> [^\n]* %?fp\d=%?fp\d\+%?fp\d +:m68060_pOEP\n;;\s+\1--> [^\n]*m68060_mem} "sched2" } } */

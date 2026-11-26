@@ -4,7 +4,7 @@
    format (d8,An,Xn) pair, and the full format, here a 32-bit displacement
    with a suppressed base register, goes in the primary pipeline.  */
 /* { dg-do compile } */
-/* { dg-skip-if "a4-relative or pc-relative addresses" { *-*-* } { "-fbaserel*" "-resident*" "-mpcrel" } { "" } } */
+/* { dg-skip-if "a4-relative or pc-relative addresses, register arguments, 16-bit int" { *-*-* } { "-fbaserel*" "-resident*" "-mpcrel" "-mregparm*" "-msasregparm" "-mshort" } { "" } } */
 /* { dg-options "-O2 -m68060 -fomit-frame-pointer -fsched-verbose=1 -fdump-rtl-sched2" } */
 
 struct s
@@ -42,6 +42,6 @@ full (int i)
 }
 
 /* lea (400,a0),a0, lea (a0,a0.l*2),a0 and lea _table(d0.l*4),a0.  */
-/* { dg-final { scan-rtl-dump {a\d=a\d\+0x190 +:m68060_pOEP\|m68060_sOEP\n} "sched2" } } */
-/* { dg-final { scan-rtl-dump {a\d=a\d<<0x1\+a\d +:m68060_pOEP\|m68060_sOEP\n} "sched2" } } */
-/* { dg-final { scan-rtl-dump {a\d=d\d<<0x2\+`table' +:m68060_pOEP\n} "sched2" } } */
+/* { dg-final { scan-rtl-dump {%?a\d=%?a\d\+0x190 +:m68060_pOEP\|m68060_sOEP\n} "sched2" } } */
+/* { dg-final { scan-rtl-dump {%?a\d=%?a\d<<0x1\+%?a\d +:m68060_pOEP\|m68060_sOEP\n} "sched2" } } */
+/* { dg-final { scan-rtl-dump {%?a\d=%?d\d<<0x2\+`table' +:m68060_pOEP\n} "sched2" } } */

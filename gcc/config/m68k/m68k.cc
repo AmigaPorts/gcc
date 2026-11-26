@@ -6567,7 +6567,9 @@ sched_attr_op_type (rtx_insn *insn, bool opx_p, bool address_p)
   if (address_p)
     return sched_address_type (QImode, op);
 
-  if (memory_operand (op, VOIDmode))
+  /* Any MEM, including the -mpcrel source operands that only
+     general_src_operand accepts.  */
+  if (MEM_P (op))
     return sched_address_type (GET_MODE (op), XEXP (op, 0));
 
   if (register_operand (op, VOIDmode))
@@ -7063,6 +7065,15 @@ m68k_sched_attr_m68060_pair (rtx_insn *insn)
   x = sched_get_operand (insn, true);
   y = sched_get_operand (insn, false);
 
+  /* *insv_32_mem stores at the bit position's byte offset from its
+     operand.  */
+  if (type == TYPE_MOVE_L
+      && set != NULL_RTX
+      && GET_CODE (SET_DEST (set)) == ZERO_EXTRACT
+      && x != NULL_RTX && MEM_P (x)
+      && CONST_INT_P (XEXP (SET_DEST (set), 2)))
+    x = adjust_address_nv (x, SImode, INTVAL (XEXP (SET_DEST (set), 2)) / 8);
+
   switch (type)
     {
     case TYPE_FALU:
@@ -7094,7 +7105,7 @@ m68k_sched_attr_m68060_pair (rtx_insn *insn)
 
   /* An immediate with extension words and a memory operand: pOEP-until-last
      for a MOVE, and for the others unless the address is (An), (An)+ or
-     -(An), which have none of their own.  */
+     -(An), which have none of their own.  A zero is a CLR or a TST.  */
   if (type != TYPE_ALUQ_L && type != TYPE_MOVEQ_L && type != TYPE_MOV3Q_L)
     {
       rtx mem = x != NULL_RTX && MEM_P (x) ? x : y;
@@ -7103,6 +7114,7 @@ m68k_sched_attr_m68060_pair (rtx_insn *insn)
 
       if (mem != NULL_RTX && MEM_P (mem)
 	  && imm != NULL_RTX && CONSTANT_P (imm)
+	  && imm != CONST0_RTX (GET_MODE (mem))
 	  && (type == TYPE_MOVE || type == TYPE_MOVE_L
 	      || !m68k_decompose_address (GET_MODE (mem), XEXP (mem, 0),
 					  reload_completed, &address)

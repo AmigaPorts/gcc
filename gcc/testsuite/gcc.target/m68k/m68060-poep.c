@@ -5,7 +5,7 @@
    displacement from an address register is the full format (bd.L,An),
    which only the primary pipeline takes (10.1.3).  */
 /* { dg-do compile } */
-/* { dg-skip-if "a4-relative or pc-relative addresses" { *-*-* } { "-fbaserel*" "-resident*" "-mpcrel" } { "" } } */
+/* { dg-skip-if "a4-relative or pc-relative addresses, register arguments, 16-bit int" { *-*-* } { "-fbaserel*" "-resident*" "-mpcrel" "-mregparm*" "-msasregparm" "-mshort" } { "" } } */
 /* { dg-options "-O2 -m68060 -fomit-frame-pointer -fsched-verbose=1 -fdump-rtl-sched2" } */
 
 void
@@ -42,8 +42,8 @@ full_symbol (long i)
   return table[i];
 }
 
-/* { dg-final { scan-rtl-dump {\[a\d\]=0x12345678 +:\(m68060_pOEP\+m68060_mem\)\n} "sched2" } } */
-/* { dg-final { scan-rtl-dump {d\d=d\d<-<0x10 +:m68060_single\n} "sched2" } } */
-/* { dg-final { scan-rtl-dump {d\d=d\d\|0x40000 +:m68060_pOEP\n} "sched2" } } */
-/* { dg-final { scan-rtl-dump {\[--sp\]=`table' +:\(m68060_single\+m68060_mem\)\n} "sched2" } } */
-/* { dg-final { scan-rtl-dump {d\d=\[a\d\+`table'\] +:\(m68060_pOEP\+m68060_mem\)\n} "sched2" } } */
+/* { dg-final { scan-rtl-dump {\[%?a\d\]=0x12345678 +:\(m68060_pOEP\+m68060_mem\)\n} "sched2" } } */
+/* { dg-final { scan-rtl-dump {%?d\d=%?d\d<-<0x10 +:m68060_single\n} "sched2" } } */
+/* { dg-final { scan-rtl-dump {%?d\d=%?d\d\|0x40000 +:m68060_pOEP\n} "sched2" } } */
+/* { dg-final { scan-rtl-dump {\[--%?sp\]=`table' +:\(m68060_single\+m68060_mem\)\n} "sched2" } } */
+/* { dg-final { scan-rtl-dump {%?d\d=\[%?a\d\+`table'\] +:\(m68060_pOEP\+m68060_mem\)\n} "sched2" } } */
