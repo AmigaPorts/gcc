@@ -260,6 +260,28 @@ void
 amigaos_init_libfuncs (void)
 {
   amigaos_floatdidf_rounded = -1;
+
+  /* One call for a / b and a % b, which the 68000 and 68010 otherwise
+     divide twice for.  From the 68020 on, divmodsi4 takes precedence.  */
+  set_optab_libfunc (sdivmod_optab, SImode, "__amigaos_divmodsi4");
+  set_optab_libfunc (udivmod_optab, SImode, "__amigaos_udivmodsi4");
+}
+
+/* TARGET_EXPAND_DIVMOD_LIBFUNC.  The divmod libcalls return the quotient
+   in d0 and the remainder in d1, the high and low words of a DImode
+   value.  */
+
+void
+amigaos_expand_divmod_libfunc (rtx libfunc, machine_mode mode, rtx op0,
+			       rtx op1, rtx *quot_p, rtx *rem_p)
+{
+  gcc_assert (mode == SImode);
+
+  rtx libval = emit_library_call_value (libfunc, NULL_RTX, LCT_CONST, DImode,
+					op0, SImode, op1, SImode);
+
+  *quot_p = simplify_gen_subreg (SImode, libval, DImode, 0);
+  *rem_p = simplify_gen_subreg (SImode, libval, DImode, 4);
 }
 
 /* TARGET_SET_CURRENT_FUNCTION.  */

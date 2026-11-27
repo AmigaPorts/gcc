@@ -2,7 +2,8 @@
 # the C libraries define them too, and come first on the link line.
 LIB1ASMSRC = m68k/lb1amigaos.S
 LIB1ASMFUNCS = _mulsi3 _amigaos_udivmodsi _amigaos_divmodsi \
-	_amigaos_udivsi3 _amigaos_umodsi3 _amigaos_divsi3 _amigaos_modsi3
+	_amigaos_udivsi3 _amigaos_umodsi3 _amigaos_divsi3 _amigaos_modsi3 \
+	_amigaos_udivmodsi4 _amigaos_divmodsi4
 
 LIB2ADD += $(srcdir)/config/m68k/fpextendsfdf2.S \
 	$(srcdir)/config/m68k/fptruncdfsf2.S \
