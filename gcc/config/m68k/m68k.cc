@@ -164,6 +164,8 @@ static void m68k_sched_md_init (FILE *, int, int);
 static void m68k_sched_dfa_pre_advance_cycle (void);
 static void m68k_sched_dfa_post_advance_cycle (void);
 static int m68k_sched_first_cycle_multipass_dfa_lookahead (void);
+static bool m68k_macro_fusion_p (void);
+static bool m68k_macro_fusion_pair_p (rtx_insn *, rtx_insn *);
 
 static bool m68k_can_eliminate (const int, const int);
 static void m68k_conditional_register_usage (void);
@@ -309,6 +311,12 @@ m68k_use_by_pieces_infrastructure_p (unsigned HOST_WIDE_INT size,
 #undef TARGET_SCHED_FIRST_CYCLE_MULTIPASS_DFA_LOOKAHEAD
 #define TARGET_SCHED_FIRST_CYCLE_MULTIPASS_DFA_LOOKAHEAD	\
   m68k_sched_first_cycle_multipass_dfa_lookahead
+
+#undef TARGET_SCHED_MACRO_FUSION_P
+#define TARGET_SCHED_MACRO_FUSION_P m68k_macro_fusion_p
+
+#undef TARGET_SCHED_MACRO_FUSION_PAIR_P
+#define TARGET_SCHED_MACRO_FUSION_PAIR_P m68k_macro_fusion_pair_p
 
 #undef TARGET_OPTION_OVERRIDE
 #define TARGET_OPTION_OVERRIDE m68k_option_override
@@ -7230,6 +7238,49 @@ m68k_sched_issue_rate (void)
     default:
       gcc_unreachable ();
       return 0;
+    }
+}
+
+/* TARGET_SCHED_MACRO_FUSION_P.  Only the 68060 model schedules after
+   reload, where a branch can lose the flags of the insn before it.  */
+
+static bool
+m68k_macro_fusion_p (void)
+{
+  return m68k_sched_cpu == CPU_M68060;
+}
+
+/* TARGET_SCHED_MACRO_FUSION_PAIR_P.  Keep a branch that compares a
+   register with zero right after the insn that sets the register and the
+   flags, so that final takes the flags from that insn
+   (m68k_find_flags_value) rather than testing the register again.  */
+
+static bool
+m68k_macro_fusion_pair_p (rtx_insn *prev, rtx_insn *curr)
+{
+  if (!any_condjump_p (curr))
+    return false;
+
+  rtx cond = XEXP (SET_SRC (pc_set (curr)), 0);
+  if (!COMPARISON_P (cond))
+    return false;
+  rtx op0 = XEXP (cond, 0);
+  if (!REG_P (op0) || XEXP (cond, 1) != CONST0_RTX (GET_MODE (op0)))
+    return false;
+
+  rtx set = single_set (prev);
+  if (!set || !rtx_equal_p (SET_DEST (set), op0) || recog_memoized (prev) < 0)
+    return false;
+
+  switch (get_attr_flags_valid (prev))
+    {
+    case FLAGS_VALID_YES:
+    case FLAGS_VALID_MOVE:
+      return true;
+    case FLAGS_VALID_NOOV:
+      return GET_CODE (cond) != GT && GET_CODE (cond) != LE;
+    default:
+      return false;
     }
 }
 
