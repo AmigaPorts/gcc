@@ -1199,7 +1199,7 @@ Objective-C and Objective-C++ Dialects}.
 -m68060  -m68302  -m68332  -m68851
 -mcpu32  -mfidoa  -m5200  -m5206e  -m528x  -m5307  -m5407
 -mcfv4e  -mbitfield  -mc68000  -mc68020
--mrtd  -mdiv  -mshort
+-mrtd  -mdiv  -mshort  -mshrink-wrap-stack-args
 -mhard-float  -m68881  -msoft-float  -mpcrel
 -malign-int  -mstrict-align  -msep-data
 -mshared-library-id=@var{n}  -mid-shared-library
@@ -28560,6 +28560,16 @@ GCC defines the macro @code{__mcfhwdiv__} when this option is enabled.
 @opindex mshort
 @opindex mno-short
 @opindex mnoshort
+@opindex mshrink-wrap-stack-args
+@opindex mno-shrink-wrap-stack-args
+@item -mshrink-wrap-stack-args
+@itemx -mno-shrink-wrap-stack-args
+With @option{-fshrink-wrap}, let code that runs before the prologue
+access the arguments on the stack.  Without this, a function that reads
+a stack argument before an early return runs its prologue on entry.
+This option is enabled by default on classic M680x0 targets and has no
+effect in a function that needs a frame pointer.
+
 @item -mshort
 @itemx -mno-short
 @itemx -mnoshort

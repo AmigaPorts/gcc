@@ -3807,6 +3807,8 @@ code treats them abstractly, as a bit in an @code{sbitmap}.  These
 and @code{shrink_wrap.components_for_bb} hooks, and deallocated by the
 generic code.
 
+@hook TARGET_SHRINK_WRAP_PROLOGUE_SP_ADJUST
+
 @hook TARGET_SHRINK_WRAP_GET_SEPARATE_COMPONENTS
 
 @hook TARGET_SHRINK_WRAP_COMPONENTS_FOR_BB

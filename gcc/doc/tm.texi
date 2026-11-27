@@ -5374,6 +5374,15 @@ code treats them abstractly, as a bit in an @code{sbitmap}.  These
 and @code{shrink_wrap.components_for_bb} hooks, and deallocated by the
 generic code.
 
+@deftypefn {Target Hook} HOST_WIDE_INT TARGET_SHRINK_WRAP_PROLOGUE_SP_ADJUST (void)
+Return the number of bytes by which the prologue of the current function
+lowers the stack pointer, if that number is a compile-time constant and
+the function has no frame pointer.  Return zero otherwise.  When the hook
+returns a positive value, shrink-wrapping lets code that runs without the
+prologue access incoming stack locations, and adjusts the offsets of
+those accesses by the returned value.
+@end deftypefn
+
 @deftypefn {Target Hook} sbitmap TARGET_SHRINK_WRAP_GET_SEPARATE_COMPONENTS (void)
 This hook should return an @code{sbitmap} with the bits set for those
 components that can be separately shrink-wrapped in the current function.
