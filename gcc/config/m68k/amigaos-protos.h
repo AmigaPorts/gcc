@@ -58,6 +58,9 @@ extern void
 amigaos_init_libfuncs (void);
 
 extern void
+amigaos_expand_divmod_libfunc (rtx, machine_mode, rtx, rtx, rtx *, rtx *);
+
+extern void
 amigaos_set_current_function (tree);
 
 extern void

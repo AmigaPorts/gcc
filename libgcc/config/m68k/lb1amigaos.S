@@ -205,3 +205,27 @@ SYM (__modsi3):
 	movel	d1, d0
 	rts
 #endif /* L_amigaos_modsi3 */
+
+/* The quotient and the remainder of one division, for code that uses both:
+   gcc's divmod libcalls (TARGET_EXPAND_DIVMOD_LIBFUNC in amigaos.cc).  They
+   return the quotient in d0 and the remainder in d1, as a 64-bit value.  */
+
+#ifdef L_amigaos_udivmodsi4
+	.text
+	FUNC (__amigaos_udivmodsi4)
+	.globl	SYM (__amigaos_udivmodsi4)
+	.weak	SYM (__amigaos_udivmodsi4)
+SYM (__amigaos_udivmodsi4):
+	moveml	sp@(4), d0/d1
+	jmp	SYM (__udivmodsi_internal)
+#endif /* L_amigaos_udivmodsi4 */
+
+#ifdef L_amigaos_divmodsi4
+	.text
+	FUNC (__amigaos_divmodsi4)
+	.globl	SYM (__amigaos_divmodsi4)
+	.weak	SYM (__amigaos_divmodsi4)
+SYM (__amigaos_divmodsi4):
+	moveml	sp@(4), d0/d1
+	jmp	SYM (__divmodsi_internal)
+#endif /* L_amigaos_divmodsi4 */
