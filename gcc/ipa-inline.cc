@@ -523,10 +523,12 @@ enum can_inline_edge_by_limits_flags
    that path save and restore more registers.
 
    With the call executed FREQ times per entry of CALLER, inlining removes
-   FREQ call and return sequences.  It adds the target's cost of the extra
-   saves on each of the (1 - FREQ) entries that do not reach the call; the
-   entries that reach it pay for the saves in either case, in CALLER or in
-   CALLEE.  The target gives its cost in hundredths of a call and return.
+   FREQ call and return sequences.  With the call reached on a fraction P
+   of the entries, it adds the target's cost of the extra saves on each of
+   the (1 - P) entries that do not reach the call; the entries that reach
+   it pay for the saves in either case, in CALLER or in CALLEE.  P is FREQ
+   unless the call is in a loop, where FREQ counts the iterations too.  The
+   target gives its cost in hundredths of a call and return.
 
    This is a late decision on purpose: it applies after the size limits, so
    it also keeps a function with one call site out of line, at -Os too.  */
@@ -550,16 +552,22 @@ inline_saves_costly_p (cgraph_edge *e, cgraph_node *caller,
   unsigned callee_saves = to->self_saved_regs;
   sreal freq = e->sreal_frequency ();
   auto *call = ipa_call_summaries->get (e);
-  if (!call || freq >= 1)
+  if (!call)
+    return false;
+  sreal reach = freq;
+  if (call->reach_prob)
+    reach = sreal (call->reach_prob - 1) / 100;
+  if (reach >= 1)
     return false;
   unsigned cost = targetm.target_option.ipa_call_save_cost
     (caller_saves, callee_saves, call->live_across_call);
-  bool costly = cost && (sreal (1) - freq) * cost > freq * 100;
+  bool costly = cost && (sreal (1) - reach) * cost > freq * 100;
   if (dump_file && (dump_flags & TDF_DETAILS))
     fprintf (dump_file, "IPA call saves %s -> %s: %u -> %u live %u "
-	     "cost %u freq %.3f reject %d\n",
+	     "cost %u freq %.3f reach %.3f reject %d\n",
 	     caller->name (), callee->name (), caller_saves, callee_saves,
-	     call->live_across_call, cost, freq.to_double (), costly);
+	     call->live_across_call, cost, freq.to_double (),
+	     reach.to_double (), costly);
   return costly;
 }
 

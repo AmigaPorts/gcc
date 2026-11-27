@@ -1396,6 +1396,44 @@ m68k_set_frame_related (rtx_insn *insn)
       RTX_FRAME_RELATED_P (XVECEXP (body, 0, i)) = 1;
 }
 
+/* Return true if STMT calls a built-in function that expands without a
+   call.  The bit-counting functions are library calls where the CPU has
+   no instruction for them: popcount and parity always, clz, ctz and ffs
+   without the 68020 bit-field instructions.  */
+static bool
+m68k_builtin_without_call_p (gimple *stmt)
+{
+  if (!gimple_call_builtin_p (stmt, BUILT_IN_NORMAL))
+    return false;
+  tree decl = gimple_call_fndecl (stmt);
+  /* is_inexpensive_builtin has __builtin_expect only.  */
+  if (DECL_FUNCTION_CODE (decl) == BUILT_IN_EXPECT_WITH_PROBABILITY)
+    return true;
+  if (!is_inexpensive_builtin (decl))
+    return false;
+  optab op;
+  switch (DECL_FUNCTION_CODE (decl))
+    {
+    CASE_INT_FN (BUILT_IN_CLZ):
+    CASE_INT_FN (BUILT_IN_CTZ):
+    CASE_INT_FN (BUILT_IN_FFS):
+    CASE_INT_FN (BUILT_IN_CLRSB):
+      /* The expanders make ctz, ffs and clrsb from clz.  */
+      op = clz_optab;
+      break;
+    CASE_INT_FN (BUILT_IN_POPCOUNT):
+    CASE_INT_FN (BUILT_IN_PARITY):
+      op = popcount_optab;
+      break;
+    default:
+      return true;
+    }
+  if (gimple_call_num_args (stmt) != 1)
+    return false;
+  machine_mode mode = TYPE_MODE (TREE_TYPE (gimple_call_arg (stmt, 0)));
+  return optab_handler (op, mode) != CODE_FOR_nothing;
+}
+
 /* Estimate simultaneous SSA integer and pointer values in a block.  Both
    classes have two scratch registers in the usual m68k C ABI.  */
 static void
@@ -1417,8 +1455,15 @@ m68k_analyze_ipa_call_saves (cgraph_node *node)
       }
   unsigned peak = 0;
   var_map map = init_var_map (num_ssa_names);
+  /* Without a view the map has a partition for version 0 and for each
+     released name, which have no SSA name; the checks of the live range
+     calculation read them.  */
+  partition_view_normal (map);
   tree_live_info_p ranges = calculate_live_ranges (map, false);
-  auto_bitmap calls, seen;
+  auto_bitmap calls, seen, returns;
+  auto_vec<std::pair<ipa_call_summary *, basic_block> > sites;
+  auto_vec<bool> several_calls;
+  several_calls.safe_grow_cleared (last_basic_block_for_fn (fun), true);
   basic_block bb;
   FOR_EACH_BB_FN (bb, fun)
     {
@@ -1467,14 +1512,22 @@ m68k_analyze_ipa_call_saves (cgraph_node *node)
 	  FOR_EACH_SSA_TREE_OPERAND (name, stmt, iter, SSA_OP_DEF)
 	    account (name, false);
 	  if (is_gimple_call (stmt) && !gimple_call_internal_p (stmt)
-	      && !(gimple_call_builtin_p (stmt, BUILT_IN_NORMAL)
-		   && is_inexpensive_builtin (gimple_call_fndecl (stmt))))
+	      && !m68k_builtin_without_call_p (stmt))
 	    {
-	      bitmap_set_bit (calls, bb->index);
+	      if (!bitmap_set_bit (calls, bb->index))
+		several_calls[bb->index] = true;
 	      peak = MAX (peak, data + addr);
 	      if (cgraph_edge *call = node->get_edge (stmt))
-		ipa_call_summaries->get_create (call)->live_across_call
-		  = MIN (data + addr, 15U);
+		{
+		  ipa_call_summary *es
+		    = ipa_call_summaries->get_create (call);
+		  es->live_across_call = MIN (data + addr, 15U);
+		  sites.safe_push (std::make_pair (es, bb));
+		}
+	      else
+		/* A call the inliner does not see is a second call for
+		   the other calls of the block.  */
+		several_calls[bb->index] = true;
 	    }
 	  FOR_EACH_SSA_TREE_OPERAND (name, stmt, iter, SSA_OP_USE)
 	    account (name, true);
@@ -1483,6 +1536,9 @@ m68k_analyze_ipa_call_saves (cgraph_node *node)
     }
   delete_tree_live_info (ranges);
   delete_var_map (map);
+  /* SEEN: the blocks that a path from the entry reaches before any call,
+     and the first block with a call on each such path.  RETURNS: the same
+     from the exit, backwards.  */
   auto_vec<basic_block> todo;
   todo.safe_push (ENTRY_BLOCK_PTR_FOR_FN (fun));
   bool fast = false;
@@ -1492,7 +1548,7 @@ m68k_analyze_ipa_call_saves (cgraph_node *node)
       if (bb == EXIT_BLOCK_PTR_FOR_FN (fun))
 	{
 	  fast = true;
-	  break;
+	  continue;
 	}
       if (!bitmap_set_bit (seen, bb->index) || bitmap_bit_p (calls, bb->index))
 	continue;
@@ -1501,6 +1557,47 @@ m68k_analyze_ipa_call_saves (cgraph_node *node)
       FOR_EACH_EDGE (e, ei, bb->succs)
 	if (!(e->flags & (EDGE_ABNORMAL | EDGE_EH | EDGE_FAKE)))
 	  todo.safe_push (e->dest);
+    }
+  todo.safe_push (EXIT_BLOCK_PTR_FOR_FN (fun));
+  while (!todo.is_empty ())
+    {
+      bb = todo.pop ();
+      if (bb == ENTRY_BLOCK_PTR_FOR_FN (fun)
+	  || !bitmap_set_bit (returns, bb->index)
+	  || bitmap_bit_p (calls, bb->index))
+	continue;
+      edge e;
+      edge_iterator ei;
+      FOR_EACH_EDGE (e, ei, bb->preds)
+	if (!(e->flags & (EDGE_ABNORMAL | EDGE_EH | EDGE_FAKE)))
+	  todo.safe_push (e->src);
+    }
+  profile_count entry_count = ENTRY_BLOCK_PTR_FOR_FN (fun)->count;
+  for (auto &site : sites)
+    {
+      bb = site.second;
+      /* With this call inlined, a return path of the callee without a
+	 call gives the function such a path.  */
+      site.first->only_call_on_path
+	= (bitmap_bit_p (seen, bb->index) && bitmap_bit_p (returns, bb->index)
+	   && !several_calls[bb->index]);
+      /* The frequency of a call in a loop counts the iterations.  The
+	 call is reached when its outermost loop is entered.  */
+      if (!current_loops || !loop_depth (bb->loop_father)
+	  || !entry_count.initialized_p () || !entry_count.nonzero_p ())
+	continue;
+      class loop *outer = loop_outermost (bb->loop_father);
+      profile_count entered = profile_count::zero ();
+      edge e;
+      edge_iterator ei;
+      FOR_EACH_EDGE (e, ei, outer->header->preds)
+	if (!flow_bb_inside_loop_p (outer, e->src))
+	  entered += e->count ();
+      if (!entered.initialized_p ())
+	continue;
+      int64_t percent
+	= (entered.to_sreal_scale (entry_count) * 100).to_nearest_int ();
+      site.first->reach_prob = 1 + MAX (0, MIN (100, percent));
     }
   ipa_fn_summary *info = ipa_fn_summaries->get (node);
   info->self_saved_regs = MIN (peak, 11U);

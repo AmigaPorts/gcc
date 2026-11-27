@@ -288,7 +288,8 @@ public:
      This is useful for debugging.  */
   ipa_call_summary ()
     : predicate (NULL), param (vNULL), call_stmt_size (0), call_stmt_time (0),
-      loop_depth (0), live_across_call (0), is_return_callee_uncaptured (false)
+      loop_depth (0), live_across_call (0), reach_prob (0),
+      only_call_on_path (false), is_return_callee_uncaptured (false)
     {
     }
 
@@ -296,7 +297,8 @@ public:
   ipa_call_summary (const ipa_call_summary &s):
     predicate (s.predicate), param (s.param), call_stmt_size (s.call_stmt_size),
     call_stmt_time (s.call_stmt_time), loop_depth (s.loop_depth),
-    live_across_call (s.live_across_call),
+    live_across_call (s.live_across_call), reach_prob (s.reach_prob),
+    only_call_on_path (s.only_call_on_path),
     is_return_callee_uncaptured (s.is_return_callee_uncaptured)
   {
   }
@@ -314,6 +316,13 @@ public:
   unsigned int loop_depth;
   /* Estimated general register words live across this call, capped at 15.  */
   unsigned char live_across_call;
+  /* For a call in a loop: one plus the estimated probability, in percent,
+     that an entry of the function reaches the call.  Zero if there is no
+     estimate; the frequency of the call is the probability then.  */
+  unsigned char reach_prob;
+  /* True if a path from the entry of the function to its exit has this
+     call and no other one.  */
+  bool only_call_on_path;
   /* Indicates whether the caller returns the value of it's callee.  */
   bool is_return_callee_uncaptured;
 };
