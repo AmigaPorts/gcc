@@ -14,3 +14,12 @@ update (unsigned *p, unsigned x)
   p[4] = e; p[5] = f; p[6] = g; p[7] = h;
   return a ^ c ^ e ^ g;
 }
+
+/* The comparison of the other file.  Some C libraries do not give this
+   function to a link with -flto.  The values are positive.  */
+int __attribute__ ((used, noinline))
+__gtsf2 (float a, float b)
+{
+  union { float f; int i; } x = { a }, y = { b };
+  return x.i > y.i;
+}
