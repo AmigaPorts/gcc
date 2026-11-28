@@ -1,6 +1,11 @@
 /* On the 68000, a / b and a % b of the same operands are one call that
-   returns both, signed or unsigned.  A constant divisor keeps its own
-   expansion, and from the 68020 on divsl.l and divul.l give both.  */
+   returns both, signed or unsigned.  From the 68020 on, divsl.l and
+   divul.l give both.
+
+   A constant divisor still makes two calls: the divmod transform leaves
+   it to a multiply by the reciprocal, which the 68000 lacks.  That is
+   today's behaviour, not the goal; udivmod10 checks it so that a change
+   shows.  */
 
 /* { dg-do compile } */
 /* { dg-skip-if "the 68000 has no -fbaserel32" { *-*-* } { "-fbaserel32" "-resident32" } { "" } } */
