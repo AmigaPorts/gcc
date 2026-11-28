@@ -4337,7 +4337,19 @@ inline_update_callee_summaries (struct cgraph_node *node, int depth,
 	inner_p = sreal (es->reach_prob - 1) / 100;
       else if (outer_freq > 0)
 	inner_p = MIN (one, e->sreal_frequency () / outer_freq);
-      int64_t percent = (outer_p * inner_p * 100).to_nearest_int ();
+      sreal reach = outer_p * inner_p;
+      /* The inlined call was in a loop: on an entry that reaches it, it
+	 runs about OUTER_FREQ / OUTER_P times, and the call of its body is
+	 reached when one of these runs reaches it.  */
+      if (outer->reach_prob && outer_p > 0 && inner_p < one)
+	{
+	  sreal miss = one;
+	  int64_t n = (outer_freq / outer_p).to_nearest_int ();
+	  for (n = MAX (1, MIN (n, 1000)); n > 0 && miss * 1000 > one; --n)
+	    miss *= one - inner_p;
+	  reach = outer_p * (one - miss);
+	}
+      int64_t percent = (reach * 100).to_nearest_int ();
       es->reach_prob = 1 + MAX (0, MIN (100, percent));
     };
 
@@ -4567,7 +4579,11 @@ ipa_merge_fn_summary_after_inlining (struct cgraph_edge *edge)
 	  for (cgraph_edge *e = (pass ? edge->caller->indirect_calls
 				 : edge->caller->callees);
 	       e; e = e->next_callee)
-	    if (e != edge && e->inline_failed)
+	    /* Not the other edge of a speculative call: it has the same
+	       statement and is not another call of the path.  */
+	    if (e != edge && e->inline_failed
+		&& !(e->call_stmt == edge->call_stmt
+		     && e->lto_stmt_uid == edge->lto_stmt_uid))
 	      if (ipa_call_summary *other = ipa_call_summaries->get (e))
 		if (other->path_pair)
 		  {

@@ -1418,8 +1418,7 @@ m68k_builtin_without_call_p (gimple *stmt)
     CASE_INT_FN (BUILT_IN_CLZ):
     CASE_INT_FN (BUILT_IN_CTZ):
     CASE_INT_FN (BUILT_IN_FFS):
-    CASE_INT_FN (BUILT_IN_CLRSB):
-      /* The expanders make ctz, ffs and clrsb from clz.  */
+      /* The expanders make ctz and ffs from clz.  */
       op = clz_optab;
       break;
     CASE_INT_FN (BUILT_IN_POPCOUNT):
