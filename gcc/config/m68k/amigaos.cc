@@ -262,9 +262,12 @@ amigaos_init_libfuncs (void)
   amigaos_floatdidf_rounded = -1;
 
   /* One call for a / b and a % b, which the 68000 and 68010 otherwise
-     divide twice for.  From the 68020 on, divmodsi4 takes precedence.  */
+     divide twice for.  From the 68020 on, divmodsi4 takes precedence.
+     The helpers are libgcc's, which the vasm target does not link.  */
+#ifndef TARGET_AMIGAOS_VASM
   set_optab_libfunc (sdivmod_optab, SImode, "__amigaos_divmodsi4");
   set_optab_libfunc (udivmod_optab, SImode, "__amigaos_udivmodsi4");
+#endif
 }
 
 /* TARGET_EXPAND_DIVMOD_LIBFUNC.  The divmod libcalls return the quotient
