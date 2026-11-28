@@ -819,6 +819,12 @@ m68k_option_override (void)
   SET_OPTION_IF_UNSET (&global_options, &global_options_set,
 		       flag_ira_region, IRA_REGION_MIXED);
 
+  /* The macro-fusion pairs only matter to the 68060's sched2, which keeps
+     them together itself.  pass_dep_fusion would build RTL-SSA twice for
+     every function, on any CPU, to move nothing.  */
+  if (!OPTION_SET_P (flag_dep_fusion))
+    flag_dep_fusion = 0;
+
   SUBTARGET_OVERRIDE_OPTIONS;
 
   /* Setup scheduling options.  */
@@ -872,6 +878,9 @@ m68k_option_override (void)
 static void
 m68k_override_options_after_change (void)
 {
+  if (!OPTION_SET_P (flag_dep_fusion))
+    flag_dep_fusion = 0;
+
   if (m68k_sched_cpu == CPU_UNKNOWN)
     {
       flag_schedule_insns = 0;
@@ -2069,6 +2078,24 @@ handle_flags_for_move (rtx *operands)
     flags_operand2 = NULL_RTX;
 }
 
+/* Whether a move from SRC to DEST, flags_valid "move", leaves flags that
+   compare DEST with 0.  fmoves to memory or data registers do not set the
+   condition codes.  Normal moves _do_ set the condition codes, but not in
+   a way that is appropriate for comparison with 0, because -0.0 would be
+   treated as a negative nonzero number.  Note that it isn't appropriate to
+   conditionalize this restriction on HONOR_SIGNED_ZEROS because that macro
+   merely indicates whether we care about the difference between -0.0 and
+   +0.0.  */
+
+static bool
+m68k_move_flags_usable_p (rtx dest, rtx src)
+{
+  return (FP_REG_P (dest)
+	  || !(FP_REG_P (src)
+	       || GET_CODE (src) == FIX
+	       || FLOAT_MODE_P (GET_MODE (dest))));
+}
+
 /* Process INSN to remember flag operands if possible.  */
 
 static void
@@ -2110,18 +2137,7 @@ m68k_asm_final_postscan_insn (FILE *, rtx_insn *insn, rtx [], int)
       flags_operand2 = NULL_RTX;
       break;
     case FLAGS_VALID_MOVE:
-      /* fmoves to memory or data registers do not set the condition
-	 codes.  Normal moves _do_ set the condition codes, but not in
-	 a way that is appropriate for comparison with 0, because -0.0
-	 would be treated as a negative nonzero number.  Note that it
-	 isn't appropriate to conditionalize this restriction on
-	 HONOR_SIGNED_ZEROS because that macro merely indicates whether
-	 we care about the difference between -0.0 and +0.0.  */
-      if (dest != NULL_RTX
-	  && !FP_REG_P (dest)
-	  && (FP_REG_P (src)
-	      || GET_CODE (src) == FIX
-	      || FLOAT_MODE_P (GET_MODE (dest))))
+      if (dest != NULL_RTX && !m68k_move_flags_usable_p (dest, src))
 	flags_operand1 = flags_operand2 = NULL_RTX;
       else
 	{
@@ -7275,8 +7291,9 @@ m68k_macro_fusion_pair_p (rtx_insn *prev, rtx_insn *curr)
   switch (get_attr_flags_valid (prev))
     {
     case FLAGS_VALID_YES:
-    case FLAGS_VALID_MOVE:
       return true;
+    case FLAGS_VALID_MOVE:
+      return m68k_move_flags_usable_p (SET_DEST (set), SET_SRC (set));
     case FLAGS_VALID_NOOV:
       return GET_CODE (cond) != GT && GET_CODE (cond) != LE;
     default:
