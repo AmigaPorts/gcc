@@ -7024,6 +7024,22 @@ specific target options and the caller does not use the same options.",
  default_target_can_inline_p)
 
 DEFHOOK
+(analyze_ipa_call_saves,
+ "Record target estimates of call-preserved register use for @var{node}\n\
+and its outgoing call edges before LTO inlining.",
+ void, (cgraph_node *node), NULL)
+
+DEFHOOK
+(ipa_call_save_cost,
+ "Return the cost of additional unconditional register saves and restores\n\
+if a function using @var{callee} preserved registers is inlined into one\n\
+using @var{caller}, with @var{live} register words live across the call.\n\
+The unit is 1/100 of the cost of a call and return.  Zero leaves the ordinary inliner\n\
+decision in place.",
+ unsigned int, (unsigned int caller, unsigned int callee, unsigned int live),
+ NULL)
+
+DEFHOOK
 (update_ipa_fn_target_info,
  "Allow target to analyze all gimple statements for the given function to\n\
 record and update some target specific information for inlining.  A typical\n\

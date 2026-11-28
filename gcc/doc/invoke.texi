@@ -1199,7 +1199,7 @@ Objective-C and Objective-C++ Dialects}.
 -m68060  -m68302  -m68332  -m68851
 -mcpu32  -mfidoa  -m5200  -m5206e  -m528x  -m5307  -m5407
 -mcfv4e  -mbitfield  -mc68000  -mc68020
--mrtd  -mdiv  -mshort
+-mrtd  -mdiv  -mshort  -mipa-callback-saves
 -mhard-float  -m68881  -msoft-float  -mpcrel
 -malign-int  -mstrict-align  -msep-data
 -mshared-library-id=@var{n}  -mid-shared-library
@@ -28560,6 +28560,20 @@ GCC defines the macro @code{__mcfhwdiv__} when this option is enabled.
 @opindex mshort
 @opindex mno-short
 @opindex mnoshort
+@opindex mipa-callback-saves
+@opindex mno-ipa-callback-saves
+@item -mipa-callback-saves
+@itemx -mno-ipa-callback-saves
+During link-time optimization, consider the extra registers a callback
+may have to save on paths that bypass an inlined call.  This optimization
+is enabled by default on classic M680x0 targets.  ColdFire targets use
+the ordinary inlining policy.  To disable the optimization for a build,
+pass @option{-mno-ipa-callback-saves} when compiling and linking.
+To get one call inlined in spite of the decision, declare the callee
+@code{inline} or give it the @code{always_inline} attribute; for a
+callee that uses many registers, @code{__builtin_expect} on the path to
+the call is not enough.
+
 @item -mshort
 @itemx -mno-short
 @itemx -mnoshort

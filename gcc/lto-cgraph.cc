@@ -269,8 +269,15 @@ lto_output_edge (struct lto_simple_output_block *ob, struct cgraph_edge *edge,
   bp = bitpack_create (ob->main_stream);
   uid = !edge->call_stmt ? edge->lto_stmt_uid
 			 : gimple_uid (edge->call_stmt) + 1;
-  bp_pack_enum (&bp, cgraph_inline_failed_t,
-	        CIF_N_REASONS, edge->inline_failed);
+  /* Keep the existing five-bit edge format.  EARLY_RETURN_SAVES is a
+     profitability diagnostic produced at WPA.  An LTO reader can reconsider
+     the edge using the ordinary not-inline-candidate reason.  */
+  static_assert (CIF_EARLY_RETURN_SAVES == CIF_CALLBACK_EDGE + 1
+		 && CIF_N_REASONS == CIF_EARLY_RETURN_SAVES + 1,
+		 "update the LTO inline failure reason encoding");
+  bp_pack_enum (&bp, cgraph_inline_failed_t, CIF_CALLBACK_EDGE + 1,
+		edge->inline_failed == CIF_EARLY_RETURN_SAVES
+		? CIF_FUNCTION_NOT_INLINE_CANDIDATE : edge->inline_failed);
   gcc_checking_assert (uid || edge->caller->thunk);
   bp_pack_var_len_unsigned (&bp, uid);
   bp_pack_value (&bp, edge->speculative_id, 16);
@@ -1572,7 +1579,8 @@ input_edge (class lto_input_block *ib, vec<symtab_node *> nodes,
   count = profile_count::stream_in (ib);
 
   bp = streamer_read_bitpack (ib);
-  inline_failed = bp_unpack_enum (&bp, cgraph_inline_failed_t, CIF_N_REASONS);
+  inline_failed = bp_unpack_enum (&bp, cgraph_inline_failed_t,
+				CIF_CALLBACK_EDGE + 1);
   stmt_id = bp_unpack_var_len_unsigned (&bp);
   speculative_id = bp_unpack_value (&bp, 16);
 

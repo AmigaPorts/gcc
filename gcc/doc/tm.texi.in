@@ -7184,6 +7184,10 @@ with the target specific attributes.  The default value is @code{','}.
 
 @hook TARGET_CAN_INLINE_P
 
+@hook TARGET_ANALYZE_IPA_CALL_SAVES
+
+@hook TARGET_IPA_CALL_SAVE_COST
+
 @hook TARGET_UPDATE_IPA_FN_TARGET_INFO
 
 @hook TARGET_NEED_IPA_FN_TARGET_INFO

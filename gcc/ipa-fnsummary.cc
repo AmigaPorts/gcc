@@ -2951,6 +2951,8 @@ analyze_function_body (struct cgraph_node *node, bool early)
     && targetm.target_option.need_ipa_fn_target_info (node->decl,
 						      info->target_info);
 
+  if (!early && flag_lto && targetm.target_option.analyze_ipa_call_saves)
+    targetm.target_option.analyze_ipa_call_saves (node);
   if (fbi.info)
     compute_bb_predicates (&fbi, node, info, params_summary);
   find_necessary_statements (node);
@@ -4306,23 +4308,72 @@ ipa_get_stack_frame_offset (struct cgraph_node *node)
 
 
 /* Update summary information of inline clones after inlining.
-   Compute peak stack usage.  */
+   Compute peak stack usage.  
+   A value that is live across the inlined call is live across each call in
+   the inlined body: add LIVE to their estimates.  OUTER is the summary of
+   the inlined call and OUTER_FREQ its frequency: a call of the inlined
+   body is reached only when the inlined call was, and it is the only call
+   on a path only if the inlined call was.  */
 
 static void
-inline_update_callee_summaries (struct cgraph_node *node, int depth)
+inline_update_callee_summaries (struct cgraph_node *node, int depth,
+				unsigned live, const ipa_call_summary *outer,
+				sreal outer_freq)
 {
   struct cgraph_edge *e;
+  auto update_path = [&] (cgraph_edge *e, ipa_call_summary *es)
+    {
+      es->only_call_on_path &= outer->only_call_on_path;
+      /* The flag is for the calls of one function body.  */
+      es->path_pair = false;
+      if (!outer->reach_prob && !es->reach_prob)
+	return;
+      sreal one = 1;
+      sreal outer_p = (outer->reach_prob
+		       ? sreal (outer->reach_prob - 1) / 100
+		       : MIN (one, outer_freq));
+      sreal inner_p = one;
+      if (es->reach_prob)
+	inner_p = sreal (es->reach_prob - 1) / 100;
+      else if (outer_freq > 0)
+	inner_p = MIN (one, e->sreal_frequency () / outer_freq);
+      sreal reach = outer_p * inner_p;
+      /* The inlined call was in a loop: on an entry that reaches it, it
+	 runs about OUTER_FREQ / OUTER_P times, and the call of its body is
+	 reached when one of these runs reaches it.  */
+      if (outer->reach_prob && outer_p > 0 && inner_p < one)
+	{
+	  sreal miss = one;
+	  int64_t n = (outer_freq / outer_p).to_nearest_int ();
+	  for (n = MAX (1, MIN (n, 1000)); n > 0 && miss * 1000 > one; --n)
+	    miss *= one - inner_p;
+	  reach = outer_p * (one - miss);
+	}
+      int64_t percent = (reach * 100).to_nearest_int ();
+      es->reach_prob = 1 + MAX (0, MIN (100, percent));
+    };
 
   ipa_propagate_frequency (node);
   for (e = node->callees; e; e = e->next_callee)
     {
       if (!e->inline_failed)
-	inline_update_callee_summaries (e->callee, depth);
+	inline_update_callee_summaries (e->callee, depth, live, outer,
+					outer_freq);
       else
-	ipa_call_summaries->get (e)->loop_depth += depth;
+	{
+	  ipa_call_summary *es = ipa_call_summaries->get (e);
+	  es->loop_depth += depth;
+	  es->live_across_call = MIN (15U, es->live_across_call + live);
+	  update_path (e, es);
+	}
     }
   for (e = node->indirect_calls; e; e = e->next_callee)
-    ipa_call_summaries->get (e)->loop_depth += depth;
+    {
+      ipa_call_summary *es = ipa_call_summaries->get (e);
+      es->loop_depth += depth;
+      es->live_across_call = MIN (15U, es->live_across_call + live);
+      update_path (e, es);
+    }
 }
 
 /* Update change_prob and points_to_local_or_readonly_memory of EDGE after
@@ -4506,6 +4557,40 @@ ipa_merge_fn_summary_after_inlining (struct cgraph_edge *edge)
 
   info->fp_expressions |= callee_info->fp_expressions;
   info->target_info |= callee_info->target_info;
+  /* The body of the callee now uses the registers of TO, with the values
+     that are live across the call.  The inliner does not look again at
+     the edges of TO that it rejected with the lower estimate; the new
+     value serves the calls of the inlined body and the pass that inlines
+     functions called once.  */
+  info->self_saved_regs
+    = MIN (15U, MAX ((unsigned) info->self_saved_regs,
+		     (unsigned) callee_info->self_saved_regs
+		     + es->live_across_call));
+  /* A return path of the callee without a call, on a path of TO that has
+     no other call, is such a path of TO.  */
+  if (callee_info->call_free_return)
+    {
+      if (es->only_call_on_path)
+	info->call_free_return = true;
+      /* The path through this call and one other call now has the other
+	 call only.  */
+      if (es->path_pair)
+	for (int pass = 0; pass < 2; ++pass)
+	  for (cgraph_edge *e = (pass ? edge->caller->indirect_calls
+				 : edge->caller->callees);
+	       e; e = e->next_callee)
+	    /* Not the other edge of a speculative call: it has the same
+	       statement and is not another call of the path.  */
+	    if (e != edge && e->inline_failed
+		&& !(e->call_stmt == edge->call_stmt
+		     && e->lto_stmt_uid == edge->lto_stmt_uid))
+	      if (ipa_call_summary *other = ipa_call_summaries->get (e))
+		if (other->path_pair)
+		  {
+		    other->only_call_on_path = true;
+		    other->path_pair = false;
+		  }
+    }
 
   if (callee_info->conds)
     {
@@ -4603,7 +4688,9 @@ ipa_merge_fn_summary_after_inlining (struct cgraph_edge *edge)
   if (info->estimated_stack_size < peak)
     info->estimated_stack_size = peak;
 
-  inline_update_callee_summaries (edge->callee, es->loop_depth);
+  inline_update_callee_summaries (edge->callee, es->loop_depth,
+				  es->live_across_call, es,
+				  edge->sreal_frequency ());
   if (info->call_size_time_table.length ())
     {
       int edge_size = 0;
@@ -4758,6 +4845,22 @@ read_ipa_call_summary (class lto_input_block *ib, struct cgraph_edge *e,
   else
     bp_unpack_value (&bp, 1);
 
+  /* The estimate uses spare bits of the word that holds the flag above.
+     An object written without it gives zero here, which means "no
+     estimate".  If the word runs out of bits, this needs a stream
+     version change.  */
+  unsigned live_across = bp_unpack_value (&bp, 4);
+  unsigned reach_prob = bp_unpack_value (&bp, 7);
+  bool only_call_on_path = bp_unpack_value (&bp, 1);
+  bool path_pair = bp_unpack_value (&bp, 1);
+  if (es)
+    {
+      es->live_across_call = live_across;
+      es->reach_prob = reach_prob;
+      es->only_call_on_path = only_call_on_path;
+      es->path_pair = path_pair;
+    }
+
   p.stream_in (ib);
   if (es)
     edge_set_predicate (e, &p);
@@ -4851,12 +4954,17 @@ inline_read_section (struct lto_file_decl_data *file_data, const char *data,
 	{
 	  info->inlinable = bp_unpack_value (&bp, 1);
 	  info->fp_expressions = bp_unpack_value (&bp, 1);
+	  /* Spare bits of the same word; see read_ipa_call_summary.  */
+	  info->self_saved_regs = bp_unpack_value (&bp, 4);
+	  info->call_free_return = bp_unpack_value (&bp, 1);
 	  if (!lto_stream_offload_p)
 	    info->target_info = streamer_read_uhwi (&ib);
 	}
       else
 	{
 	  bp_unpack_value (&bp, 1);
+	  bp_unpack_value (&bp, 1);
+	  bp_unpack_value (&bp, 4);
 	  bp_unpack_value (&bp, 1);
 	  if (!lto_stream_offload_p)
 	    streamer_read_uhwi (&ib);
@@ -5037,6 +5145,10 @@ write_ipa_call_summary (struct output_block *ob, struct cgraph_edge *e)
 
   bitpack_d bp = bitpack_create (ob->main_stream);
   bp_pack_value (&bp, es->is_return_callee_uncaptured, 1);
+  bp_pack_value (&bp, es->live_across_call, 4);
+  bp_pack_value (&bp, es->reach_prob, 7);
+  bp_pack_value (&bp, es->only_call_on_path, 1);
+  bp_pack_value (&bp, es->path_pair, 1);
   streamer_write_bitpack (&bp);
 
   if (es->predicate)
@@ -5097,6 +5209,8 @@ ipa_fn_summary_write (void)
 	  bp = bitpack_create (ob->main_stream);
 	  bp_pack_value (&bp, info->inlinable, 1);
 	  bp_pack_value (&bp, info->fp_expressions, 1);
+	  bp_pack_value (&bp, info->self_saved_regs, 4);
+	  bp_pack_value (&bp, info->call_free_return, 1);
 	  streamer_write_bitpack (&bp);
 	  if (!lto_stream_offload_p)
 	    streamer_write_uhwi (ob, info->target_info);

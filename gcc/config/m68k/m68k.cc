@@ -66,12 +66,25 @@ along with GCC; see the file COPYING3.  If not see
 #include "insn-codes.h"
 #include "opts.h"
 #include "optabs.h"
+#include "optabs-tree.h"
 #include "builtins.h"
 #include "rtl-iter.h"
 #include "toplev.h"
 #include "df.h"
 #include "cfgloop.h"
 
+
+#include "gimple.h"
+#include "ssa.h"
+#include "cgraph.h"
+#include "gimple-iterator.h"
+#include "tree-ssa-live.h"
+#include "symbol-summary.h"
+#include "sreal.h"
+#include "ipa-cp.h"
+#include "ipa-prop.h"
+#include "ipa-fnsummary.h"
+#include "builtins.h"
 
 /* This file should be included last.  */
 #include "target-def.h"
@@ -491,6 +504,14 @@ TARGET_GNU_ATTRIBUTES (m68k_attribute_table,
 
 #undef TARGET_DOCUMENTATION_NAME
 #define TARGET_DOCUMENTATION_NAME "m68k"
+
+static void m68k_analyze_ipa_call_saves (cgraph_node *);
+static unsigned m68k_ipa_call_save_cost (unsigned, unsigned, unsigned);
+
+#undef TARGET_ANALYZE_IPA_CALL_SAVES
+#define TARGET_ANALYZE_IPA_CALL_SAVES m68k_analyze_ipa_call_saves
+#undef TARGET_IPA_CALL_SAVE_COST
+#define TARGET_IPA_CALL_SAVE_COST m68k_ipa_call_save_cost
 
 struct gcc_target targetm = TARGET_INITIALIZER;
 
@@ -1417,6 +1438,413 @@ m68k_set_frame_related (rtx_insn *insn)
   if (GET_CODE (body) == PARALLEL)
     for (i = 0; i < XVECLEN (body, 0); i++)
       RTX_FRAME_RELATED_P (XVECEXP (body, 0, i)) = 1;
+}
+
+/* Return true if STMT calls a built-in function that expands without a
+   call.  The bit-counting functions are library calls where the CPU has
+   no instruction for them: popcount and parity always, clz, ctz and ffs
+   without the 68020 bit-field instructions.  */
+static bool
+m68k_builtin_without_call_p (gimple *stmt)
+{
+  if (!gimple_call_builtin_p (stmt, BUILT_IN_NORMAL))
+    return false;
+  tree decl = gimple_call_fndecl (stmt);
+  /* is_inexpensive_builtin has __builtin_expect only.  */
+  if (DECL_FUNCTION_CODE (decl) == BUILT_IN_EXPECT_WITH_PROBABILITY)
+    return true;
+  if (!is_inexpensive_builtin (decl))
+    return false;
+  optab op;
+  switch (DECL_FUNCTION_CODE (decl))
+    {
+    CASE_INT_FN (BUILT_IN_CLZ):
+    CASE_INT_FN (BUILT_IN_CTZ):
+    CASE_INT_FN (BUILT_IN_FFS):
+      /* The expanders make ctz and ffs from clz.  */
+      op = clz_optab;
+      break;
+    CASE_INT_FN (BUILT_IN_POPCOUNT):
+    CASE_INT_FN (BUILT_IN_PARITY):
+      op = popcount_optab;
+      break;
+    default:
+      return true;
+    }
+  if (gimple_call_num_args (stmt) != 1)
+    return false;
+  machine_mode mode = TYPE_MODE (TREE_TYPE (gimple_call_arg (stmt, 0)));
+  return optab_handler (op, mode) != CODE_FOR_nothing;
+}
+
+/* Return true if STMT, which is not a call statement, becomes a library
+   call: arithmetic that the CPU has no instruction for, and a block copy
+   that is too large for single moves.  */
+static bool
+m68k_stmt_libcall_p (gimple *stmt)
+{
+  if (gcond *cond = dyn_cast <gcond *> (stmt))
+    return (!TARGET_HARD_FLOAT
+	    && SCALAR_FLOAT_TYPE_P (TREE_TYPE (gimple_cond_lhs (cond))));
+  if (!is_gimple_assign (stmt))
+    return false;
+  tree type = TREE_TYPE (gimple_assign_lhs (stmt));
+  if (gimple_assign_single_p (stmt))
+    {
+      if (is_gimple_reg_type (type) || gimple_clobber_p (stmt))
+	return false;
+      tree size = TYPE_SIZE_UNIT (type);
+      return (!size || !tree_fits_uhwi_p (size)
+	      || !can_move_by_pieces (tree_to_uhwi (size),
+				      TYPE_ALIGN (type)));
+    }
+  enum tree_code code = gimple_assign_rhs_code (stmt);
+  tree from = TREE_TYPE (gimple_assign_rhs1 (stmt));
+  if (TREE_CODE_CLASS (code) == tcc_comparison)
+    return !TARGET_HARD_FLOAT && SCALAR_FLOAT_TYPE_P (from);
+  if (CONVERT_EXPR_CODE_P (code) || code == FLOAT_EXPR
+      || code == FIX_TRUNC_EXPR)
+    {
+      if (!SCALAR_FLOAT_TYPE_P (type) && !SCALAR_FLOAT_TYPE_P (from))
+	return false;
+      if (!TARGET_HARD_FLOAT)
+	return true;
+      /* The FPU converts integers of up to 32 bits.  */
+      tree other = SCALAR_FLOAT_TYPE_P (type) ? from : type;
+      return INTEGRAL_TYPE_P (other) && TYPE_PRECISION (other) > 32;
+    }
+  bool fp = SCALAR_FLOAT_TYPE_P (type);
+  if (!fp && !INTEGRAL_TYPE_P (type))
+    return false;
+  machine_mode mode = TYPE_MODE (type);
+  switch (code)
+    {
+    case PLUS_EXPR:
+    case MINUS_EXPR:
+    case RDIV_EXPR:
+      if (!fp)
+	return false;
+      break;
+    case MULT_EXPR:
+      if (fp)
+	break;
+      /* Shifts and additions make a product with a constant, and the
+	 widening multiplication makes a two-word product.  */
+      if (TREE_CODE (gimple_assign_rhs2 (stmt)) == INTEGER_CST
+	  || (GET_MODE_SIZE (mode) == 2 * UNITS_PER_WORD
+	      && (find_widening_optab_handler (umul_widen_optab, mode,
+					       word_mode)
+		  != CODE_FOR_nothing)))
+	return false;
+      break;
+    case TRUNC_DIV_EXPR:
+    case TRUNC_MOD_EXPR:
+    case FLOOR_DIV_EXPR:
+    case FLOOR_MOD_EXPR:
+    case CEIL_DIV_EXPR:
+    case CEIL_MOD_EXPR:
+    case ROUND_DIV_EXPR:
+    case ROUND_MOD_EXPR:
+    case EXACT_DIV_EXPR:
+      if (integer_pow2p (gimple_assign_rhs2 (stmt))
+	  || (optab_handler (TYPE_UNSIGNED (type)
+			     ? udivmod_optab : sdivmod_optab, mode)
+	      != CODE_FOR_nothing))
+	return false;
+      break;
+    default:
+      return false;
+    }
+  optab op = optab_for_tree_code (code, type, optab_default);
+  return op != unknown_optab && optab_handler (op, mode) == CODE_FOR_nothing;
+}
+
+/* Estimate simultaneous SSA integer and pointer values in a block.  Both
+   classes have two scratch registers in the usual m68k C ABI.  */
+static void
+m68k_analyze_ipa_call_saves (cgraph_node *node)
+{
+  if (TARGET_COLDFIRE || !m68k_ipa_callback_saves
+      || m68k_get_function_kind (node->decl) != m68k_fk_normal_function)
+    return;
+
+  function *fun = cfun;
+  unsigned data_scratch = 0, addr_scratch = 0;
+  for (unsigned reg = D0_REG; reg < SP_REG; ++reg)
+    if (!fixed_regs[reg] && this_target_hard_regs->x_call_used_regs[reg])
+      {
+	if (reg < A0_REG)
+	  ++data_scratch;
+	else
+	  ++addr_scratch;
+      }
+  unsigned peak = 0;
+  var_map map = init_var_map (num_ssa_names);
+  /* Without a view the map has a partition for version 0 and for each
+     released name, which have no SSA name; the checks of the live range
+     calculation read them.  */
+  partition_view_normal (map);
+  tree_live_info_p ranges = calculate_live_ranges (map, false);
+  auto_bitmap calls, seen, returns;
+  auto_vec<std::pair<ipa_call_summary *, basic_block> > sites;
+  /* The calls of each block, with the library calls.  */
+  auto_vec<unsigned char> ncalls;
+  ncalls.safe_grow_cleared (last_basic_block_for_fn (fun), true);
+  basic_block bb;
+  FOR_EACH_BB_FN (bb, fun)
+    {
+      auto_bitmap live;
+      unsigned int data = 0, addr = 0;
+      auto account = [&] (tree name, bool add)
+	{
+	  if (virtual_operand_p (name))
+	    return;
+	  bool pointer = POINTER_TYPE_P (TREE_TYPE (name));
+	  /* Without an FPU a floating-point value is in data registers.  */
+	  if (!pointer && !INTEGRAL_TYPE_P (TREE_TYPE (name))
+	      && !(!TARGET_HARD_FLOAT
+		   && SCALAR_FLOAT_TYPE_P (TREE_TYPE (name))))
+	    return;
+	  unsigned id = SSA_NAME_VERSION (name);
+	  unsigned &n = pointer ? addr : data;
+	  unsigned bits = TYPE_PRECISION (TREE_TYPE (name));
+	  unsigned words = MIN (2U, (bits + 31U) / 32U);
+	  if (add && bitmap_set_bit (live, id))
+	    n += words;
+	  else if (!add && bitmap_clear_bit (live, id))
+	    n -= words;
+	};
+      unsigned part;
+      bitmap_iterator bi;
+      EXECUTE_IF_SET_IN_BITMAP (live_on_exit (ranges, bb), 0, part, bi)
+	account (partition_to_var (map, part), true);
+      auto sample = [&] ()
+	{
+	  unsigned excess = (data > data_scratch ? data - data_scratch : 0)
+			    + (addr > addr_scratch ? addr - addr_scratch : 0);
+	  peak = MAX (peak, excess);
+	};
+      /* The end of the block: a block can have no statement, and its last
+	 statement can set a value that is live on exit.  */
+      sample ();
+      for (gimple_stmt_iterator i = gsi_last_bb (bb); !gsi_end_p (i);
+	   gsi_prev (&i))
+	{
+	  gimple *stmt = gsi_stmt (i);
+	  if (is_gimple_debug (stmt))
+	    continue;
+	  tree name;
+	  ssa_op_iter iter;
+	  FOR_EACH_SSA_TREE_OPERAND (name, stmt, iter, SSA_OP_DEF)
+	    account (name, false);
+	  if (is_gimple_call (stmt)
+	      ? (!gimple_call_internal_p (stmt)
+		 && !m68k_builtin_without_call_p (stmt))
+	      : m68k_stmt_libcall_p (stmt))
+	    {
+	      bitmap_set_bit (calls, bb->index);
+	      if (ncalls[bb->index] < 3)
+		++ncalls[bb->index];
+	      peak = MAX (peak, data + addr);
+	      cgraph_edge *call
+		= is_gimple_call (stmt) ? node->get_edge (stmt) : NULL;
+	      if (call)
+		{
+		  ipa_call_summary *es
+		    = ipa_call_summaries->get_create (call);
+		  es->live_across_call = MIN (data + addr, 15U);
+		  sites.safe_push (std::make_pair (es, bb));
+		}
+	    }
+	  FOR_EACH_SSA_TREE_OPERAND (name, stmt, iter, SSA_OP_USE)
+	    account (name, true);
+	  sample ();
+	}
+    }
+  delete_tree_live_info (ranges);
+  delete_var_map (map);
+  /* SEEN: the blocks that a path from the entry reaches before any call,
+     and the first block with a call on each such path.  RETURNS: the same
+     from the exit, backwards.  */
+  auto_vec<basic_block> todo;
+  todo.safe_push (ENTRY_BLOCK_PTR_FOR_FN (fun));
+  bool fast = false;
+  while (!todo.is_empty ())
+    {
+      bb = todo.pop ();
+      if (bb == EXIT_BLOCK_PTR_FOR_FN (fun))
+	{
+	  fast = true;
+	  continue;
+	}
+      if (!bitmap_set_bit (seen, bb->index) || bitmap_bit_p (calls, bb->index))
+	continue;
+      edge e;
+      edge_iterator ei;
+      FOR_EACH_EDGE (e, ei, bb->succs)
+	if (!(e->flags & (EDGE_ABNORMAL | EDGE_EH | EDGE_FAKE)))
+	  todo.safe_push (e->dest);
+    }
+  todo.safe_push (EXIT_BLOCK_PTR_FOR_FN (fun));
+  while (!todo.is_empty ())
+    {
+      bb = todo.pop ();
+      if (bb == ENTRY_BLOCK_PTR_FOR_FN (fun)
+	  || !bitmap_set_bit (returns, bb->index)
+	  || bitmap_bit_p (calls, bb->index))
+	continue;
+      edge e;
+      edge_iterator ei;
+      FOR_EACH_EDGE (e, ei, bb->preds)
+	if (!(e->flags & (EDGE_ABNORMAL | EDGE_EH | EDGE_FAKE)))
+	  todo.safe_push (e->src);
+    }
+  ipa_fn_summary *info = ipa_fn_summaries->get (node);
+  info->self_saved_regs = MIN (peak, 11U);
+  /* An entrypoint function saves no register and a saveallregs function
+     saves all of them: an inlined body cannot add saves to either.  The
+     calls get no path flag, so that inlining does not give the function
+     the path either.  */
+  tree attrs = TYPE_ATTRIBUTES (TREE_TYPE (node->decl));
+  if (lookup_attribute ("entrypoint", attrs)
+      || lookup_attribute ("saveallregs", attrs))
+    {
+      info->call_free_return = false;
+      return;
+    }
+  info->call_free_return = fast;
+  profile_count entry_count = ENTRY_BLOCK_PTR_FOR_FN (fun)->count;
+  for (auto &site : sites)
+    {
+      bb = site.second;
+      /* With this call inlined, a return path of the callee without a
+	 call gives the function such a path.  */
+      site.first->only_call_on_path
+	= (bitmap_bit_p (seen, bb->index) && bitmap_bit_p (returns, bb->index)
+	   && ncalls[bb->index] == 1);
+      /* The frequency of a call in a loop counts the iterations.  The
+	 call is reached when its outermost loop is entered and an
+	 iteration executes the call: with the call in a fraction P of N
+	 iterations, on 1 - (1 - P)^N of the entries of the loop.  */
+      if (!current_loops || !loop_depth (bb->loop_father)
+	  || !entry_count.initialized_p () || !entry_count.nonzero_p ())
+	continue;
+      class loop *outer = loop_outermost (bb->loop_father);
+      profile_count entered = profile_count::zero ();
+      edge e;
+      edge_iterator ei;
+      FOR_EACH_EDGE (e, ei, outer->header->preds)
+	if (!flow_bb_inside_loop_p (outer, e->src))
+	  entered += e->count ();
+      if (!entered.initialized_p ())
+	continue;
+      sreal reach = entered.to_sreal_scale (entry_count);
+      profile_count header = outer->header->count;
+      if (entered.nonzero_p () && header.initialized_p ()
+	  && header.nonzero_p () && bb->count.initialized_p ())
+	{
+	  sreal one = 1;
+	  sreal skip = one - MIN (one, bb->count.to_sreal_scale (header));
+	  sreal miss = one;
+	  int64_t n = header.to_sreal_scale (entered).to_nearest_int ();
+	  for (n = MAX (1, MIN (n, 1000)); n > 0 && miss * 1000 > one; --n)
+	    miss *= skip;
+	  reach *= one - miss;
+	}
+      int64_t percent = (reach * 100).to_nearest_int ();
+      site.first->reach_prob = 1 + MAX (0, MIN (100, percent));
+    }
+  /* A path with two calls and no other one: when inlining removes one of
+     the calls from the path, the other one is the only call on it.  The
+     function records one such pair, because the flag does not say which
+     calls belong together.  */
+  auto pair = [&] (unsigned i, unsigned j)
+    {
+      ipa_call_summary *a = sites[i].first, *b = sites[j].first;
+      if (a->only_call_on_path && b->only_call_on_path)
+	return false;
+      a->path_pair = b->path_pair = true;
+      return true;
+    };
+  if (sites.length () > 16)
+    return;
+  for (unsigned i = 0; i < sites.length (); ++i)
+    {
+      basic_block first = sites[i].second;
+      if (!bitmap_bit_p (seen, first->index))
+	continue;
+      if (ncalls[first->index] == 2)
+	{
+	  /* Both calls in one block.  */
+	  if (bitmap_bit_p (returns, first->index))
+	    for (unsigned j = i + 1; j < sites.length (); ++j)
+	      if (sites[j].second == first && pair (i, j))
+		return;
+	  continue;
+	}
+      if (ncalls[first->index] != 1)
+	continue;
+      /* The blocks after FIRST that a path reaches before another
+	 call, and the block of that call.  */
+      auto_bitmap after;
+      todo.safe_push (first);
+      while (!todo.is_empty ())
+	{
+	  bb = todo.pop ();
+	  edge e;
+	  edge_iterator ei;
+	  FOR_EACH_EDGE (e, ei, bb->succs)
+	    if (!(e->flags & (EDGE_ABNORMAL | EDGE_EH | EDGE_FAKE))
+		&& e->dest != EXIT_BLOCK_PTR_FOR_FN (fun)
+		&& bitmap_set_bit (after, e->dest->index)
+		&& !bitmap_bit_p (calls, e->dest->index))
+	      todo.safe_push (e->dest);
+	}
+      for (unsigned j = 0; j < sites.length (); ++j)
+	{
+	  basic_block second = sites[j].second;
+	  if (second != first && ncalls[second->index] == 1
+	      && bitmap_bit_p (after, second->index)
+	      && bitmap_bit_p (returns, second->index)
+	      && pair (i, j))
+	    return;
+	}
+    }
+}
+
+/* Implement TARGET_IPA_CALL_SAVE_COST.  The unit is 1/100 of a call and
+   return.  Each added register, and the MOVEM pair itself, counts as one
+   whole call.
+
+   That is more than the instructions cost: on the 68000, MOVEM.L takes 16
+   cycles per register for the save and the restore together, and JSR with
+   RTS takes 36.  The price is set by measurement.  A price from the cycle
+   counts (45 per register) keeps too few calls out of line: on the 68060
+   it gives ADoom 2% to 5% and Heretic 1% to 3%, where this price gives
+   15% to 19%.  Prices from 100 to 250 differ by about 1%.  The inliner
+   underestimates what a merged body does to the callback: the register
+   estimate comes from GIMPLE, and the branch frequencies are guesses.
+
+   With nine or more added registers the price is above what a 90%
+   branch probability pays for, so __builtin_expect on the path to the call
+   does not change the decision for such a callee.  An inline declaration
+   or always_inline on the callee does; so does a profile.
+
+   Below MIN_MOVEM_REGS the function saves with single moves and the extra
+   work is small; leave those inlines to the ordinary heuristics.  A caller
+   that has a MOVEM pair already is left alone too: charging it for added
+   registers changed nothing in those workloads and vetoed more inlines
+   elsewhere.  */
+static unsigned
+m68k_ipa_call_save_cost (unsigned caller_saves, unsigned callee_saves,
+			 unsigned live)
+{
+  if (!m68k_ipa_callback_saves || TARGET_COLDFIRE)
+    return 0;
+  unsigned combined = MIN (11U, callee_saves + live);
+  if (caller_saves >= MIN_MOVEM_REGS || combined < MIN_MOVEM_REGS)
+    return 0;
+  return (combined - caller_saves + 1) * 100;
 }
 
 /* Emit RTL for the "prologue" define_expand.  */
