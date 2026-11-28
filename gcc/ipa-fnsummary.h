@@ -289,7 +289,8 @@ public:
   ipa_call_summary ()
     : predicate (NULL), param (vNULL), call_stmt_size (0), call_stmt_time (0),
       loop_depth (0), live_across_call (0), reach_prob (0),
-      only_call_on_path (false), is_return_callee_uncaptured (false)
+      only_call_on_path (false), path_pair (false),
+      is_return_callee_uncaptured (false)
     {
     }
 
@@ -298,7 +299,7 @@ public:
     predicate (s.predicate), param (s.param), call_stmt_size (s.call_stmt_size),
     call_stmt_time (s.call_stmt_time), loop_depth (s.loop_depth),
     live_across_call (s.live_across_call), reach_prob (s.reach_prob),
-    only_call_on_path (s.only_call_on_path),
+    only_call_on_path (s.only_call_on_path), path_pair (s.path_pair),
     is_return_callee_uncaptured (s.is_return_callee_uncaptured)
   {
   }
@@ -323,6 +324,10 @@ public:
   /* True if a path from the entry of the function to its exit has this
      call and no other one.  */
   bool only_call_on_path;
+  /* True if a path from the entry to the exit has this call and one other
+     call, which has the flag too.  At most two calls of a function have
+     it.  */
+  bool path_pair;
   /* Indicates whether the caller returns the value of it's callee.  */
   bool is_return_callee_uncaptured;
 };

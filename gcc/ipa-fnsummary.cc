@@ -4324,6 +4324,8 @@ inline_update_callee_summaries (struct cgraph_node *node, int depth,
   auto update_path = [&] (cgraph_edge *e, ipa_call_summary *es)
     {
       es->only_call_on_path &= outer->only_call_on_path;
+      /* The flag is for the calls of one function body.  */
+      es->path_pair = false;
       if (!outer->reach_prob && !es->reach_prob)
 	return;
       sreal one = 1;
@@ -4554,8 +4556,25 @@ ipa_merge_fn_summary_after_inlining (struct cgraph_edge *edge)
 		     + es->live_across_call));
   /* A return path of the callee without a call, on a path of TO that has
      no other call, is such a path of TO.  */
-  if (callee_info->call_free_return && es->only_call_on_path)
-    info->call_free_return = true;
+  if (callee_info->call_free_return)
+    {
+      if (es->only_call_on_path)
+	info->call_free_return = true;
+      /* The path through this call and one other call now has the other
+	 call only.  */
+      if (es->path_pair)
+	for (int pass = 0; pass < 2; ++pass)
+	  for (cgraph_edge *e = (pass ? edge->caller->indirect_calls
+				 : edge->caller->callees);
+	       e; e = e->next_callee)
+	    if (e != edge && e->inline_failed)
+	      if (ipa_call_summary *other = ipa_call_summaries->get (e))
+		if (other->path_pair)
+		  {
+		    other->only_call_on_path = true;
+		    other->path_pair = false;
+		  }
+    }
 
   if (callee_info->conds)
     {
@@ -4817,11 +4836,13 @@ read_ipa_call_summary (class lto_input_block *ib, struct cgraph_edge *e,
   unsigned live_across = bp_unpack_value (&bp, 4);
   unsigned reach_prob = bp_unpack_value (&bp, 7);
   bool only_call_on_path = bp_unpack_value (&bp, 1);
+  bool path_pair = bp_unpack_value (&bp, 1);
   if (es)
     {
       es->live_across_call = live_across;
       es->reach_prob = reach_prob;
       es->only_call_on_path = only_call_on_path;
+      es->path_pair = path_pair;
     }
 
   p.stream_in (ib);
@@ -5111,6 +5132,7 @@ write_ipa_call_summary (struct output_block *ob, struct cgraph_edge *e)
   bp_pack_value (&bp, es->live_across_call, 4);
   bp_pack_value (&bp, es->reach_prob, 7);
   bp_pack_value (&bp, es->only_call_on_path, 1);
+  bp_pack_value (&bp, es->path_pair, 1);
   streamer_write_bitpack (&bp);
 
   if (es->predicate)
